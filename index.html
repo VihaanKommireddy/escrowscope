@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <meta charset="utf-8">
+
+  <title>EscrowScope</title>
+
+  <style>
+
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+
+    label { display: block; margin-top: 12px; font-weight: 600; }
+
+    input, textarea { width: 100%; padding: 8px; font-size: 16px; margin-top: 4px; }
+
+    textarea { height: 120px; font-family: monospace; }
+
+    button { margin-top: 16px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+
+    #result { margin-top: 20px; padding: 16px; background: #f4f4f4; white-space: pre-line; border-radius: 8px; }
+
+  </style>
+
+</head>
+
+<body>
+
+  <h1>EscrowScope</h1>
+
+  <p>Why did my mortgage payment just jump? Type in your escrow statement's numbers and check the servicer's math against federal law (12 CFR 1024.17).</p>
+
+  <label>Starting balance ($)</label>
+
+  <input id="start" type="number" value="1500">
+
+  <label>Monthly escrow deposit ($)</label>
+
+  <input id="deposit" type="number" value="400">
+
+  <label>Bills for the year (name, amount, month paid)</label>
+
+  <textarea id="bills">[
+
+  { "name": "property tax 1st half", "amount": 1800, "month": 5 },
+
+  { "name": "homeowners insurance", "amount": 1200, "month": 7 },
+
+  { "name": "property tax 2nd half", "amount": 1800, "month": 11 }
+
+]</textarea>
+
+  <button id="go">Check the math</button>
+
+  <div id="result">Result shows up here.</div>
+
+  <script type="module">
+
+    import { analyze } from "./engine.js";
+
+    document.getElementById("go").addEventListener("click", () => {
+
+      const account = {
+
+        startingBalance: Number(document.getElementById("start").value),
+
+        monthlyDeposit: Number(document.getElementById("deposit").value),
+
+        bills: JSON.parse(document.getElementById("bills").value),
+
+      };
+
+      const r = analyze(account);
+
+      let verdict;
+
+      if (r.surplus >= 50) {
+
+        verdict = "OVER-COLLECTING by $" + r.surplus + ". The servicer owes a refund within 30 days.";
+
+      } else if (r.surplus > 0) {
+
+        verdict = "Small surplus of $" + r.surplus + ". May be refunded or credited.";
+
+      } else if (r.surplus === 0) {
+
+        verdict = "The math checks out exactly.";
+
+      } else {
+
+        verdict = "Shortage of $" + Math.abs(r.surplus) + ". The servicer may collect more.";
+
+      }
+
+      document.getElementById("result").innerText =
+
+        "Total annual bills: $" + r.total +
+
+        "\nCushion cap (1/6): $" + r.cushionCap +
+
+        "\nLow point: $" + r.lowPoint +
+
+        "\n\n" + verdict;
+
+    });
+
+  </script>
+
+</body>
+
+</html>
