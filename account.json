@@ -1,0 +1,9 @@
+{
+  "startingBalance": 1500,
+  "monthlyDeposit": 400,
+  "bills": [
+    { "name": "property tax 1st half", "amount": 1800, "month": 5 },
+    { "name": "homeowners insurance", "amount": 1200, "month": 7 },
+    { "name": "property tax 2nd half", "amount": 1800, "month": 11 }
+  ]
+}
