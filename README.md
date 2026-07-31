@@ -32,4 +32,5 @@ from 12 CFR 1024.17, and the engine passes a test suite of hand-derived cases
 
 ## Status
 
-v0.2: tested terminal engine. Next: a web page so you don't need a terminal.
+v0.3: live web app at https://vihaankommireddy.github.io/escrowscope/
+plus the terminal tool (check.js) and tested engine (node tests.js).
