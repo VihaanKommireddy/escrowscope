@@ -17,6 +17,13 @@ commands: `audit/README.md`.
   cases where nothing is wrong (a refund that may simply be on its way, a figure
   that is "too close to call").
 
+**Stage 3 update (same day, engine at f686075):** all 15 Stage 2 defects are
+verified fixed, and the engine still matches the oracle on 100,000 fresh fuzz
+cases. Re-verification found 5 new items, 2 of them wrong-answer misses: a
+genuinely over-cushioned statement can come out green because of the low-point
+nudge (N1), and a not-current borrower with any deficiency has no upper limit on
+the payment (N2). Details in section 8.
+
 ## 1. Where the law was checked
 
 | Source | What it confirmed |
@@ -239,3 +246,118 @@ Simulated servicers, 20,000 statements each (`stage2-compare-checks.mjs`):
 | Information request: 5 and 30 business days, no fee | § 1024.36(c), (d)(2)(i)(B), (g)(1) | Right, but omits the 15-day extension in (d)(2)(ii) |
 | What the letter contains | (a): borrower's name, loan identification, the error believed to have occurred | Name, loan number and property are there. It never says in words that it believes there is an error (see defect 2). |
 | Whether an escrow-analysis dispute is a covered "error" | Not listed by name; (b)(11) "any other error relating to the servicing" | The page says "can send", which is the honest wording. |
+
+## 8. Stage 3 — re-verification (2026-09-19, engine at commit f686075)
+
+Every fix was checked against the running code and the text it generates, not
+against commit messages. Script: `audit/stage3-reverify.mjs` (35 checks pass).
+
+### The 15 defects and B2
+
+| # | Defect | Status | Evidence |
+|---|---|---|---|
+| A1 | Whole-dollar statement flagged `PAYMENT_ABOVE_MAX` | **Fixed** | Tolerance is now $1.00 per separately rounded part ($1 / $2 / $3). The $4,806.00 repro is no longer flagged and its letter is a request for information. Edges hold for every part count: max + $1.00 / $2.00 / $3.00 passes, one cent more is flagged. 20,000 simulated whole-dollar servicers, now including zero-ish shortages and deficiencies: **0 accused** (the same simulation accuses 79 of 8,000 on the pre-fix engine). Largest lawful overshoot seen: 50¢ / $1.06 / $1.68 for 1 / 2 / 3 parts; the theoretical worst is about $0.50 / $1.63 / $2.38, so the new tolerances cannot be tightened much. **Cost:** a payment that really is over the maximum by up to $2.00 a month (shortage) or $3.00 a month (deficiency + shortage) now passes: at most **$24 / $36 a year**, up from $12. That money stays in the escrow account and comes back as a surplus at the next analysis. |
+| A2 | Letter called "Notice of error" for mere questions | **Fixed** | One rule, `letterKind`. 44 letters generated (30 vectors, 3 examples, each flag alone, the nudge alone, refund-due-but-matching, too-close-but-matching, a mix): the "Notice of error" title, the sentence "I believe the statement contains the error(s) described below", and the notice-of-error next step appear exactly when a discrepancy flag fires (7 notices, 37 requests). `LUMP_SUM_OFFERED`, "payment lower than expected", the nudge, a refund on a matching statement and every too-close case are requests for information. |
+| A3 | `explainJump` blamed deficiency collection when the borrower is not current | **Fixed**, but see new defect N2 | TV23, $300 → $550: the $100 is "deficiency repayment set by your mortgage documents, not by this rule (12 CFR 1024.17(f)(4)(iii))", unexplained $0, compare row "match". 20,000 not-current deficiency accounts: never "more than the federal math supports"; parts still sum exactly. |
+| A4 | Step 2 "the most a servicer may collect" | **Fixed** | "The regular monthly payment is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top." |
+| A5 | "a shortage has to be spread over at least 12 months" | **Fixed** | Tier-correct choices ((f)(3)(i) three, (f)(3)(ii) two), plus the caution that a balance really below $0 on the analysis date can correctly be called a deficiency. |
+| A6 | "may lawfully round" stated as law | **Fixed** | "HUD's 1995 guidance says dollar amounts may be rounded to the nearest dollar (60 FR 8812)". The old phrase is gone from all generated text and from engine code. |
+| A7 | "Held above the legal cushion" on a refundable surplus | **Fixed** | "…before any surplus refund" when there is a surplus; unchanged when there is none. |
+| A8 | § 1024.36 step missed the 15-day extension; clocks stated as unconditional | **Fixed** | Both steps say "generally"; § 1024.35 adds "with reasons"; § 1024.36 now carries the 15 business days. |
+| A9 | "When the math checks out" with nothing compared | **Fixed** | Shown only when `overall === "matches"`. |
+| A10 | "Most payment jumps are lawful" | **Fixed** | "Many". |
+| A11 | "That date is printed on your statement" | **Fixed** | "usually printed". |
+| A12 | `paymentJumpDecomposition` parts did not sum | **Fixed** | Four parts (bills, shortage repayment, deficiency repayment, last year's add-on dropping off) sum to exactly new − old on 20,000 random `priorYear` blocks (10,069 with an add-on in last year's payment, 4,221 negative jumps, 3,336 deficiency accounts, 458 of them not current). "New" is now the payment while a deficiency is being repaid. TV18's pinned values are unchanged. |
+| A13 | Label "Your bills changed" | **Fixed** | "Bills now versus your old payment". |
+| A14 | Threw on absurd unvalidated numbers | **Fixed** | 45 absurd values in every statement field: nothing throws, none is treated as a real number. |
+| A15 | 888-995-HOPE not on the linked page | **Fixed** | The counselor step carries its link and no phone; 855-411-2372 (printed on the CFPB page) stays. |
+| B2 | Low-point mix-up nudge (director's rule) | **Works as written — and opens a real miss, see N1** | An over-the-cap minimum that equals the federal low point (within $7) draws one nudge and a "not-compared" row, never `CUSHION_OVER_CAP`; the nudge alone leaves `overall` at "not-provided". |
+
+### B2, quantified
+
+Simulated servicers that **really** hold a cushion over the cap (by $7.01 to
+about a month's payment), 20,000 each:
+
+| Where the balance sits | `CUSHION_OVER_CAP` hidden behind the nudge |
+|---|---:|
+| On the servicer's own target, within $7 (the normal state of an account whose bills came in as projected) | **100.0%** (19,996 of 20,000) |
+| Within $100 of the servicer's target | 7.1% |
+| Anywhere within $3,000 | 0.2% |
+
+Why: a servicer that targets a cushion of X sets things up so the lowest month
+lands on X. If last year went to plan, the federal low point **is** X. So for a
+servicer that over-cushions as a habit, the mix-up rule fires almost every time.
+
+When the flag is hidden, does something else catch it?
+
+| The homeowner also typed | Caught by another discrepancy flag | Banner |
+|---|---:|---|
+| the claimed shortage / surplus / "none" | **100%** (`KIND_DIFFERS` or `AMOUNT_DIFFERS`) | amber |
+| only the new payment | **0%** (`PAYMENT_ABOVE_MAX` never fires: the oversized cushion is already funded, so the payment is just bills ÷ 12) | **green "Matches"** for every not-current borrower (19,997 of 19,997) and for current borrowers when the excess is under about $43 (5,638 of 19,996); amber for the rest, but only because of the refund banner |
+| nothing else | 0% | neutral (teal) |
+
+### New defects found in Stage 3
+
+**N1 — wrong-answer (miss): a genuinely over-cushioned statement comes out
+fully green.** Caused by B2 plus "a matching payment row makes `overall`
+matches".
+*Repro:* bills $3,600 in June and $3,600 in December, balance $1,800.00, a
+payment was more than 30 days late. Statement: required minimum $1,800.00 (the
+cap is $1,200.00), new payment $600.00. Engine: cushion row "not-compared",
+no flags, one nudge, `overall` "matches", banner green "Matches: Your
+statement's math matches the federal method." The cushion is $600 over the
+legal limit.
+*Fix:* (1) while a nudge is open and no flag has fired, `overall` must not be
+"matches" — use a neutral "one number to double-check" state, never green.
+(2) If the claimed amount was typed and it disagrees with the federal figure by
+about (typed minimum − cap), that is evidence the typed number IS the real
+minimum: raise `CUSHION_OVER_CAP` and keep the "the cushion is the likely
+reason" sentence.
+
+**N2 — wrong-answer (miss): borrower not current + any deficiency = no upper
+limit on the payment.** Pre-existing; missed in Stage 2.
+*Repro:* one bill of $3,600 in June, balance −$10.00, a payment was 30+ days
+late. Federal: base $300.00, shortage $2,400.00 (÷ 12 = $200.00), deficiency
+$10.00. A new payment of $1,000.00 — or $5,000.00 — is a "match", `overall`
+"matches", banner green, and `explainJump` calls $500.00 a month "deficiency
+repayment set by your mortgage documents" for a $10.00 deficiency.
+(f)(4)(iii) hands the **schedule** to the mortgage documents; it does not make
+the amount unlimited. The most that can be deficiency recovery in any month is
+the whole deficiency.
+*Fix:* when not current, the ceiling is base + shortage ÷ 12 + the **whole**
+deficiency (plus tolerance). Above that: `PAYMENT_ABOVE_MAX`, and in
+`explainJump` the excess is "not explained".
+
+**N3 — misleading-text: "Your statement matches the federal math. It shows a
+surplus of $300.00, which the rule says is refunded within 30 days."** appears
+whenever the compared rows match and the federal math finds a refundable
+surplus — even when the homeowner typed only the payment and no surplus at all.
+*Repro:* TV01's account with `{ newMonthlyEscrowCents: 40000 }`.
+*Fix:* say "It shows" only when the claimed row is a surplus and matches;
+otherwise "The numbers you typed match. The federal math also finds a surplus
+of $300.00 …".
+
+**N4 — cosmetic:** in a notice of error that also carries a pure question
+(lump sum, refund timing, too close to call), every numbered item sits under
+"I believe the statement contains the error(s) described below". Put questions
+under their own "I also have a question" heading.
+
+**N5 — cosmetic:** with no statement numbers typed, the letter still says "My
+numbers line up with the statement." Nothing was compared. Say "For my
+records, please send me…" only.
+
+### Re-run, exact counts (engine at f686075)
+
+| Run | Result |
+|---|---|
+| `check-vectors.mjs` | 30 of 30 vs the oracle; 30 of 30 vs the engine |
+| `prove-harness.mjs --n 5000` | 2 correct engines pass; 12 of 12 planted bugs caught; 4 of 4 `nearLine` convention variants named (exit 3) |
+| `fuzz.mjs`, seeds 20260919, 1, 7, 424242, 987654321 × 20,000 | **100,000 cases: 0 threw, 0 disagree with the oracle, 0 invariant failures, 0 soft diffs, 0 convention diffs** |
+| `stage2-code-checks.mjs` | all pass (152 corruptions rejected; 3,000 extreme accounts equal the oracle) |
+| `stage2-compare-checks.mjs --n 20000` (updated to A1 / A3 / A12 / B2) | all hard checks pass; lawful-to-the-cent servicers 0 of 20,000 accused; whole-dollar servicers 0 of 20,000 accused; every unlawful family caught. Run against the **pre-fix** engine (0677461^) the same script fails 7 hard checks, so it still catches regressions. |
+| `stage3-reverify.mjs --n 20000` | 35 of 35 fix checks pass; 5 new findings above |
+
+The project's own suite shows 575 of 577 passing; the two failures
+("banned-text pattern is proven", "sw.js CACHE_NAME is up to date") belong to
+uncommitted service-worker / page work in progress, not to `engine/` or
+`audit/`.

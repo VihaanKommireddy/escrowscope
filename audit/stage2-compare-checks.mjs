@@ -2,6 +2,11 @@
 //   projectWithPayment, paymentJumpDecomposition, explainJump, compareWithStatement flags, refundDeadline.
 // Method for compareWithStatement: SIMULATED SERVICERS. A lawful servicer's statement must draw no
 // accusing flag (false accusation); an unlawful one must draw the right flag (miss).
+// Updated in Stage 3 to the engine's deliberate new rules, so it PASSES on correct behavior and FAILS on a regression:
+//   A1  payment tolerance is $1.00 per separately rounded part of the maximum ($1 / $2 / $3)
+//   A3  explainJump never blames deficiency collection when the borrower is not current
+//   A12 paymentJumpDecomposition has FOUR parts that must add up to exactly (new - old)
+//   B2  an over-the-cap minimum that equals the federal low point draws a nudge + a 'not-compared' row instead of CUSHION_OVER_CAP
 // Usage: node stage2-compare-checks.mjs [path-to-engine/index.js] [--n 20000]
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolve, dirname, join } from 'node:path';
@@ -22,6 +27,9 @@ let failures = 0;
 const section = (t) => console.log(`\n=== ${t} ===`);
 const check = (ok, label, detail = '') => { if (!ok) failures++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${detail ? '  ' + detail : ''}`); };
 const finding = (label, detail = '') => console.log(`NOTE ${label}${detail ? '  ' + detail : ''}`);
+
+// A1: $1.00 for each separately rounded part of OUR maximum: bills/12, + shortage/12 if any, + deficiency/2 if any.
+const paymentTolerance = (r) => 100 * (1 + (r.newMonthlyEscrowPayment.shortageSpreadOver12Cents > 0 ? 1 : 0) + (r.newMonthlyEscrowPayment.deficiencySpreadCents > 0 ? 1 : 0));
 
 function randomAccount(opts = {}) {
   const n = int(1, 6); const d = [];
@@ -67,16 +75,15 @@ section('paymentJumpDecomposition (analyze, needs priorYear)');
     const oldHadShortageAddOn = rnd() < 0.5; const oldMonthly = oldBase + (oldHadShortageAddOn ? int(100, 20000) : 0);
     a.priorYear = { annualDisbursementsCents: oldD, monthlyEscrowCents: oldMonthly, cushionCents: Math.floor(oldD / 6), stepTwoAddCents: int(0, 300000) };
     const r = E.analyze(a); const j = r.paymentJumpDecomposition; cases++;
-    const parts = j.billsWentUpCents + j.shortageRepaymentCents; const jump = j.newMonthlyEscrowCents - j.oldMonthlyEscrowCents;
+    const parts = j.billsWentUpCents + j.shortageRepaymentCents + j.deficiencyRepaymentCents + j.lastYearAddOnDroppedOffCents; const jump = j.newMonthlyEscrowCents - j.oldMonthlyEscrowCents;
     if (parts !== jump) { sumBad++; if (!oldHadShortageAddOn) sumBadWhenOldIsPlain++; if (!example) example = { old: oldMonthly, oldBillsDiv12: oldBase, new: j.newMonthlyEscrowCents, billsWentUp: j.billsWentUpCents, shortageRepayment: j.shortageRepaymentCents, partsSum: parts, realJump: jump }; }
     const b = j.shortageBreakdown; const bsum = b.cushionRoseCents + b.timingNeedRoseCents + b.lastYearCameInUnderProjectionCents;
     if (bsum !== r.requiredStartingBalanceCents - a.startingBalanceCents) breakdownBad++;
-    if (r.newMonthlyEscrowPayment.deficiencySpreadCents > 0 && j.newMonthlyEscrowCents !== r.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents) deficiencyNewOmitsSpread++;
+    if (j.newMonthlyEscrowCents !== r.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents) deficiencyNewOmitsSpread++;
   }
   check(breakdownBad === 0, `${cases} cases: shortageBreakdown's three pieces add up exactly to (required start - balance)`);
-  check(sumBadWhenOldIsPlain === 0, 'when last year\'s payment was exactly last year\'s bills/12: billsWentUp + shortageRepayment == new - old, exactly');
-  if (sumBad > 0) finding(`paymentJumpDecomposition parts do NOT add up to (new - old) in ${sumBad} of ${cases} cases: every case where last year's payment included its own shortage add-on. It has no remainder term.`, JSON.stringify(example));
-  if (deficiencyNewOmitsSpread > 0) finding(`in ${deficiencyNewOmitsSpread} deficiency cases paymentJumpDecomposition.newMonthlyEscrowCents leaves out the deficiency repayment (it is base + shortage/12 only), so it is not the payment the borrower sees in months 1-2.`);
+  check(sumBad === 0, `A12: ${cases} cases (half with an add-on in last year's payment): billsWentUp + shortageRepayment + deficiencyRepayment + lastYearAddOnDroppedOff == new - old, exactly`, sumBad ? `${sumBad} wrong, e.g. ${JSON.stringify(example)}` : '');
+  check(deficiencyNewOmitsSpread === 0, 'A12: its "new payment" is the payment while a deficiency is being repaid (base + shortage/12 + deficiency/2)', deficiencyNewOmitsSpread ? `${deficiencyNewOmitsSpread} wrong` : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -94,11 +101,11 @@ section('explainJump: four parts must add up to exactly (new - old), always');
     if (r.deficiencyCents > 0 && !a.borrowerCurrent) {
       const st2 = { currentMonthlyEscrowCents: r.baseMonthlyPaymentCents, newMonthlyEscrowCents: r.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents + Math.ceil(r.deficiencyCents / 2) };
       const j2 = E.explainJump(r, st2); const un = j2.parts.find((p) => p.key === 'unexplained');
-      if (un.cents > 100 && /more than the federal math supports/.test(un.sentence)) { notCurrentDeficiencyBlamed++; if (!ex) ex = { account: a, statement: st2, sentence: un.sentence }; }
+      if (j2.parts.some((p) => /more than the federal math supports/.test(p.sentence))) { notCurrentDeficiencyBlamed++; if (!ex) ex = { account: a, statement: st2, sentence: un.sentence }; }
     }
   }
   check(bad === 0, `${N} random old/new payments (${negJumps} negative jumps, ${defCases} deficiency accounts): parts sum exactly, whole cents, no -0`);
-  if (notCurrentDeficiencyBlamed) finding(`explainJump: borrower NOT current + deficiency being collected through the payment -> ${notCurrentDeficiencyBlamed} cases where the deficiency collection is labelled "more than the federal math supports", although (f)(4)(iii) puts no federal limit on it (compare.js treats the same payment as a match).`, JSON.stringify(ex).slice(0, 600));
+  check(notCurrentDeficiencyBlamed === 0, 'A3: borrower not current + deficiency collected through the payment is never labelled "more than the federal math supports" ((f)(4)(iii))', notCurrentDeficiencyBlamed ? `${notCurrentDeficiencyBlamed} cases, e.g. ${JSON.stringify(ex).slice(0, 400)}` : '');
   check(E.explainJump({}, null) === null && E.explainJump(E.analyze(randomAccount()), { newMonthlyEscrowCents: 5 }) === null, 'returns null without both payments');
 }
 
@@ -138,7 +145,7 @@ function lawfulExactStatement(a, r) {
     const a = withOutcome(randomAccount({ cushionMonths: pick([2, 2, 2, 1, 0]) }), pick(['bigShortage', 'smallShortage', 'surplus', 'deficiency', 'none', 'none']));
     const r = E.analyze(a); const { st, how } = lawfulExactStatement(a, r);
     const c = E.compareWithStatement(r, st);
-    let bad = false;
+    let bad = (c.nudges ?? []).length > 0; if (bad) tally(flagsSeen, 'NUDGE');
     for (const f of c.flags) { const accusing = ACCUSING.includes(f.kind) || (f.kind === 'AMOUNT_DIFFERS' && f.rowKey !== 'newMonthlyEscrow'); if (accusing) { bad = true; tally(flagsSeen, f.kind + (f.rowKey ? ':' + f.rowKey : '')); } else tally(softSeen, f.kind + ':' + f.rowKey); }
     if (bad) { accused++; if (examples.length < 4) examples.push({ account: a, statement: st, how, flags: c.flags.map((f) => f.kind + ' ' + f.sentence.slice(0, 160)) }); }
   }
@@ -151,8 +158,10 @@ section('compareWithStatement vs a lawful servicer that ROUNDS EVERY FIGURE TO W
 {
   const flagsSeen = {}; let accused = 0; let maxPayGap = 0; const examples = []; let total = 0;
   for (let i = 0; i < N; i++) {
-    const a = withOutcome(randomAccount({ current: true }), pick(['bigShortage', 'bigShortage', 'smallShortage', 'surplus', 'none']));
-    if (a.startingBalanceCents < 0) continue; total++;
+    const fam = pick(['bigShortage', 'bigShortage', 'smallShortage', 'surplus', 'none', 'nearZero', 'nearZero', 'deficiency']);
+    const a = withOutcome(randomAccount({ current: true }), fam);
+    if (fam === 'nearZero') a.startingBalanceCents = Math.max(0, oracle(a).requiredStartingBalanceCents + int(-900, 900));
+    if (a.startingBalanceCents < 0 && fam !== 'deficiency') continue; total++;
     const r = E.analyze(a); const D = r.annualDisbursementsCents;
     const P$ = halfUp(D, 1200) * 100; // bills / 12, to the nearest dollar
     let t = 0; let min = 0; for (let m = 1; m <= 12; m++) { t += P$ - r.table[m - 1].disbursementCents; if (t < min) min = t; }
@@ -160,7 +169,8 @@ section('compareWithStatement vs a lawful servicer that ROUNDS EVERY FIGURE TO W
     const req$ = -min + cushion$; const S = a.startingBalanceCents;
     const st = { requiredMinimumBalanceCents: cushion$, shortageSpreadMonths: 12 };
     let pay = P$;
-    if (S < req$) { const sh$ = halfUp(req$ - S, 100) * 100; st.claimedKind = 'shortage'; st.claimedAmountCents = sh$; pay += halfUp(sh$, 1200) * 100; }
+    if (S < 0) { const def$ = halfUp(-S, 100) * 100; const sh$ = halfUp(req$, 100) * 100; st.claimedKind = 'deficiency'; st.claimedAmountCents = def$; pay += halfUp(sh$, 1200) * 100 + halfUp(def$, 200) * 100; }
+    else if (S < req$) { const sh$ = halfUp(req$ - S, 100) * 100; st.claimedKind = 'shortage'; st.claimedAmountCents = sh$; pay += halfUp(sh$, 1200) * 100; }
     else if (S > req$) { st.claimedKind = 'surplus'; st.claimedAmountCents = halfUp(S - req$, 100) * 100; }
     else st.claimedKind = 'none';
     st.newMonthlyEscrowCents = pay;
@@ -168,8 +178,8 @@ section('compareWithStatement vs a lawful servicer that ROUNDS EVERY FIGURE TO W
     const acc = c.flags.filter((f) => ACCUSING.includes(f.kind) || (f.kind === 'AMOUNT_DIFFERS' && f.rowKey !== 'newMonthlyEscrow'));
     if (acc.length) { accused++; acc.forEach((f) => tally(flagsSeen, f.kind)); const pf = acc.find((f) => f.kind === 'PAYMENT_ABOVE_MAX'); if (pf) maxPayGap = Math.max(maxPayGap, pf.amountCents); if (examples.length < 2) examples.push({ account: a, statement: st, flags: acc.map((f) => f.sentence.slice(0, 230)) }); }
   }
-  if (accused === 0) check(true, `${total} whole-dollar statements: none accused`);
-  else { finding(`FALSE ACCUSATIONS: ${accused} of ${total} whole-dollar-rounding statements drew an accusing flag: ${JSON.stringify(flagsSeen)}. Largest "over the maximum" gap reported: ${maxPayGap} cents a month.`); examples.forEach((e) => console.log('     example: ' + JSON.stringify(e).slice(0, 1000))); }
+  check(accused === 0, `A1: ${total} whole-dollar statements (big, small and zero-ish shortages, surpluses, deficiencies): none accused`, accused ? `${accused} accused: ${JSON.stringify(flagsSeen)}, largest over-the-maximum gap ${maxPayGap} cents` : '');
+  examples.forEach((e) => console.log('     example: ' + JSON.stringify(e).slice(0, 1000)));
 }
 
 section('compareWithStatement vs UNLAWFUL statements (no flag = a miss) and the tolerance edges');
@@ -180,19 +190,29 @@ section('compareWithStatement vs UNLAWFUL statements (no flag = a miss) and the 
   for (let i = 0; i < Math.floor(N / 4); i++) {
     // 1. cushion over the cap
     { const a = withOutcome(randomAccount({ cushionMonths: pick([2, 1, 0]) }), 'bigShortage'); const r = E.analyze(a);
-      score('cushion over cap by > $7.00 -> CUSHION_OVER_CAP', has(E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + int(701, 90000) }), 'CUSHION_OVER_CAP'));
+      { const typed = r.cushionCapCents + int(701, 90000); const c = E.compareWithStatement(r, { requiredMinimumBalanceCents: typed }); const isLowPoint = Math.abs(typed - r.lowPoint.projectedBalanceCents) <= 700; const nudged = (c.nudges ?? []).length === 1 && c.rows[0].status === 'not-compared' && c.overall !== 'look-here';
+        score('cushion over cap by > $7.00 -> CUSHION_OVER_CAP, or (B2) the nudge when the typed number is the federal low point', isLowPoint ? nudged && !has(c, 'CUSHION_OVER_CAP') : has(c, 'CUSHION_OVER_CAP') && (c.nudges ?? []).length === 0); }
       tally(edge, 'cushion over by exactly $7.00 flagged: ' + has(E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + 700 }), 'CUSHION_OVER_CAP'));
-      tally(edge, 'cushion over by $7.01 flagged: ' + has(E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + 701 }), 'CUSHION_OVER_CAP')); }
+      { const c = E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + 701 }); tally(edge, 'cushion over by $7.01 flagged (or, B2, nudged because it equals the low point): ' + (has(c, 'CUSHION_OVER_CAP') || ((c.nudges ?? []).length === 1 && Math.abs(r.cushionCapCents + 701 - r.lowPoint.projectedBalanceCents) <= 700))); } }
+    // 1b. B2: a servicer that really holds an oversized cushion X, with the balance sitting on the servicer's own target (so the federal low point equals X)
+    { const a = randomAccount({ current: pick([true, false]) }); const ref = oracle(a); const X = ref.cushionCapCents + int(701, 90000); const noise = int(-700, 700); a.startingBalanceCents = ref.stepTwoAddCents + X + noise; const r = E.analyze(a);
+      const claim = noise < 0 ? { claimedKind: 'shortage', claimedAmountCents: -noise } : noise > 0 ? { claimedKind: 'surplus', claimedAmountCents: noise } : { claimedKind: 'none' };
+      const alone = E.compareWithStatement(r, { requiredMinimumBalanceCents: X }); const withClaim = E.compareWithStatement(r, { requiredMinimumBalanceCents: X, ...claim });
+      score('B2: over-the-cap minimum that equals the federal low point -> one nudge, row "not-compared", no CUSHION_OVER_CAP, and the nudge alone never makes overall "matches" or "look-here"', (alone.nudges ?? []).length === 1 && alone.rows[0].status === 'not-compared' && !has(alone, 'CUSHION_OVER_CAP') && alone.overall === 'not-provided');
+      score('B2: ...and when the servicer\'s claimed shortage/surplus/none is typed too, KIND_DIFFERS or AMOUNT_DIFFERS still fires', has(withClaim, 'KIND_DIFFERS') || has(withClaim, 'AMOUNT_DIFFERS')); }
     // 2. payment above the lawful maximum (current borrower, and NOT-current borrower with a shortage only)
     for (const current of [true, false]) { const a = withOutcome(randomAccount({ current }), pick(['bigShortage', 'smallShortage', 'surplus', 'none'])); const r = E.analyze(a); const max = r.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents;
-      score(`payment above the maximum by > $1.00 (borrower current=${current}, no deficiency) -> PAYMENT_ABOVE_MAX`, has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + int(101, 30000) }), 'PAYMENT_ABOVE_MAX'));
-      tally(edge, 'payment over by exactly $1.00 flagged: ' + has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + 100 }), 'PAYMENT_ABOVE_MAX'));
-      tally(edge, 'payment over by $1.01 flagged: ' + has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + 101 }), 'PAYMENT_ABOVE_MAX')); }
+      const tol = paymentTolerance(r);
+      score(`payment above the maximum by more than the scaled tolerance (borrower current=${current}, no deficiency) -> PAYMENT_ABOVE_MAX`, has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + tol + int(1, 30000) }), 'PAYMENT_ABOVE_MAX'));
+      score(`A1 edge, ${tol / 100} part(s): exactly ${tol / 100}.00 over is NOT flagged`, !has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + tol }), 'PAYMENT_ABOVE_MAX'));
+      score(`A1 edge, ${tol / 100} part(s): ${tol / 100}.01 over IS flagged`, has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + tol + 1 }), 'PAYMENT_ABOVE_MAX')); }
+    { const a = withOutcome(randomAccount({ current: true }), 'deficiency'); const r = E.analyze(a); const max = r.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents; const tol = paymentTolerance(r);
+      score(`A1 edge, deficiency account (${tol / 100} parts), borrower current: exactly the tolerance passes, one cent more is flagged`, !has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + tol }), 'PAYMENT_ABOVE_MAX') && has(E.compareWithStatement(r, { newMonthlyEscrowCents: max + tol + 1 }), 'PAYMENT_ABOVE_MAX')); }
     // 3. shortage repaid too fast
     for (const current of [true, false]) { const a = withOutcome(randomAccount({ current }), 'bigShortage'); const r = E.analyze(a); if (r.shortageCents <= r.baseMonthlyPaymentCents + 700) continue; const m = int(1, 11);
       score(`large shortage spread over 1-11 months (current=${current}) -> SPREAD_TOO_SHORT`, has(E.compareWithStatement(r, { shortageSpreadMonths: m, claimedKind: pick(['shortage', undefined]), claimedAmountCents: r.shortageCents, newMonthlyEscrowCents: r.baseMonthlyPaymentCents + halfUp(r.shortageCents, m) }), 'SPREAD_TOO_SHORT'));
-      const fasterBy = halfUp(r.shortageCents, m) - halfUp(r.shortageCents, 12); // only expect the payment flag when the faster plan costs more than the $1.00 tolerance
-      if (fasterBy > 100) score(`...and the faster payment itself (more than $1.00 a month above the 12-month plan) -> PAYMENT_ABOVE_MAX`, has(E.compareWithStatement(r, { shortageSpreadMonths: m, newMonthlyEscrowCents: r.baseMonthlyPaymentCents + halfUp(r.shortageCents, m) }), 'PAYMENT_ABOVE_MAX'));
+      const fasterBy = halfUp(r.shortageCents, m) - halfUp(r.shortageCents, 12); // only expect the payment flag when the faster plan costs more than the scaled tolerance
+      if (fasterBy > paymentTolerance(r)) score(`...and the faster payment itself (above the 12-month plan by more than the tolerance) -> PAYMENT_ABOVE_MAX`, has(E.compareWithStatement(r, { shortageSpreadMonths: m, newMonthlyEscrowCents: r.baseMonthlyPaymentCents + halfUp(r.shortageCents, m) }), 'PAYMENT_ABOVE_MAX'));
       score('lump sum printed on the statement for a large shortage -> LUMP_SUM_OFFERED', has(E.compareWithStatement(r, { lumpSumOfferedOnStatement: true }), 'LUMP_SUM_OFFERED')); }
     { const a = withOutcome(randomAccount(), 'smallShortage'); const r = E.analyze(a); if (r.shortageCents > 700 && r.shortageCents < r.baseMonthlyPaymentCents - 700 && r.deficiencyCents === 0) {
       score('small shortage spread over 2-11 months -> SPREAD_TOO_SHORT (SPEC D6)', has(E.compareWithStatement(r, { shortageSpreadMonths: int(2, 11) }), 'SPREAD_TOO_SHORT'));

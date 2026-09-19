@@ -30,6 +30,10 @@ parts the oracle does not cover:
 | `stage2-code-checks.mjs` | parseDollars attack strings, month conversion for every start month, "validateAccount really guards analyze", extreme amounts, frozen-input (no mutation) test, static scan for Date / random / globals / division. |
 | `stage2-compare-checks.mjs` | `projectWithPayment`, `paymentJumpDecomposition`, `explainJump`, `refundDeadline` (every date 1900–2999), and `compareWithStatement` against **simulated servicers**: lawful ones must not be accused, unlawful ones must be caught. |
 
+| `stage3-reverify.mjs` | Stage 3: re-verifies each of the 15 audit fixes (A1–A15) against generated text and code paths, and measures how often the B2 "low-point mix-up" nudge hides a real oversized cushion. |
+
+`stage2-compare-checks.mjs` was updated in Stage 3 to the engine's deliberate new rules (A1 scaled payment tolerance, A3, A12 four-part sum, B2 nudge). It passes on the current engine and fails 7 hard checks on the pre-fix engine.
+
 Two changes were made to `fuzz.mjs` / `compare.mjs` in Stage 2 at the
 director's request (SPEC E3a.6): `result.inputs` is left out of the "bill order
 changes nothing" check, and extra descriptive keys on `nearLine` are ignored.
@@ -55,6 +59,7 @@ node prove-harness.mjs --n 5000
 # 4. Stage 2 checks of the rest of the engine
 node stage2-code-checks.mjs
 node stage2-compare-checks.mjs --n 20000
+node stage3-reverify.mjs --n 20000
 #    "NOTE" lines are findings to read; "FAIL" lines are hard failures.
 
 # 5. Rebuild the hand-derived vectors and re-check them
