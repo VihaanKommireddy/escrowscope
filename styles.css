@@ -1785,6 +1785,25 @@ code,
   color: var(--color-flag);
 }
 
+.flag-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flag-card-tag svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.flag-card-jump a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--weight-semibold);
+}
+
 .flag-card-amount {
   font-family: var(--font-mono);
   font-size: 20px;
@@ -2258,6 +2277,7 @@ code,
   .btn,
   .eyebrow,
   .nudges,
+  .flag-card-jump,
   .block-lede,
   .page-problem,
   .page-alert,

@@ -265,6 +265,10 @@ export function statusWords(status) {
 
 const FLAG_TAGS = {
   CUSHION_OVER_CAP: "Cushion above the limit",
+  // The typed "required minimum" might be a real over-the-limit cushion, or it
+  // might be the lowest projected balance copied into the wrong box. The engine
+  // cannot tell which, so it asks the visitor to check the number.
+  CUSHION_MAYBE_OVER_CAP: "Check this number",
   PAYMENT_ABOVE_MAX: "Payment above the federal math",
   AMOUNT_DIFFERS: "The amounts differ",
   KIND_DIFFERS: "A different conclusion",
@@ -282,7 +286,14 @@ function statusChip(status) {
   return el("span", { className: "status status--" + words.look }, [icon(words.iconName), words.text]);
 }
 
-function renderCompare(check) {
+// The small label on a flag card. A kind this page has never heard of still gets
+// a full card: the default label, the amber mark, and the engine's own sentence.
+export function flagTag(kind) {
+  if (typeof kind === "string" && Object.prototype.hasOwnProperty.call(FLAG_TAGS, kind)) return FLAG_TAGS[kind];
+  return "Look here";
+}
+
+function renderCompare(check, fieldToId) {
   const comparison = check.comparison;
   const box = byId("compare-body");
   clear(box);
@@ -331,7 +342,7 @@ function renderCompare(check) {
     const list = el("ul", { className: "flag-list" });
     for (const flag of comparison.flags) {
       const head = el("div", { className: "flag-card-head" }, [
-        el("span", { className: "flag-card-tag", text: FLAG_TAGS[flag.kind] || "Look here" }),
+        el("span", { className: "flag-card-tag" }, [icon("flag"), flagTag(flag.kind)]),
       ]);
       if (typeof flag.amountCents === "number" && flag.amountCents !== 0) {
         head.append(el("span", { className: "flag-card-amount", text: formatCents(flag.amountCents) }));
@@ -340,6 +351,12 @@ function renderCompare(check) {
       // Most flag sentences already end with their cite; only add it when missing.
       if (flag.cite && !String(flag.sentence).includes(flag.cite)) {
         card.append(el("p", { className: "cite", text: "Source: " + flag.cite }));
+      }
+      // Some flags name the box they are about: offer the same jump link the
+      // error summary uses.
+      const targetId = fieldToId && typeof flag.field === "string" ? fieldToId(flag.field) : "";
+      if (targetId) {
+        card.append(el("p", { className: "flag-card-jump" }, [el("a", { text: "Go to that box", attrs: { href: "#" + targetId } })]));
       }
       list.append(card);
     }
@@ -623,7 +640,7 @@ export function renderResults(check, options) {
     function () { renderRefundClock(check); },
     function () { renderNudges(check, settings.fieldToId); },
     function () { renderThreeNumbers(check); },
-    function () { renderCompare(check); },
+    function () { renderCompare(check, settings.fieldToId); },
     function () { renderChartBlock(check); },
     function () { renderJumpBlock(check); },
     function () { renderPayment(check); },

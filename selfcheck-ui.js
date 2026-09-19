@@ -1,4 +1,4 @@
-// selfcheck-ui.js — "Don't take our word for it" (SPEC D1).
+// selfcheck-ui.js — the "check the checker" section (SPEC D1).
 //
 // One button runs the page's own calculator against every worked case in
 // engine/vectors.js, right here in the visitor's browser, and shows every
@@ -28,6 +28,102 @@ import {
   escrowToCalendarMonth,
 } from "./engine/index.js";
 
+// ---------- where each worked case came from ----------
+
+// The page tells the visitor where its test cases came from, so these two lists
+// have to be exact. They hold IDS, never counts: every number the page prints is
+// the length of a list, so nothing here goes stale when cases are added.
+//
+// ORIGINAL_CASE_IDS: the expected numbers of these cases were set from the
+// regulation's own method BEFORE this page's calculator existed. The calculator
+// had to match them, not the other way around.
+const ORIGINAL_CASE_IDS = [
+  "TV01",
+  "TV02",
+  "TV03",
+  "TV04",
+  "TV05",
+  "TV06",
+  "TV07",
+  "TV08",
+  "TV09",
+  "TV10",
+  "TV10b",
+  "TV11",
+  "TV12",
+  "TV13",
+  "TV14",
+  "TV15",
+  "TV16",
+  "TV17",
+  "TV18",
+  "TV19",
+  "TV20",
+  "TV21",
+];
+
+// INDEPENDENT_CASE_IDS: added later, after the calculator existed, by an
+// independent checker who had not seen the calculator's code.
+const INDEPENDENT_CASE_IDS = ["TV22", "TV23", "TV24", "TV25", "TV26", "TV27", "TV28", "TV29"];
+
+// Sort the cases into three buckets by id. A case whose id is on NEITHER list
+// (one added after this file was last touched) goes into "other", and the page
+// then makes no claim at all about where it came from.
+// A plain function of its input, so tests/shell.test.js can run it in Node.
+export function caseGroups(vectors) {
+  const groups = { original: [], independent: [], other: [] };
+  for (const vector of vectors) {
+    if (ORIGINAL_CASE_IDS.includes(vector.id)) {
+      groups.original.push(vector.id);
+    } else if (INDEPENDENT_CASE_IDS.includes(vector.id)) {
+      groups.independent.push(vector.id);
+    } else {
+      groups.other.push(vector.id);
+    }
+  }
+  return groups;
+}
+
+// The sentences the page shows, one per bucket, and only for a bucket that has
+// something in it. Every number comes from the length of a list.
+export function caseOriginSentences(groups) {
+  const sentences = [];
+  const original = groups.original.length;
+  const independent = groups.independent.length;
+  const other = groups.other.length;
+
+  if (original === 1) {
+    sentences.push(
+      "1 of these cases came first. Its expected numbers were set from the regulation’s own method before " +
+        "this page’s calculator existed, so the calculator had to match it, not the other way around."
+    );
+  } else if (original > 1) {
+    sentences.push(
+      original +
+        " of these cases came first. Their expected numbers were set from the regulation’s own method before " +
+        "this page’s calculator existed, so the calculator had to match them, not the other way around."
+    );
+  }
+
+  // "N more were added later…", or "N were added later…" when nothing was said
+  // before it.
+  function addedLater(count) {
+    const more = sentences.length > 0 ? " more" : "";
+    const verb = count === 1 ? " was" : " were";
+    return count + more + verb + " added later";
+  }
+
+  if (independent > 0) {
+    sentences.push(addedLater(independent) + " by an independent checker who had not seen the calculator’s code.");
+  }
+
+  // No claim about where these came from, on purpose.
+  if (other > 0) {
+    sentences.push(addedLater(other) + ".");
+  }
+  return sentences;
+}
+
 // The two cases that get a tag and a sentence, and sit at the top of the list.
 const PINNED_IDS = ["TV02", "TV01"];
 const CALLOUTS = {
@@ -54,7 +150,7 @@ const PLAIN_LABELS = {
   shortageCents: "Shortage (money below the target)",
   deficiencyCents: "Deficiency (a balance below $0)",
   "lowPoint.projectedBalanceCents": "Lowest projected balance of the year",
-  "lowPoint.month": "Month of the low point (counted from the start of the escrow year)",
+  "lowPoint.month": "Month of the low point (counted from the first of the 12 months)",
   "lowPoint.calendarMonth": "Month of the low point (calendar month)",
   "lowPoint.lowestTargetBalanceCents": "Lowest target balance of the year",
   classification: "Verdict code",
@@ -268,7 +364,7 @@ function buildInputsBlock(caseId, account) {
   const cushion = account.cushionMonths === 1 ? "1 month of bills" : account.cushionMonths + " months of bills";
   block.append(
     el("dl", { className: "selfcheck-facts" }, [
-      factRow("First month of the escrow year", monthName(account.startMonth), false),
+      factRow("First month of the 12 months", monthName(account.startMonth), false),
       factRow("Starting balance", formatCents(account.startingBalanceCents), true),
       factRow("Cushion allowed", cushion, false),
       factRow("Borrower up to date on payments", account.borrowerCurrent ? "Yes" : "No", false),
@@ -281,7 +377,7 @@ function buildInputsBlock(caseId, account) {
     body.append(
       el("tr", {}, [
         el("th", { text: bill.label, attrs: { scope: "row" } }),
-        el("td", { text: monthName(calendarMonth) + " (month " + bill.month + " of the escrow year)" }),
+        el("td", { text: monthName(calendarMonth) + " (month " + bill.month + " of the 12)" }),
         el("td", { className: "num", text: formatCents(bill.amountCents) }),
       ])
     );
@@ -703,12 +799,12 @@ export function initSelfCheck(container) {
   clear(container);
   const total = VECTORS.length;
 
+  // Where the cases came from, with every count read from the lists at the top
+  // of this file.
+  const originParagraph = el("p", { text: caseOriginSentences(caseGroups(VECTORS)).join(" ") });
+
   const intro = el("div", { className: "selfcheck-intro" }, [
-    el("p", {
-      text:
-        "The expected numbers in these cases were worked out from the regulation’s own method before this " +
-        "page’s calculator existed. The calculator had to match them, not the other way around.",
-    }),
+    originParagraph,
     el("p", {}, [
       "In the source code the cases live in the file ",
       el("code", { text: "docs/research/01-test-vectors.json" }),

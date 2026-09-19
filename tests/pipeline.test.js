@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 
 import { EXAMPLES } from "../examples.js";
 import { VECTORS, accountFromVector } from "../engine/index.js";
-import { letterPanelWords, statusWords, dialableDigits } from "../render.js";
+import { letterPanelWords, statusWords, dialableDigits, flagTag } from "../render.js";
 import { GUIDE_REGIONS, numberVisibleRegions } from "../guide.js";
 import {
   BILL_KINDS,
@@ -553,9 +553,13 @@ test("A2: which letter it is comes from the engine, and the panel is worded from
   assert.equal(runCheck(emptyValues()).letterKind, "", "no letter kind when there are no results");
 });
 
-// B2: the lowest projected balance typed into "required minimum" is a likely mix-up, not an accusation.
-test("B2: a low point typed as the required minimum gives a gentle warning on that box, not a cushion flag", () => {
-  const values = exampleToValues(exampleById("holding-too-much")); // TV01: low point $1,100, cap $800
+// B2 + fix order 3: a typed "required minimum" that equals the federal low point.
+// The engine's rule has three cases; these tests pin the two the page cares about
+// by field name, flag kind, status and tone, never by the engine's sentences.
+const CUSHION_KINDS = ["CUSHION_OVER_CAP", "CUSHION_MAYBE_OVER_CAP"];
+
+test("B2 case (a): low point typed as the minimum AND a matching claim → a warning under that box, no cushion flag", () => {
+  const values = exampleToValues(exampleById("holding-too-much")); // TV01: low point $1,100, cap $800, surplus $300 claimed
   const before = runCheck(values);
   values.requiredMinimum = "1,100.00";
   const check = runCheck(values);
@@ -564,11 +568,52 @@ test("B2: a low point typed as the required minimum gives a gentle warning on th
   const onTheBox = check.warnings.filter((warning) => warning.field === "statement.requiredMinimumBalanceCents");
   assert.equal(onTheBox.length, 1, "exactly one warning, mapped to the required-minimum box");
   assert.ok(onTheBox[0].message.length > 0);
-  assert.ok(!check.comparison.flags.some((flag) => flag.kind === "CUSHION_OVER_CAP"), "no cushion accusation");
+  assert.ok(!check.comparison.flags.some((flag) => CUSHION_KINDS.includes(flag.kind)), "no cushion flag of either kind");
   const row = check.comparison.rows.find((entry) => entry.key === "requiredMinimumBalance");
   assert.equal(row.status, "not-compared");
   assert.equal(check.comparison.overall, before.comparison.overall, "the mix-up does not turn the comparison into look-here");
   assert.equal(check.verdict.tone, before.verdict.tone, "and does not change the banner's tone");
+});
+
+test("B2 case (c): ONLY the low point typed as the minimum → amber CUSHION_MAYBE_OVER_CAP, no nudge, still a request for information", () => {
+  const values = goodValues(); // TV01's account, nothing from the statement typed yet
+  values.requiredMinimum = "1,100.00";
+  const check = runCheck(values);
+  assert.equal(check.ok, true);
+
+  const kinds = check.comparison.flags.map((flag) => flag.kind);
+  assert.ok(kinds.includes("CUSHION_MAYBE_OVER_CAP"), "got: " + JSON.stringify(kinds));
+  assert.equal(check.verdict.tone, "flag");
+  assert.equal(check.comparison.overall, "look-here");
+  const fromNudge = check.warnings.filter((warning) => warning.field === "statement.requiredMinimumBalanceCents");
+  assert.equal(fromNudge.length, 0, "a flag OR a nudge, never both");
+  assert.equal(check.letterKind, "REQUEST_FOR_INFORMATION");
+});
+
+test("B2 auditor's repro: an over-the-cap cushion on a not-current account is amber, never 'matches'", () => {
+  const values = emptyValues();
+  values.startMonth = "1";
+  values.startingBalance = "1,800.00";
+  values.behind = "yes";
+  values.requiredMinimum = "1,800.00";
+  values.newPayment = "600.00";
+  values.bills = [
+    { kind: "property-tax", name: "", amount: "3,600", month: "6" },
+    { kind: "property-tax", name: "", amount: "3,600", month: "12" },
+  ];
+  const check = runCheck(values);
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.notEqual(check.comparison.overall, "matches");
+  assert.equal(check.verdict.tone, "flag");
+  assert.ok(check.comparison.flags.some((flag) => CUSHION_KINDS.includes(flag.kind)), "the cushion finding is not hidden");
+});
+
+test("fix order 3: a flag kind the page has never heard of still gets a full label", () => {
+  assert.equal(flagTag("CUSHION_MAYBE_OVER_CAP"), "Check this number");
+  assert.equal(flagTag("CUSHION_OVER_CAP"), "Cushion above the limit");
+  for (const odd of ["SOMETHING_NEW", "", undefined, null, "toString", "__proto__", 4]) {
+    assert.equal(flagTag(odd), "Look here", "never blank, never borrowed from another kind");
+  }
 });
 
 test("B2: a comparison status the page has never heard of is never blank and never a match", () => {

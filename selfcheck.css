@@ -110,6 +110,15 @@
   color: var(--color-primary);
 }
 
+/* The caveat that sits directly under the number, and the note under the
+   "Offline copy" line. Ink, not muted: these are part of the reading, not fine
+   print. */
+.proof-under {
+  margin-top: var(--space-3);
+  line-height: 1.55;
+  color: var(--color-ink);
+}
+
 .proof-list-intro {
   margin-top: var(--space-3);
   color: var(--color-muted);
@@ -137,14 +146,31 @@
   margin: 0;
 }
 
-/* The four explanations next to the meter. */
+/* "Offline copy: saved / being saved / not saved". A second, separate reading,
+   so it gets its own rule above it. */
+.proof-offline-block {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-strong);
+}
+
+.proof-offline {
+  font-weight: var(--weight-semibold);
+  line-height: 1.45;
+}
+
+/* The four explanations next to the meter. They are of very different lengths,
+   so they flow down newspaper-style columns (two when there is room, one on a
+   phone) instead of sitting in a grid with a hole under the short ones. Reading
+   order stays top to bottom: number, what it cannot see, the rule, the test. */
 .proof-notes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-  gap: var(--space-5) var(--space-6);
+  columns: 2 260px;
+  column-gap: var(--space-6);
 }
 
 .proof-note {
+  break-inside: avoid;
+  margin-bottom: var(--space-5);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border-strong);
 }
@@ -162,6 +188,18 @@
 
 .proof-note p + p {
   margin-top: var(--space-2);
+}
+
+/* The list under "What it cannot see". */
+.proof-note-list {
+  margin-top: var(--space-2);
+  padding-left: var(--space-5);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.proof-note-list li + li {
+  margin-top: var(--space-1);
 }
 
 /* ───────────────────────── 2. Self-check ───────────────────────── */
@@ -533,6 +571,80 @@
 
 .selfcheck-months[open] > .selfcheck-months-toggle {
   margin-bottom: var(--space-2);
+}
+
+/* ───────────────────────── Forced colors ───────────────────────── */
+
+/* Windows "Contrast themes" (and similar modes) throw away every background
+   tint and replace the page's colors with the visitor's own. Anything that was
+   told by a tint has to be told by a line instead. Only system color keywords
+   are used here (CanvasText, Highlight), never a token, because those keywords
+   ARE the visitor's chosen colors. The words and icons already say pass or
+   does not match; these rules keep the shapes around them. */
+@media (forced-colors: active) {
+  /* The summary line after a run: green or amber tint becomes a full border. */
+  .selfcheck-status.is-pass,
+  .selfcheck-status.is-differs {
+    border: 1px solid CanvasText;
+    border-left-width: 4px;
+  }
+
+  /* A run with something that does not match gets the louder line. */
+  .selfcheck-status.is-differs {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Pass / Does not match chips: the tint becomes an outline around the words. */
+  .selfcheck-mark {
+    border: 1px solid CanvasText;
+  }
+
+  .selfcheck-mark.is-differs {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+
+  /* A table row or cell that does not match: amber tint becomes a ring. */
+  .selfcheck .data-table tbody tr.is-differs,
+  .selfcheck .data-table td.is-differs {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* A case that does not match, in the list of cases. */
+  .selfcheck-case.is-differs > .selfcheck-summary {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* The plus / minus at the end of each row and the ruler under the big number
+     are drawn with background images, which forced colors would leave in the
+     page's own teal and grey. Redraw them in the visitor's text color. */
+  .selfcheck-summary::after {
+    forced-color-adjust: none;
+    background:
+      linear-gradient(CanvasText, CanvasText) center / 16px 2px no-repeat,
+      linear-gradient(CanvasText, CanvasText) center / 2px 16px no-repeat;
+  }
+
+  .selfcheck-case[open] > .selfcheck-summary::after {
+    background: linear-gradient(CanvasText, CanvasText) center / 16px 2px no-repeat;
+  }
+
+  .proof-ticks {
+    forced-color-adjust: none;
+    border-top-color: CanvasText;
+    background-image:
+      repeating-linear-gradient(to right, CanvasText 0 1px, transparent 1px 40px),
+      repeating-linear-gradient(to right, CanvasText 0 1px, transparent 1px 8px);
+  }
+
+  /* The meter's heavy top rule and the "Offline copy" rule stay visible. */
+  .proof-meter {
+    border: 1px solid CanvasText;
+    border-top-width: 3px;
+  }
 }
 
 /* ───────────────────────── Print ───────────────────────── */

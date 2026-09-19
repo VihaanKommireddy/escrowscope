@@ -2,21 +2,30 @@
 //
 // The panel shows one live number: how many files this page has asked for since
 // it finished loading. Checking the math needs nothing from the internet, so the
-// number should sit at 0 no matter what the visitor types or presses.
+// number should sit at 0 whatever the visitor types or presses.
 //
 // Where the number comes from: every browser keeps its own performance log of
 // the files a page requests. This file only READS that log. It never makes a
 // request of its own (that would spoil the very thing it measures).
 //
+// What the number does NOT prove, and the panel says so in plain words: the log
+// covers this page only. It does not list the service worker's background
+// downloads of this site's own files, a link the visitor clicks, a new window,
+// the browser's own probes, or anything after the log is full. Every sentence in
+// this file is meant to claim exactly what the mechanism shows and no more.
+//
 // Screen readers: the number is NOT a live region, on purpose. A counter that
-// announced itself would chatter. Only the line under the "Count again" button
-// speaks, and only because the visitor pressed that button.
+// announced itself would chatter. The "Offline copy" line is not one either.
+// Only the line under the "Count again" button speaks, and only because the
+// visitor pressed that button.
 
 import { el, svgEl, clear } from "./dom.js";
+import { onServiceWorkerChange, serviceWorkerSwitchedOff } from "./sw-register.js";
 
 // ---------- reading the browser's log ----------
 
-// Very old browsers have no performance log. Then we say so instead of guessing.
+// Very old browsers have no performance log. Then the panel says so instead of
+// guessing.
 function browserHasPerformanceLog() {
   if (typeof performance === "undefined") return false;
   return typeof performance.getEntriesByType === "function";
@@ -59,25 +68,21 @@ function readRequestsSinceLoad(loadFinishedAt) {
   return requests;
 }
 
-// "https://example.org/folder/logo.svg?x=1" becomes "logo.svg?x=1". The query
-// part stays in, so the visitor sees everything that was part of the request.
-function describeRequest(entry) {
+// The address of one request, written out in full. A request to this site loses
+// only the site's own name from the front ("/escrowscope/styles.css?x=1"); a
+// request to any other site keeps everything. Nothing is shortened, because the
+// point of the list is that the visitor can see every part of what was asked for.
+export function describeRequest(entry, pageOrigin) {
   let url;
   try {
     url = new URL(entry.name);
   } catch (error) {
     return String(entry.name);
   }
-  const segments = url.pathname.split("/");
-  let fileName = segments[segments.length - 1];
-  if (fileName === "") {
-    fileName = "(the page itself)";
+  if (url.origin === pageOrigin) {
+    return url.pathname + url.search;
   }
-  let description = fileName + url.search;
-  if (url.origin !== window.location.origin) {
-    description = description + " (from " + url.host + ")";
-  }
-  return description;
+  return url.href;
 }
 
 // Is this request the small picture shown in the browser tab? Some browsers ask
@@ -142,19 +147,142 @@ function explainer(title, paragraphs) {
   return block;
 }
 
+function bulletList(sentences) {
+  const list = el("ul", { className: "proof-note-list" });
+  for (const sentence of sentences) {
+    list.append(el("li", { text: sentence }));
+  }
+  return list;
+}
+
+// ---------- the words on the meter ----------
+
+// tests/shell.test.js checks that these two lines are in this file word for
+// word. They were rewritten after an independent audit: the old zero line said
+// more than a page's own request log can show.
+const COUNT_LABEL = "Requests made by this page since it finished loading";
+const ZERO_LINE = "0: this page has not asked the network for anything since it loaded";
+
+// The one kind of download the number cannot see. It sits directly under the
+// number, so nobody reads the 0 without it.
+const BACKGROUND_COPY_SENTENCE =
+  "Not in this count: the first time you visit, your browser saves a copy of this site’s own files in the " +
+  "background, so the page can open offline. On later visits it checks whether those files have changed. " +
+  "Both steps download this site’s files. Neither one sends anything you type.";
+
+// ---------- the "Offline copy" line ----------
+
+// Page code is not allowed to open the browser's saved-files box (only sw.js
+// may; the shell test enforces it). So this line reads the STATE of the service
+// worker instead, and the panel says that this is what it reads.
+//
+// `registration` is what navigator.serviceWorker.getRegistration() gave back
+// (undefined when nothing is registered). A worker only becomes "active" after
+// every file on its list was saved, which is why "active" can be read as "saved".
+// A plain function of its inputs, so it can be tested in Node.
+export function offlineCopyState(registration, pageHasController) {
+  if (!registration) return "none";
+  if (registration.active) {
+    return pageHasController ? "saved" : "saved-for-next-load";
+  }
+  if (registration.installing || registration.waiting) return "saving";
+  return "none";
+}
+
+const OFFLINE_COPY_SENTENCES = {
+  checking: "Offline copy: checking.",
+  saved: "Offline copy: saved (a service worker is active for this page).",
+  "saved-for-next-load":
+    "Offline copy: saved (a service worker is installed; it starts answering for this page the next time " +
+    "the page loads).",
+  saving: "Offline copy: being saved (your browser is downloading this site’s own files in the background).",
+  none:
+    "Offline copy: not saved (this browser refused or does not support it; the page still works while you " +
+    "are online).",
+  off:
+    "Offline copy: switched off for this visit, because the page address has ?nosw in it. Nothing is being " +
+    "saved, and the service worker from an earlier visit is removed, so its saved files are no longer used.",
+};
+
+export function offlineCopySentence(state) {
+  if (OFFLINE_COPY_SENTENCES[state] === undefined) return OFFLINE_COPY_SENTENCES.none;
+  return OFFLINE_COPY_SENTENCES[state];
+}
+
+// Keep the "Offline copy" line in step with the service worker.
+function watchOfflineCopy(lineNode) {
+  function show(state) {
+    lineNode.textContent = offlineCopySentence(state);
+  }
+
+  if (!("serviceWorker" in navigator)) {
+    show("none");
+    return;
+  }
+  if (serviceWorkerSwitchedOff()) {
+    show("off");
+    return;
+  }
+
+  // On a first visit nothing is registered for the first second or so, because
+  // sw-register.js waits for the page to finish loading. "Not saved" would be
+  // the wrong thing to say before it has even tried.
+  let registerHasTried = false;
+
+  function refresh() {
+    navigator.serviceWorker
+      .getRegistration()
+      .then((registration) => {
+        const state = offlineCopyState(registration, Boolean(navigator.serviceWorker.controller));
+        if (state === "none" && !registerHasTried) {
+          show("checking");
+        } else {
+          show(state);
+        }
+      })
+      .catch(() => {
+        show("none");
+      });
+  }
+
+  show("checking");
+  refresh();
+  // sw-register.js calls this when registering worked, when it failed, and at
+  // every step the new worker takes while it saves the files.
+  onServiceWorkerChange(() => {
+    registerHasTried = true;
+    refresh();
+  });
+  // The browser fires this when a worker starts answering for this page.
+  navigator.serviceWorker.addEventListener("controllerchange", refresh);
+}
+
 // ---------- the panel ----------
 
 export function initProofPanel(container) {
   clear(container);
 
-  // The meter: label, big number, state line, list of requests, button.
+  // The meter: label, big number, state line, the note about the background
+  // copy, the "Offline copy" line, the list of requests, the button.
   const label = el("p", {
     className: "proof-label",
-    text: "Network requests since this page finished loading:",
+    text: COUNT_LABEL,
     attrs: { id: "proof-count-label" },
   });
   const countNode = el("p", { className: "proof-count num", text: "–" });
   const stateNode = el("p", { className: "proof-state" });
+  const backgroundCopyNote = el("p", { className: "proof-under small", text: BACKGROUND_COPY_SENTENCE });
+  // Deliberately NOT a live region: it changes by itself a moment after the page
+  // opens, and a screen reader should not be interrupted by that.
+  const offlineCopyLine = el("p", { className: "proof-offline", text: offlineCopySentence("checking") });
+  const offlineCopyNote = el("p", {
+    className: "proof-under small",
+    text:
+      "That line reads the state of the service worker, the small script that keeps the saved copy. It does " +
+      "not look inside the saved files. With a saved copy, this page opens with the internet off in most " +
+      "browsers. After this site is updated, a returning visitor sees the old version for one more visit, " +
+      "while the browser saves the new files in the background.",
+  });
   const listIntro = el("p", {
     className: "proof-list-intro small",
     text: "Here is exactly what was requested:",
@@ -179,9 +307,11 @@ export function initProofPanel(container) {
       countNode,
       el("div", { className: "proof-ticks", attrs: { "aria-hidden": "true" } }),
       stateNode,
+      backgroundCopyNote,
       listIntro,
       listNode,
       el("div", { className: "proof-actions" }, [recountButton, recountNote]),
+      el("div", { className: "proof-offline-block" }, [offlineCopyLine, offlineCopyNote]),
     ]
   );
 
@@ -197,26 +327,26 @@ export function initProofPanel(container) {
       }),
     ]),
     explainer("What it cannot see", [
-      el("p", {
-        text:
-          "The log only covers this page. It cannot see other tabs, other apps, or browser extensions " +
-          "you have installed.",
-      }),
-      el("p", {
-        text:
-          "One more thing, so nothing is left out: on your first visit, your browser saves a copy of this " +
-          "site’s own files in the background so the page can work offline. On later visits it checks " +
-          "whether those files have changed. Both steps download this site’s files. Neither one sends " +
-          "anything you type.",
-      }),
+      el("p", { text: "The log covers background requests made by this page, and nothing else. It cannot see:" }),
+      bulletList([
+        "Other tabs, other apps, or browser extensions you have installed.",
+        "A link you click that opens another website, or a new window. Opening a page is not a background " +
+          "request, so the log does not list it.",
+        "Anything that happens after the browser’s log is full. It holds about 250 entries.",
+        "The browser’s own probes, such as looking for a tab icon. Some browsers log those and some do not.",
+        "The service worker’s own downloads: the background copy of this site’s files described under the number.",
+      ]),
     ]),
-    explainer("The stronger guarantee", [
+    explainer("The stronger protection", [
       el("p", {}, [
-        "A counter can only report what it sees. The stronger protection is a rule written near the top " +
-          "of this page’s code, called a Content-Security-Policy. It includes the line ",
+        "The stronger protection is a rule near the top of this page’s code, called a " +
+          "Content-Security-Policy. It includes the line ",
         el("code", { className: "proof-code", text: "connect-src 'none'" }),
-        ". In plain words: the browser itself refuses any connection this page tries to open. Even if this " +
-          "page’s code tried to send your numbers somewhere, the browser would block it.",
+        ". In plain words: your browser blocks this page from making background connections to any website. " +
+          "That is the way pages normally send data out without you noticing. It does not stop a link you " +
+          "click from opening another site, and it cannot stop this site’s own files from being downloaded. " +
+          "The code on this page never puts your numbers into either of those, and the code is open for " +
+          "anyone to read.",
       ]),
       el("p", {}, [
         "You can confirm it. Right-click the page, choose View Page Source, and look for ",
@@ -227,13 +357,16 @@ export function initProofPanel(container) {
     explainer("Test it yourself", [
       el("p", {
         text:
-          "Turn on airplane mode (or switch off wifi), then type new numbers and press Check the math. " +
-          "It still works, because nothing needs the internet.",
+          "With this page open, turn on airplane mode (or switch off wifi). Then type new numbers and press " +
+          "Check the math. It still works, because checking your numbers needs nothing from the internet.",
       }),
     ]),
   ]);
 
   container.append(el("div", { className: "proof" }, [meter, notes]));
+
+  // The "Offline copy" line does not depend on the performance log.
+  watchOfflineCopy(offlineCopyLine);
 
   // No performance log in this browser: say so plainly and stop.
   if (!browserHasPerformanceLog()) {
@@ -242,7 +375,7 @@ export function initProofPanel(container) {
       el("span", {
         text:
           "This browser does not share its network log with pages, so this counter cannot run here. " +
-          "The rule described under “The stronger guarantee” still applies.",
+          "The rule described under “The stronger protection” still applies.",
       })
     );
     recountButton.disabled = true;
@@ -270,7 +403,7 @@ export function initProofPanel(container) {
 
     clear(listNode);
     if (count === 0) {
-      stateNode.replaceChildren(icon("check"), el("span", { text: "0: nothing has been sent or fetched" }));
+      stateNode.replaceChildren(icon("check"), el("span", { text: ZERO_LINE }));
       listIntro.hidden = true;
       listNode.hidden = true;
       return count;
@@ -283,11 +416,14 @@ export function initProofPanel(container) {
     stateNode.replaceChildren(
       icon("info"),
       el("span", {
-        text: sentence + " Asking for a file is a download. It is not the same as sending your numbers.",
+        text:
+          sentence +
+          " Asking for a file is a download. Each address is listed in full below, so you can check that " +
+          "none of them carries your numbers.",
       })
     );
     for (const request of requests) {
-      let line = describeRequest(request);
+      let line = describeRequest(request, window.location.origin);
       if (isTabIconRequest(request)) {
         line = line + " (the small icon in your browser tab; the browser asks for it by itself)";
       }

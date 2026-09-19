@@ -1,7 +1,7 @@
 {
   "name": "EscrowScope",
   "short_name": "EscrowScope",
-  "description": "Check the math on your yearly mortgage escrow statement against the federal escrow rule. It runs in your browser, works offline, and nothing you type leaves your device.",
+  "description": "Check the math on your yearly mortgage escrow statement against the federal escrow rule. It runs in your browser. There is no account and no tracking. The web host can see that your browser downloaded the files. It never sees what you type. In most browsers the page opens offline after one visit.",
   "lang": "en",
   "start_url": "./",
   "scope": "./",
