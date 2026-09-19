@@ -157,6 +157,33 @@ mortgage documents allow a smaller cushion") and "I'm more than 30 days behind
 on a payment" (→ `borrowerCurrent:false`). The user picks **calendar** months
 everywhere; conversion to escrow-year order happens in `readInputs` only.
 
+## 4b. SPEC Part E addendum (math audit, added mid-build — Part E wins over everything above)
+
+- **E1.** The property `lowPoint − cushionCap === difference` is exact only when
+  `min(step1) <= 0`; otherwise the gap equals `min(step1)` (1–6 cents). The
+  property test asserts both branches and proves the second branch was hit.
+  The never-below-0 floor on the Step 2 add stays.
+- **E2.** New classifications `DEFICIENCY_BORROWER_NOT_CURRENT` and
+  `DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_LT_ONE_MONTH` / `…_GE_ONE_MONTH`
+  ((f)(4)(iii)): deficiency spread fields 0, `deficiencySpreadMonths: 0`, text
+  says the mortgage documents control collection. Shortage handling never
+  depends on `borrowerCurrent`. **Vectors for these are written by the
+  independent auditor and appended to the research JSON by the director** — no
+  builder writes them. After an append, the Engine Builder re-runs
+  `node tools/make-vectors.mjs`. Nothing anywhere hard-codes "22".
+- **E3.** `result.nearLine` = `null` or `{ line: "SURPLUS_50" |
+  "ONE_MONTH_PAYMENT", distanceCents, toleranceCents: 700 }`. `classification`
+  stays cent-exact. Inside the band, `explainVerdict` / `nextSteps` /
+  `buildLetter` soften, and the UI never shows refund-required banner styling
+  or the D8 refund date. The UI styles from the verdict object + `nearLine`,
+  never from `classification` alone.
+- **E4.** The deficiency/shortage split is HUD 1995 guidance (60 FR 8812,
+  8813–14), labeled as guidance in comments, `explainSteps`, and the
+  show-the-math panel. `result.cite` strings expected by the vectors don't change.
+- **E5.** No `-0` in any output; `formatCents(-0)` → "$0.00"; a test walks every
+  numeric output across vectors, examples and randomized runs. The UI never
+  negates a cents value or builds a money string itself.
+
 ## 5. Shell rules the tests will enforce (`tests/shell.test.js`, UI Builder)
 
 Everything in the Build Chief brief's "Quality bar" and "shell test" paragraphs,

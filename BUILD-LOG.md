@@ -41,6 +41,16 @@ work happens, in order.
 | 3.1 | `docs/BUILD-CONTRACT.md` — written before any code so two builders could work in the same folder at once: file ownership, exact engine exports, the three examples' numbers (worked by hand by the Build Chief from the reg notes), the DOM-free `pipeline.js` seam, error field names, ports. | Build Chief |
 | 3.2 | Engine Builder and UI Builder launched in parallel against SPEC Part C/D + the build contract. | Build Chief |
 
+| 3.3 | Engine Builder's first commits seen on `v1`: `dda476d` (`examples.js`), `f17eda0` (`tools/make-vectors.mjs`, generated `engine/vectors.js`, sync test, vector + self-check tests — red on purpose, no engine yet). | Engine Builder |
+| 3.4 | SPEC Part E arrived mid-build from the independent math audit (`c43d133`, written by the director). Build Chief read it in full, relayed E1–E5 plus the auditor's nine "bugs to not have" to the Engine Builder, relayed the page-facing parts (E3 banner rule, E2 new classifications, E4 guidance label, E5 no UI-side negation, vector count no longer fixed at 22) to the UI Builder, and added section 4b to `docs/BUILD-CONTRACT.md`. | Build Chief |
+
+**A mistake of the Build Chief's, caught by the audit (3.4):** the original
+Engine Builder brief repeated SPEC C5's property `lowPoint − cushionCap ===
+difference` as unconditional. The auditor showed it is exact only when the
+lowest Step 1 balance is zero or below; otherwise it is off by that balance
+(1–6 cents, from half-up rounding of the monthly payment). The test is what
+changes, not the engine. Corrected in the relay and in the contract.
+
 **Clarifications to the spec made in 3.1 (not silent):**
 
 - SPEC D1 says the self-check "compares every expected field". Two keys inside
