@@ -25,6 +25,7 @@ import {
   VECTORS,
 } from "../engine/index.js";
 import { EXAMPLES } from "../examples.js";
+import { TOO_CLOSE_SENTENCE } from "../engine/explain.js";
 
 // ---------- building lots of realistic situations ----------
 
@@ -217,7 +218,7 @@ test("statement agrees → green 'clear': matches the federal method, then the s
   assert.ok(verdict.body.includes("$300.00"));
   assert.ok(verdict.body.includes("$25.00 a month"));
   assert.match(verdict.body, /That is allowed\./);
-  assert.match(verdict.body, /Most payment jumps are lawful/);
+  assert.match(verdict.body, /Many payment jumps are lawful/);
 });
 
 test("any flag → amber 'flag': each gap in dollars, plus the standing caveat", () => {
@@ -268,7 +269,7 @@ test("E3: TV26, TV27, TV28 (inside the band) get the softened wording and NO ref
       const verdict = explainVerdict(result, comparison);
       assert.equal(verdict.tooCloseToCall, true, id);
       assert.match(verdict.body, /too close to call/, id);
-      assert.match(verdict.body, /round to whole dollars/, id);
+      assert.match(verdict.body, /HUD's 1995 guidance says dollar amounts may be rounded to the nearest dollar/, id);
       assert.match(verdict.body, /either side/, id);
       assert.ok(verdict.body.includes(formatCents(result.nearLine.amountCents)), id + ": states our cent-exact figure");
       if (result.nearLine.line === "SURPLUS_50") {
@@ -448,7 +449,11 @@ test("PROPERTY: the four parts add up to exactly new − old, for every vector a
         assert.equal(jump.changeCents, newCents - oldCents);
         assert.deepStrictEqual(jump.parts.map((part) => part.key), ["billsChanged", "shortageRepayment", "deficiencyRepayment", "unexplained"]);
         assert.ok(jump.parts[1].cents >= 0 && jump.parts[1].cents <= result.newMonthlyEscrowPayment.shortageSpreadOver12Cents);
-        assert.ok(jump.parts[2].cents >= 0 && jump.parts[2].cents <= result.newMonthlyEscrowPayment.deficiencySpreadCents);
+        assert.ok(jump.parts[2].cents >= 0);
+        // The "deficiency ÷ 2" ceiling only exists for a borrower who is current, (f)(4)(iii) (audit A3).
+        const notCurrentDeficiency = result.deficiencyCents > 0 && !result.inputs.borrowerCurrent;
+        if (!notCurrentDeficiency) assert.ok(jump.parts[2].cents <= result.newMonthlyEscrowPayment.deficiencySpreadCents);
+        if (notCurrentDeficiency) assert.ok(jump.parts[3].cents <= 0, "nothing above the base is 'unexplained' when the mortgage documents set the deficiency repayment");
         checked = checked + 1;
       }
     }
@@ -476,7 +481,7 @@ test("nextSteps always carries the real deadlines, the CFPB complaint link, and 
     assert.match(everything, /12 CFR 1024\.35/);
     assert.match(everything, /12 CFR 1024\.36/);
     assert.ok(steps.some((step) => step.url === "https://www.consumerfinance.gov/complaint/" && step.phone === "855-411-2372"));
-    assert.ok(steps.some((step) => step.url === "https://www.consumerfinance.gov/find-a-housing-counselor/" && step.phone === "888-995-HOPE (4673)"));
+    assert.ok(steps.some((step) => step.url === "https://www.consumerfinance.gov/find-a-housing-counselor/" && !("phone" in step)));
     for (const step of steps) {
       assert.ok(step.title.length > 5 && step.body.length > 40);
       if (step.url !== undefined) assert.ok(ALLOWED_URLS.includes(step.url), step.url);
@@ -548,5 +553,139 @@ test("the servicer line at exactly bills ÷ 12 is the federal line", () => {
     assert.equal(line.lowPoint.balanceCents, result.lowPoint.projectedBalanceCents);
     assert.equal(line.lowPoint.month, result.lowPoint.month);
     assert.equal(line.includesShortageAddOn, false);
+  }
+});
+
+// =====================================================================
+// FIX ORDER 1 (math audit, docs/verification/math-audit.md section 5)
+// =====================================================================
+
+test("A3: not current + deficiency — the dollars above base + shortage are 'deficiency repayment set by your mortgage documents', never 'unexplained' (TV23, $300 → $550)", () => {
+  const result = analyze(vectorAccount("TV23"));
+  const statement = { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: 55000 };
+  assert.equal(rowStatus(compareWithStatement(result, statement), "newMonthlyEscrow"), "match");
+  const jump = explainJump(result, statement);
+  assert.deepStrictEqual(jump.parts.map((part) => part.cents), [0, 15000, 10000, 0]);
+  assert.match(jump.parts[2].sentence, /set by your mortgage documents, not by this rule/);
+  assert.match(jump.parts[2].sentence, /12 CFR 1024\.17\(f\)\(4\)\(iii\)/);
+  assert.equal(JSON.stringify(jump).includes("more than the federal math supports"), false);
+  // Below the base, the remainder is still reported as "lower than the bills call for".
+  const low = explainJump(result, { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: 25000 });
+  assert.deepStrictEqual(low.parts.map((part) => part.cents), [0, 0, 0, -5000]);
+});
+
+function rowStatus(comparison, key) {
+  return comparison.rows.find((row) => row.key === key).status;
+}
+
+test("A1 in explainJump: a leftover inside the scaled payment tolerance reads as rounding; one cent more does not", () => {
+  const example = exampleById("jumped-ok"); // two rounded parts → $2.00
+  const result = analyze(example.account);
+  const atEdge = explainJump(result, { currentMonthlyEscrowCents: 40000, newMonthlyEscrowCents: 50200 });
+  assert.equal(atEdge.parts[3].cents, 200);
+  assert.match(atEdge.parts[3].sentence, /rounding/);
+  assert.match(atEdge.parts[3].sentence, /60 FR 8812/);
+  const past = explainJump(result, { currentMonthlyEscrowCents: 40000, newMonthlyEscrowCents: 50201 });
+  assert.match(past.parts[3].sentence, /more than the federal math supports/);
+});
+
+test("A4: step 2 says the REGULAR payment is one-twelfth, and that repayment can be added on top", () => {
+  const step = explainSteps(analyze(vectorAccount("TV01")))[1];
+  assert.ok(step.plain.startsWith("The regular monthly payment is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top."));
+  assert.equal(step.plain.includes("The most a servicer may collect"), false);
+  assert.match(step.plain, /our choice/);
+});
+
+test("A6: whole-dollar rounding is attributed to HUD's 1995 guidance (60 FR 8812), never stated as settled law", () => {
+  assert.match(TOO_CLOSE_SENTENCE, /HUD's 1995 guidance says dollar amounts may be rounded to the nearest dollar \(60 FR 8812\), so /);
+  for (const situation of SITUATIONS) {
+    for (const text of everyWordFor(situation)) {
+      assert.equal(/lawfully round|may lawfully/i.test(text), false, situation.name + ": " + text);
+    }
+  }
+});
+
+test("A7: 'held above the legal cushion' says 'before any surplus refund' when there is a surplus, and not otherwise", () => {
+  const holding = exampleById("holding-too-much");
+  const withSurplus = explainServicerLine(analyze(holding.account), holding.account, holding.statement);
+  assert.equal(withSurplus.aboveCushionCents, 30000);
+  assert.match(withSurplus.sentence, /Held above the legal cushion, before any surplus refund: \$300\.00\./);
+  const cushion = exampleById("cushion-too-big");
+  const noSurplus = explainServicerLine(analyze(cushion.account), cushion.account, cushion.statement);
+  assert.match(noSurplus.sentence, /Held above the legal cushion: \$150\.00\./);
+  assert.equal(noSurplus.sentence.includes("surplus"), false);
+});
+
+test("A8: both clocks say 'generally'; § 1024.36 carries its 15-business-day extension; § 1024.35's extension says 'with reasons'", () => {
+  const flagged = exampleById("cushion-too-big");
+  const result = analyze(flagged.account);
+  const steps = nextSteps(result, compareWithStatement(result, flagged.statement));
+  const notice = steps.find((step) => step.title === "Put it in writing: a notice of error");
+  const request = steps.find((step) => step.title === "Ask for the worksheet: a request for information");
+  for (const step of [notice, request]) {
+    assert.match(step.body, /generally has 5 business days/);
+    assert.match(step.body, /generally has 30 business days|generally 30 business days/);
+    assert.match(step.body, /15 more business days/);
+  }
+  assert.match(notice.body, /with reasons/);
+});
+
+test("A9: 'When the math checks out…' shows only when the statement was actually checked and matches", () => {
+  const example = exampleById("jumped-ok");
+  const result = analyze(example.account);
+  const title = "When the math checks out, the cost is the bills";
+  const titles = (statement) => nextSteps(result, compareWithStatement(result, statement)).map((step) => step.title);
+  assert.ok(titles(example.statement).includes(title));
+  assert.equal(titles(undefined).includes(title), false);
+  assert.equal(titles({}).includes(title), false);
+});
+
+test("A10: 'Many payment jumps are lawful' — never 'Most'", () => {
+  const example = exampleById("jumped-ok");
+  const verdict = verdictFor(example.account, example.statement);
+  assert.match(verdict.body, /Many payment jumps are lawful/);
+  for (const situation of SITUATIONS) {
+    for (const text of everyWordFor(situation)) assert.equal(text.includes("Most payment jumps"), false);
+  }
+});
+
+test("A11: the analysis date is 'usually' printed on the statement", () => {
+  const result = analyze(vectorAccount("TV01"));
+  const step = nextSteps(result, compareWithStatement(result, undefined))[0];
+  assert.equal(step.title, "Watch for the refund");
+  assert.match(step.body, /That date is usually printed on your statement\./);
+});
+
+test("A13: the first jump part is labelled for what it is: bills now versus the OLD PAYMENT", () => {
+  const example = exampleById("jumped-ok");
+  const jump = explainJump(analyze(example.account), example.statement);
+  assert.equal(jump.parts[0].label, "Bills now versus your old payment");
+});
+
+test("A14: absurd, unvalidated numbers never make explainJump or explainServicerLine throw — they count as not given", () => {
+  const example = exampleById("jumped-ok");
+  const result = analyze(example.account);
+  for (const value of [2 ** 53, 1e20, NaN, Infinity, -Infinity, -5, 1.5, "500", 1000000001, null, {}, []]) {
+    assert.equal(explainJump(result, { currentMonthlyEscrowCents: value, newMonthlyEscrowCents: 50000 }), null, String(value));
+    assert.equal(explainJump(result, { currentMonthlyEscrowCents: 40000, newMonthlyEscrowCents: value }), null, String(value));
+    assert.equal(explainServicerLine(result, example.account, { newMonthlyEscrowCents: value }), null, String(value));
+  }
+  assert.notEqual(explainJump(result, { currentMonthlyEscrowCents: 1000000000, newMonthlyEscrowCents: 1000000000 }), null);
+});
+
+test("A15: only contact details printed on the linked official page — the counselor step has a link and NO phone", () => {
+  for (const situation of SITUATIONS) {
+    const comparison = compareWithStatement(situation.result, situation.statement);
+    const steps = nextSteps(situation.result, comparison);
+    const counselor = steps.find((step) => step.url === "https://www.consumerfinance.gov/find-a-housing-counselor/");
+    const complaint = steps.find((step) => step.url === "https://www.consumerfinance.gov/complaint/");
+    assert.equal("phone" in counselor, false);
+    assert.equal(complaint.phone, "855-411-2372");
+    assert.deepStrictEqual(steps.filter((step) => "phone" in step), [complaint]);
+    for (const text of everyWordFor(situation)) {
+      assert.equal(text.includes("HOPE"), false);
+      assert.equal(text.includes("888-995"), false); // (a bare "995" would trip on the year 1995 in HUD's URL)
+      assert.equal(text.includes("4673"), false);
+    }
   }
 });

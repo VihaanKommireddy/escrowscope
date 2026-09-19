@@ -2,8 +2,9 @@
 //
 // VOICE RULES (from the brand guide — binding, and enforced by
 // tests/explain.test.js, which scans every sentence this file can produce):
-//   • Calm, never alarmed. Most payment jumps are lawful: real tax and
-//     insurance increases running through a correctly-run account.
+//   • Calm, never alarmed. Many payment jumps are lawful: real tax and
+//     insurance increases running through a correctly-run account. ("Many",
+//     not a bigger word: we have no source for how many.)
 //   • Show the math: every claim carries its dollars.
 //   • Plain words first; the citation is the footnote. Define jargon the
 //     moment it appears. 6th–8th grade reading level, short sentences.
@@ -16,8 +17,9 @@
 //
 // Every function here is pure: numbers in, words out.
 
-import { formatCents, MONTH_NAMES } from "./money.js";
-import { projectWithPayment, TOLERANCE_PAYMENT_CENTS } from "./analyze.js";
+import { formatCents, MONTH_NAMES, MAX_MONEY_CENTS } from "./money.js";
+import { projectWithPayment, TOLERANCE_PAYMENT_CENTS, paymentToleranceCents, countPaymentParts } from "./analyze.js";
+import { letterKind } from "./letter.js";
 
 // Official pages only. Every URL below appears in the research docs' source lists.
 const URL_ECFR = "https://www.ecfr.gov/current/title-12/chapter-X/part-1024/subpart-B/section-1024.17";
@@ -28,8 +30,10 @@ const URL_ERROR_RULE = "https://www.consumerfinance.gov/rules-policy/regulations
 const URL_INFO_RULE = "https://www.consumerfinance.gov/rules-policy/regulations/1024/36/";
 const URL_COMPLAINT = "https://www.consumerfinance.gov/complaint/";
 const URL_COUNSELOR = "https://www.consumerfinance.gov/find-a-housing-counselor/";
+// Contact details: only ones printed on the official page we link to. The
+// CFPB complaint page prints this number. The housing-counselor finder page
+// does not print a phone number, so that step carries its link and no phone.
 const PHONE_CFPB = "855-411-2372";
-const PHONE_COUNSELOR = "888-995-HOPE (4673)";
 
 const HUD_GUIDANCE_CITE = "HUD guidance, 60 FR 8812, 8813–14";
 
@@ -53,8 +57,10 @@ function joinSentences(sentences) {
 // next steps. `near` is result.nearLine (or null).
 // ---------------------------------------------------------------------------
 
+// Whole-dollar rounding comes from HUD's 1995 guidance, not from the text of
+// the regulation, so the sentence says whose statement it is (math audit A6).
 export const TOO_CLOSE_SENTENCE =
-  "That is too close to call: a servicer may lawfully round to whole dollars, so its figure could land on either side of the line.";
+  "That is too close to call. HUD's 1995 guidance says dollar amounts may be rounded to the nearest dollar (60 FR 8812), so a servicer's figure could land on either side of the line.";
 
 function surplusSentences(result) {
   const amount = formatCents(result.surplusCents);
@@ -226,7 +232,7 @@ export function explainVerdict(result, comparison) {
     sentences.push(CAVEAT);
   }
   if (matches && (result.shortageCents > 0 || result.deficiencyCents > 0)) {
-    sentences.push("Most payment jumps are lawful. They come from real tax and insurance increases.");
+    sentences.push("Many payment jumps are lawful. They come from real tax and insurance increases.");
   }
   if (comparison.overall === "not-provided") {
     sentences.push("Add the numbers from your statement to see whether your servicer's math agrees.");
@@ -303,7 +309,7 @@ export function explainSteps(result) {
     },
     {
       title: "Step 2. Divide by 12 to get the monthly payment",
-      plain: "The most a servicer may collect each month is one-twelfth of the year's bills. If it does not divide evenly, we round to the nearest cent. That rounding is our choice. The rule does not mention cents.",
+      plain: "The regular monthly payment is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top. If it does not divide evenly, we round to the nearest cent. That rounding is our choice. The rule does not mention cents.",
       math: total + " ÷ 12 = " + monthly,
       cite: "12 CFR 1024.17(c)(1)(ii)",
       url: URL_CFPB_RULE,
@@ -357,11 +363,18 @@ function smallerOf(a, b) {
   return a < b ? a : b;
 }
 
+// A usable payment: whole cents from $0 up to the tool's $10,000,000 limit.
+// Anything else (NaN, Infinity, 1e20, negatives, fractions, text) counts as
+// "not given", so absurd input can never make these functions throw (audit A14).
+function isUsableCents(value) {
+  return Number.isSafeInteger(value) && value >= 0 && value <= MAX_MONEY_CENTS;
+}
+
 export function explainJump(result, statement) {
   if (statement === null || typeof statement !== "object") return null;
   const oldCents = statement.currentMonthlyEscrowCents;
   const newCents = statement.newMonthlyEscrowCents;
-  const bothGiven = Number.isInteger(oldCents) && oldCents >= 0 && Number.isInteger(newCents) && newCents >= 0;
+  const bothGiven = isUsableCents(oldCents) && isUsableCents(newCents);
   if (!bothGiven) return null;
 
   const base = result.baseMonthlyPaymentCents;
@@ -373,9 +386,17 @@ export function explainJump(result, statement) {
   let shortagePartCents = 0;
   let deficiencyPartCents = 0;
   const aboveBase = newCents - base;
+  // Borrower not current + a deficiency: (f)(4)(iii) lets the mortgage
+  // documents, not this rule, set how the deficiency is collected. So there is
+  // no federal "deficiency ÷ 2" ceiling to measure against, and whatever sits
+  // above base + shortage repayment is deficiency repayment — NOT "more than
+  // the federal math supports". This keeps explainJump in step with
+  // compare.js, which calls the same payment a match (math audit A3).
+  const deficiencySetByMortgageDocuments = result.deficiencyCents > 0 && !result.inputs.borrowerCurrent;
   if (aboveBase > 0) {
     shortagePartCents = smallerOf(aboveBase, payment.shortageSpreadOver12Cents);
-    deficiencyPartCents = smallerOf(aboveBase - shortagePartCents, payment.deficiencySpreadCents);
+    const stillLeft = aboveBase - shortagePartCents;
+    deficiencyPartCents = deficiencySetByMortgageDocuments ? stillLeft : smallerOf(stillLeft, payment.deficiencySpreadCents);
   }
   const unexplainedCents = changeCents - billsChangedCents - shortagePartCents - deficiencyPartCents;
 
@@ -388,13 +409,19 @@ export function explainJump(result, statement) {
 
   let deficiencySentence = "None of the new payment is deficiency repayment.";
   if (deficiencyPartCents > 0) deficiencySentence = formatCents(deficiencyPartCents) + " a month goes to repaying the deficiency of " + formatCents(result.deficiencyCents) + ". A deficiency is a balance below $0.";
+  if (deficiencyPartCents > 0 && deficiencySetByMortgageDocuments) {
+    deficiencySentence = formatCents(deficiencyPartCents) + " a month is above the bills and the shortage repayment. With a deficiency of " + formatCents(result.deficiencyCents) + " and a payment more than 30 days late, this is deficiency repayment set by your mortgage documents, not by this rule (12 CFR 1024.17(f)(4)(iii)).";
+  }
 
+  // "Small enough to be rounding" uses the same scaled tolerance compare.js
+  // uses for the same purpose: $1.00 per separately rounded part (audit A1).
+  const roundingCents = paymentToleranceCents(countPaymentParts(payment));
   let unexplainedSentence = "Nothing is left over. The federal math explains the whole change.";
-  if (unexplainedCents > TOLERANCE_PAYMENT_CENTS) unexplainedSentence = formatCents(unexplainedCents) + " a month is more than the federal math supports from the numbers typed here. It is worth asking your servicer what it covers.";
-  if (unexplainedCents > 0 && unexplainedCents <= TOLERANCE_PAYMENT_CENTS) unexplainedSentence = formatCents(unexplainedCents) + " a month is left over. That is small enough to be rounding.";
+  if (unexplainedCents > roundingCents) unexplainedSentence = formatCents(unexplainedCents) + " a month is more than the federal math supports from the numbers typed here. It is worth asking your servicer what it covers.";
+  if (unexplainedCents > 0 && unexplainedCents <= roundingCents) unexplainedSentence = formatCents(unexplainedCents) + " a month is left over. That is small enough to be whole-dollar rounding, which HUD's 1995 guidance describes (60 FR 8812).";
   if (unexplainedCents < 0) unexplainedSentence = "The new payment is " + formatCents(-unexplainedCents) + " a month lower than the bills typed here call for. Collecting less is allowed.";
 
-  let note = "Most payment jumps are lawful. They come from real tax and insurance increases.";
+  let note = "Many payment jumps are lawful. They come from real tax and insurance increases.";
   if (changeCents <= 0) note = "Your escrow payment did not go up.";
   if (shortagePartCents > 0) note = "About " + formatCents(shortagePartCents) + " of the new payment is shortage repayment. It should drop off after the shortage is repaid, if your bills stay the same.";
 
@@ -403,7 +430,10 @@ export function explainJump(result, statement) {
     newCents: newCents,
     changeCents: changeCents,
     parts: [
-      { key: "billsChanged", label: "Your bills changed", cents: billsChangedCents, sentence: billsSentence },
+      // The label says what this number really is: this year's bills ÷ 12 minus
+      // the OLD PAYMENT. If the old payment carried a shortage add-on, this can
+      // be negative even though the bills themselves went up (math audit A13).
+      { key: "billsChanged", label: "Bills now versus your old payment", cents: billsChangedCents, sentence: billsSentence },
       { key: "shortageRepayment", label: "Repaying a shortage", cents: shortagePartCents, sentence: shortageSentence },
       { key: "deficiencyRepayment", label: "Repaying a deficiency", cents: deficiencyPartCents, sentence: deficiencySentence },
       { key: "unexplained", label: "Not explained by the federal math", cents: unexplainedCents, sentence: unexplainedSentence },
@@ -420,7 +450,7 @@ export function explainJump(result, statement) {
 export function explainServicerLine(result, account, statement) {
   if (statement === null || typeof statement !== "object") return null;
   const paymentCents = statement.newMonthlyEscrowCents;
-  if (!Number.isInteger(paymentCents) || paymentCents < 0) return null;
+  if (!isUsableCents(paymentCents)) return null;
 
   const balancesCents = projectWithPayment(account, paymentCents);
 
@@ -440,13 +470,21 @@ export function explainServicerLine(result, account, statement) {
   const aboveCushionCents = lowPoint.balanceCents - result.cushionCapCents;
 
   const owesSomething = result.shortageCents > 0 || result.deficiencyCents > 0;
+  // This compares against bills ÷ 12 ALONE, which is one rounded figure, so
+  // the single-part $1.00 tolerance is the right one here (not the scaled
+  // $2–$3 used against the multi-part maximum; decided on its merits, audit A1).
   const includesShortageAddOn = owesSomething && paymentCents > result.baseMonthlyPaymentCents + TOLERANCE_PAYMENT_CENTS;
 
   let label = "With your statement's payment (" + formatCents(paymentCents) + " a month)";
   if (includesShortageAddOn) label = "With your statement's payment (" + formatCents(paymentCents) + " a month, which already includes shortage repayment)";
 
   let sentence = "Paying " + formatCents(paymentCents) + " a month, your lowest month-end balance would be " + formatCents(lowPoint.balanceCents) + " in " + monthName(lowPoint.calendarMonth) + ".";
-  if (aboveCushionCents > 0) sentence = sentence + " Held above the legal cushion: " + formatCents(aboveCushionCents) + ".";
+  // With a surplus on the account, part of what sits above the cushion is the
+  // surplus itself, which the statement may already show as refundable. After
+  // a refund the line would sit lower, so say "before any surplus refund".
+  // With no surplus there is no refund to mention (math audit A7).
+  if (aboveCushionCents > 0 && result.surplusCents > 0) sentence = sentence + " Held above the legal cushion, before any surplus refund: " + formatCents(aboveCushionCents) + ".";
+  if (aboveCushionCents > 0 && result.surplusCents === 0) sentence = sentence + " Held above the legal cushion: " + formatCents(aboveCushionCents) + ".";
   if (aboveCushionCents < 0) sentence = sentence + " That is " + formatCents(-aboveCushionCents) + " under the most cushion the rule allows.";
   if (aboveCushionCents === 0) sentence = sentence + " That lands right on the most cushion the rule allows.";
   if (includesShortageAddOn) sentence = sentence + " This payment already includes repayment of a shortage, so this line shows what the account will really hold.";
@@ -483,7 +521,7 @@ export function nextSteps(result, comparison) {
   } else if (result.classification === "SURPLUS_REFUND_REQUIRED") {
     steps.push({
       title: "Watch for the refund",
-      body: "The rule says a surplus of $50 or more is refunded within 30 days of the date of the escrow analysis. That date is printed on your statement. If it has passed and nothing has arrived, you can call your servicer and ask when the refund was sent.",
+      body: "The rule says a surplus of $50 or more is refunded within 30 days of the date of the escrow analysis. That date is usually printed on your statement. If it has passed and nothing has arrived, you can call your servicer and ask when the refund was sent.",
       url: URL_CFPB_RULE,
     });
   }
@@ -509,7 +547,9 @@ export function nextSteps(result, comparison) {
     }
   }
 
-  if (!hasFlags && (result.shortageCents > 0 || result.deficiencyCents > 0)) {
+  // Only when the statement was actually checked and lines up. With no
+  // statement numbers typed in, nothing has "checked out" yet (math audit A9).
+  if (comparison.overall === "matches" && (result.shortageCents > 0 || result.deficiencyCents > 0)) {
     steps.push({
       title: "When the math checks out, the cost is the bills",
       body: "A higher payment usually means higher tax or insurance bills. Things people look into: shopping for homeowners insurance, a homestead exemption or a property tax appeal with the county, and whether to pay a shortage at once or let it spread. Either way, the base payment follows the bills.",
@@ -523,15 +563,27 @@ export function nextSteps(result, comparison) {
     });
   }
 
-  const ifNeeded = hasFlags ? "If the call does not settle it, you" : "If something still looks off later, you";
-  steps.push({
-    title: "Put it in writing: a notice of error",
-    body: ifNeeded + " can send a written notice of error under 12 CFR 1024.35. Send it to the address your servicer lists for error notices, which is often not the payment address. The servicer has 5 business days to say it got your letter. It has 30 business days to fix the problem or explain in writing why it found none. It may take 15 more business days if it tells you in writing first. The letter on this page is a starting point.",
-    url: URL_ERROR_RULE,
-  });
+  // Which letter leads is decided by letterKind (letter.js) and nowhere else
+  // (math audit A2). The notice-of-error step appears only when a flag asserts
+  // a discrepancy; otherwise the request for information leads, because a
+  // notice of error is for saying "I believe there is an error".
+  // The clocks say "generally": the rules have exceptions (for example a
+  // repeated or overbroad request, or one sent more than a year after the loan
+  // was transferred or paid off) (math audit A8).
+  const isNoticeOfError = letterKind(result, comparison) === "NOTICE_OF_ERROR";
+  if (isNoticeOfError) {
+    steps.push({
+      title: "Put it in writing: a notice of error",
+      body: "If the call does not settle it, you can send a written notice of error under 12 CFR 1024.35. Send it to the address your servicer lists for error notices, which is often not the payment address. The servicer generally has 5 business days to say it got your letter. It generally has 30 business days to fix the problem or explain in writing why it found none. It may take 15 more business days if it tells you so in writing first, with reasons. The letter on this page is a starting point.",
+      url: URL_ERROR_RULE,
+    });
+  }
+  const requestOpening = isNoticeOfError
+    ? "You can also ask in writing for the full escrow analysis worksheet under 12 CFR 1024.36."
+    : "You can ask in writing for the full escrow analysis worksheet, and ask any question about it, under 12 CFR 1024.36. The letter on this page is a starting point.";
   steps.push({
     title: "Ask for the worksheet: a request for information",
-    body: "You can also ask in writing for the full escrow analysis worksheet under 12 CFR 1024.36. The servicer has 5 business days to say it got your request and 30 business days to answer. It may not charge a fee for this.",
+    body: requestOpening + " Send it to the address your servicer lists for information requests. The servicer generally has 5 business days to say it got your request. It generally has 30 business days to answer. It may take 15 more business days if it tells you so in writing first. It may not charge a fee for this. If the answer shows a mistake, a notice of error under 12 CFR 1024.35 is the next letter.",
     url: URL_INFO_RULE,
   });
   steps.push({
@@ -543,8 +595,7 @@ export function nextSteps(result, comparison) {
   steps.push({
     title: "Talk to a HUD-approved housing counselor",
     body: "A housing counselor gives free or low-cost, independent help with mortgage questions. You can bring a printout of this page. This page is math, not legal advice.",
-    url: URL_COUNSELOR,
-    phone: PHONE_COUNSELOR,
+    url: URL_COUNSELOR, // no phone: the linked page does not print one (math audit A15)
   });
 
   return steps;

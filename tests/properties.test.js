@@ -418,15 +418,23 @@ test("E5 + C5: every numeric output is a whole number and none is negative zero 
     assert.equal(jump.parts.reduce((sum, part) => sum + part.cents, 0), statement.newMonthlyEscrowCents - statement.currentMonthlyEscrowCents, "jump parts must add up" + context);
 
     // The comparison can never contradict itself.
-    assert.equal(comparison.overall, comparison.flags.length > 0 ? "look-here" : "matches");
+    // (A "not-compared" row — audit B2 — asserts nothing, so it neither needs a flag nor counts as a match.)
+    const comparedRows = comparison.rows.filter((row) => row.status !== "not-compared");
+    let expectedOverall = "not-provided";
+    if (comparedRows.length > 0) expectedOverall = "matches";
+    if (comparison.flags.length > 0) expectedOverall = "look-here";
+    assert.equal(comparison.overall, expectedOverall, context + "\nstatement=" + JSON.stringify(statement));
+    assert.ok(Array.isArray(comparison.nudges));
+    assert.ok(comparison.nudges.length <= 1);
     for (const row of comparison.rows) {
       assert.equal(row.gapCents, row.statementCents - row.federalCents);
-      assert.equal(comparison.flags.some((flag) => flag.rowKey === row.key), row.status !== "match", row.key + context);
+      const needsFlag = row.status === "differs" || row.status === "over-limit";
+      assert.equal(comparison.flags.some((flag) => flag.rowKey === row.key), needsFlag, row.key + context);
     }
     // And the words never crash.
     const verdict = explainVerdict(result, comparison);
     assert.equal(verdict.tooCloseToCall, result.nearLine !== null);
-    assert.ok(nextSteps(result, comparison).length >= 4);
+    assert.ok(nextSteps(result, comparison).length >= 3); // at least: information request, CFPB complaint, housing counselor
     assert.equal(typeof buildLetter(result, comparison, {}), "string");
   }
   assert.ok(numbersSeen > 300000, "only " + numbersSeen + " numbers were checked");

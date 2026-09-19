@@ -635,3 +635,71 @@ test("bug 9 guard: the shortage spread rounds HALF UP ($479.99 ÷ 12 = $40.00, $
   account.startingBalanceCents = -15001;
   assert.equal(analyze(account).newMonthlyEscrowPayment.deficiencySpreadCents, 7501);
 });
+
+// ---------- FIX ORDER 1, A12: paymentJumpDecomposition's parts add up to new − old ----------
+
+test("A12: TV18's pinned values are unchanged, and the two added parts are 0 there", () => {
+  const account = tv01Account();
+  account.startingBalanceCents = 112500;
+  account.disbursements = [
+    { label: "Property tax 1st half", month: 5, amountCents: 210000 },
+    { label: "Homeowners insurance", month: 7, amountCents: 150000 },
+    { label: "Property tax 2nd half", month: 11, amountCents: 210000 },
+  ];
+  account.priorYear = { annualDisbursementsCents: 480000, monthlyEscrowCents: 40000, cushionCents: 80000, stepTwoAddCents: 40000 };
+  const jump = analyze(account).paymentJumpDecomposition;
+  assert.equal(jump.oldMonthlyEscrowCents, 40000);
+  assert.equal(jump.newMonthlyEscrowCents, 50000);
+  assert.equal(jump.billsWentUpCents, 7500);
+  assert.equal(jump.shortageRepaymentCents, 2500);
+  assert.equal(jump.deficiencyRepaymentCents, 0);
+  assert.equal(jump.lastYearAddOnDroppedOffCents, 0);
+});
+
+test("A12: last year's payment carried its own add-on, and this year has a deficiency — the four parts still add up exactly", () => {
+  const account = negativeBalanceAccount(-10000); // base $400, shortage ÷ 12 = $100, deficiency ÷ 2 = $50
+  account.priorYear = { annualDisbursementsCents: 420000, monthlyEscrowCents: 38000, cushionCents: 70000, stepTwoAddCents: 35000 }; // last year's base $350 + a $30 add-on
+  const jump = analyze(account).paymentJumpDecomposition;
+  assert.equal(jump.newMonthlyEscrowCents, 55000); // now includes the deficiency repayment
+  assert.equal(jump.billsWentUpCents, 5000);
+  assert.equal(jump.shortageRepaymentCents, 10000);
+  assert.equal(jump.deficiencyRepaymentCents, 5000);
+  assert.equal(jump.lastYearAddOnDroppedOffCents, -3000);
+  assert.equal(jump.billsWentUpCents + jump.shortageRepaymentCents + jump.deficiencyRepaymentCents + jump.lastYearAddOnDroppedOffCents, 55000 - 38000);
+});
+
+test("A12 PROPERTY: over 2,000 random priorYear blocks the parts sum EXACTLY to new − old; whole numbers; no negative zero", () => {
+  // A tiny seeded generator (an LCG) so a failure can be replayed.
+  let state = 20260919;
+  function nextWhole(low, high) {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    return low + (state % (high - low + 1));
+  }
+  for (let run = 0; run < 2000; run++) {
+    const account = tv01Account();
+    account.startingBalanceCents = nextWhole(-300000, 400000);
+    account.borrowerCurrent = nextWhole(0, 9) > 0;
+    account.disbursements = [
+      { label: "Tax", month: nextWhole(1, 12), amountCents: nextWhole(1, 900000) },
+      { label: "Insurance", month: nextWhole(1, 12), amountCents: nextWhole(1, 400000) },
+    ];
+    const lastYearTotal = nextWhole(0, 1300000);
+    account.priorYear = {
+      annualDisbursementsCents: lastYearTotal,
+      monthlyEscrowCents: nextWhole(0, 200000), // may or may not equal last year's base: it can carry an add-on
+      cushionCents: nextWhole(0, 250000),
+      stepTwoAddCents: nextWhole(0, 900000),
+    };
+    const result = analyze(account);
+    const jump = result.paymentJumpDecomposition;
+    const parts = [jump.billsWentUpCents, jump.shortageRepaymentCents, jump.deficiencyRepaymentCents, jump.lastYearAddOnDroppedOffCents];
+    let sum = 0;
+    for (const part of parts) {
+      assert.ok(Number.isInteger(part), JSON.stringify(account));
+      assert.equal(Object.is(part, -0), false, JSON.stringify(account));
+      sum = sum + part;
+    }
+    assert.equal(sum, jump.newMonthlyEscrowCents - jump.oldMonthlyEscrowCents, JSON.stringify(account));
+    assert.equal(jump.newMonthlyEscrowCents, result.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents);
+  }
+});

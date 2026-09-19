@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { analyze, compareWithStatement, buildLetter, accountFromVector, VECTORS } from "../engine/index.js";
+import { analyze, compareWithStatement, buildLetter, letterKind, nextSteps, accountFromVector, VECTORS } from "../engine/index.js";
 import { EXAMPLES } from "../examples.js";
 
 function letterFor(exampleId, details) {
@@ -93,7 +93,8 @@ test("something to ask about → a notice of error under § 1024.35, pre-filled 
 
 test("a refund that looks due → the letter asks about it without demanding or promising anything", () => {
   const letter = letterFor("holding-too-much", {});
-  assert.ok(letter.includes("Re: Notice of error under 12 C.F.R. § 1024.35"));
+  // The statement matches and the 30 days may not have run, so this asks; it does not assert an error (audit A2).
+  assert.ok(letter.includes("Re: Request for information under 12 C.F.R. § 1024.36"));
   assert.ok(letter.includes("1. By my math the account has a surplus of $300.00."));
   assert.match(letter, /If the refund has been sent, please tell me the date/);
 });
@@ -144,4 +145,113 @@ test("buildLetter is repeatable and changes nothing it is given", () => {
   const first = buildLetter(result, comparison, details);
   assert.equal(buildLetter(result, comparison, details), first);
   assert.equal(JSON.stringify([result, comparison, details]), before);
+});
+
+// =====================================================================
+// FIX ORDER 1, A2: notice of error ONLY when a flag asserts a discrepancy
+// =====================================================================
+
+const NOTICE = "NOTICE_OF_ERROR";
+const REQUEST = "REQUEST_FOR_INFORMATION";
+
+function accountById(id) {
+  return accountFromVector(VECTORS.find((vector) => vector.id === id));
+}
+
+test("A2 table: every vector with no statement → request for information (refund due, too close to call, or nothing to ask)", () => {
+  for (const vector of VECTORS) {
+    const result = analyze(accountFromVector(vector));
+    const comparison = compareWithStatement(result, undefined);
+    assert.equal(letterKind(result, comparison), REQUEST, vector.id);
+    const letter = buildLetter(result, comparison, {});
+    assert.ok(letter.includes("Re: Request for information under 12 C.F.R. § 1024.36"), vector.id);
+    assert.equal(letter.includes("Notice of error"), false, vector.id);
+    assert.equal(letter.includes("I believe the statement contains the error"), false, vector.id);
+  }
+});
+
+test("A2 table: the named cases — a matching statement + refund due, and every nearLine vector, are requests that still carry their question", () => {
+  for (const id of ["TV01", "TV03", "TV13", "TV16", "TV17", "TV25", "TV29"]) {
+    const result = analyze(accountById(id));
+    const agrees = { claimedKind: "surplus", claimedAmountCents: result.surplusCents, newMonthlyEscrowCents: result.baseMonthlyPaymentCents };
+    const comparison = compareWithStatement(result, agrees);
+    assert.equal(comparison.overall, "matches", id);
+    assert.equal(letterKind(result, comparison), REQUEST, id);
+    const letter = buildLetter(result, comparison, {});
+    assert.ok(letter.includes("What I am asking about:"), id);
+    assert.match(letter, /If the refund has been sent, please tell me the date/, id);
+  }
+  for (const id of ["TV06", "TV07", "TV10", "TV10b", "TV26", "TV27", "TV28"]) {
+    const result = analyze(accountById(id));
+    const comparison = compareWithStatement(result, undefined);
+    assert.equal(letterKind(result, comparison), REQUEST, id);
+    assert.match(buildLetter(result, comparison, {}), /rounding could put your figure on either side/, id);
+  }
+});
+
+test("A2 table: the three examples", () => {
+  const expected = { "jumped-ok": REQUEST, "holding-too-much": REQUEST, "cushion-too-big": NOTICE };
+  for (const example of EXAMPLES) {
+    const result = analyze(example.account);
+    assert.equal(letterKind(result, compareWithStatement(result, example.statement)), expected[example.id], example.id);
+  }
+});
+
+test("A2 table: each flag kind ALONE → the expected kind of letter", () => {
+  const tv11 = accountById("TV11"); // shortage $1,200 ≥ one month's payment $480; cap $960; maximum $580
+  const tv09 = accountById("TV09"); // shortage $240 < one month's payment
+  const rows = [
+    ["CUSHION_OVER_CAP", tv11, { requiredMinimumBalanceCents: 196000 }, NOTICE],
+    ["PAYMENT_ABOVE_MAX", tv11, { newMonthlyEscrowCents: 70000 }, NOTICE],
+    ["KIND_DIFFERS", tv11, { claimedKind: "surplus", claimedAmountCents: 5000 }, NOTICE],
+    ["AMOUNT_DIFFERS", tv11, { claimedKind: "shortage", claimedAmountCents: 200000 }, NOTICE], // on the claimed amount
+    ["SPREAD_TOO_SHORT", tv11, { shortageSpreadMonths: 6 }, NOTICE],
+    ["LUMP_SUM_OFFERED", tv11, { lumpSumOfferedOnStatement: true }, REQUEST], // a question, never a finding (SPEC D6)
+    ["AMOUNT_DIFFERS", tv09, { newMonthlyEscrowCents: 45000 }, REQUEST], // payment LOWER than expected: lower is allowed
+  ];
+  for (const [kind, account, statement, expectedKind] of rows) {
+    const result = analyze(account);
+    const comparison = compareWithStatement(result, statement);
+    assert.deepStrictEqual(comparison.flags.map((flag) => flag.kind), [kind], kind);
+    assert.equal(letterKind(result, comparison), expectedKind, kind);
+    const letter = buildLetter(result, comparison, {});
+    assert.ok(letter.includes("1. " + comparison.flags[0].letterLine), kind + ": the question is carried either way");
+  }
+});
+
+test("A2: a notice of error says in plain words that the borrower believes the statement contains the error(s) — § 1024.35(a)", () => {
+  const notice = letterFor("cushion-too-big", {});
+  assert.ok(notice.includes("Re: Notice of error under 12 C.F.R. § 1024.35"));
+  assert.ok(notice.includes("I believe the statement contains the error(s) described below."));
+  assert.match(notice, /either confirm it is correct and explain why, or correct it/);
+
+  const request = letterFor("holding-too-much", {});
+  assert.ok(request.includes("Re: Request for information under 12 C.F.R. § 1024.36"));
+  assert.equal(request.includes("error(s)"), false);
+  assert.equal(request.includes("correct it and send me an updated statement"), false);
+  assert.match(request, /Please answer the question/);
+});
+
+test("A2 + B2: the low-point mix-up nudge is a request for information that asks about the cushion", () => {
+  const result = analyze(accountById("TV01"));
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 110000 });
+  assert.equal(letterKind(result, comparison), REQUEST);
+  const letter = buildLetter(result, comparison, {});
+  assert.match(letter, /Please confirm the required minimum balance/);
+  assert.equal(letter.includes("Notice of error"), false);
+});
+
+test("A2: letterKind is the one rule — nextSteps leads with the matching step", () => {
+  for (const example of EXAMPLES) {
+    const result = analyze(example.account);
+    const comparison = compareWithStatement(result, example.statement);
+    const titles = nextSteps(result, comparison).map((step) => step.title);
+    const hasNoticeStep = titles.includes("Put it in writing: a notice of error");
+    assert.equal(hasNoticeStep, letterKind(result, comparison) === NOTICE, example.id);
+    assert.ok(titles.includes("Ask for the worksheet: a request for information"), example.id);
+    if (!hasNoticeStep) {
+      const ladder = titles.filter((title) => title.includes("request for information") || title.includes("complaint") || title.includes("counselor"));
+      assert.equal(ladder[0], "Ask for the worksheet: a request for information", example.id);
+    }
+  }
 });

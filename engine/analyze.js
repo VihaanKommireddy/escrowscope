@@ -51,6 +51,25 @@ import {
 export const TOLERANCE_BALANCE_CENTS = 700;
 export const TOLERANCE_PAYMENT_CENTS = 100;
 
+// The lawful maximum payment is a SUM of up to three parts: bills ÷ 12, plus
+// shortage ÷ 12, plus deficiency ÷ 2. A servicer that rounds to whole dollars
+// (HUD's 1995 guidance, 60 FR 8812, says dollar amounts may be rounded to the
+// nearest dollar) rounds EACH part on its own, so the rounding can stack:
+// $401 + $26 = $427 where our cents say $425.96. So the payment tolerance is
+// $1.00 for each separately rounded part: $1.00, $2.00 or $3.00.
+// (Math audit finding A1. A choice, not law.)
+export function paymentToleranceCents(partsInMaximum) {
+  return TOLERANCE_PAYMENT_CENTS * partsInMaximum;
+}
+
+// How many separately rounded parts this account's maximum payment has.
+export function countPaymentParts(newMonthlyEscrowPayment) {
+  let parts = 1; // bills ÷ 12 is always there
+  if (newMonthlyEscrowPayment.shortageSpreadOver12Cents > 0) parts = parts + 1;
+  if (newMonthlyEscrowPayment.deficiencySpreadCents > 0) parts = parts + 1;
+  return parts;
+}
+
 // A surplus of $50.00 or more must be refunded. 12 CFR 1024.17(f)(2)(i):
 // "greater than or equal to 50 dollars".
 const REFUND_THRESHOLD_CENTS = 5000;
@@ -278,10 +297,11 @@ function classify(amounts, oneMonthPaymentCents, borrowerCurrent) {
 //   • a surplus of $50.00 or more must be refunded            (f)(2)(i)
 //   • a shortage or deficiency of one month's payment or more
 //     loses the "repay within 30 days" option                 (f)(3), (f)(4)
-// Our cent rounding can move a figure by a few cents, and HUD lets a servicer
-// round any figure to whole dollars, so a lawful statement can sit up to about
-// $7 away from ours. If our figure is within $7.00 of one of those lines, a
-// servicer could lawfully land on EITHER side of it. `classification` stays
+// Our cent rounding can move a figure by a few cents, and HUD's 1995 guidance
+// says dollar amounts may be rounded to the nearest dollar (60 FR 8812 —
+// guidance, not regulation text), so a statement that follows it can sit up to
+// about $7 away from ours. If our figure is within $7.00 of one of those
+// lines, such a servicer could land on EITHER side of it. `classification` stays
 // cent-exact, and this block tells the words (explain.js, letter.js) and the
 // page to soften: state the figure, say it is too close to call.
 //
@@ -372,11 +392,22 @@ function buildPaymentJumpDecomposition(priorYear, pieces) {
   const lastYearBaseCents = divideRoundHalfUp(priorYear.annualDisbursementsCents, 12);
   const lastYearTargetEndCents = priorYear.stepTwoAddCents + priorYear.cushionCents;
 
+  // Four parts that ALWAYS add up to exactly (new − old)  [math audit A12]:
+  //   billsWentUp            = this year's base − last year's base
+  //   shortageRepayment      = shortage ÷ 12
+  //   deficiencyRepayment    = deficiency ÷ 2 (0 when there is none)
+  //   lastYearAddOnDroppedOff = last year's base − last year's payment.
+  //     Last year's payment may have carried its own shortage add-on. That
+  //     add-on is gone now, so this part is negative by that amount.
+  // Sum = (base_new + shortage + deficiency) − last year's payment = new − old.
+  // The last two are ADDED keys; TV18 pins the others and has no deficiency.
   return {
     oldMonthlyEscrowCents: priorYear.monthlyEscrowCents,
-    newMonthlyEscrowCents: pieces.baseMonthlyCents + pieces.shortageSpreadOver12Cents,
+    newMonthlyEscrowCents: pieces.baseMonthlyCents + pieces.shortageSpreadOver12Cents + pieces.deficiencySpreadCents,
     billsWentUpCents: pieces.baseMonthlyCents - lastYearBaseCents,
     shortageRepaymentCents: pieces.shortageSpreadOver12Cents,
+    deficiencyRepaymentCents: pieces.deficiencySpreadCents,
+    lastYearAddOnDroppedOffCents: lastYearBaseCents - priorYear.monthlyEscrowCents,
     shortageBreakdown: {
       cushionRoseCents: pieces.cushionCapCents - priorYear.cushionCents,
       timingNeedRoseCents: pieces.stepTwoAddCents - priorYear.stepTwoAddCents,
@@ -531,6 +562,7 @@ export function analyze(account) {
     result.paymentJumpDecomposition = buildPaymentJumpDecomposition(account.priorYear, {
       baseMonthlyCents: baseMonthlyPaymentCents,
       shortageSpreadOver12Cents: newMonthlyEscrowPayment.shortageSpreadOver12Cents,
+      deficiencySpreadCents: newMonthlyEscrowPayment.deficiencySpreadCents,
       cushionCapCents: cushionCapCents,
       stepTwoAddCents: stepTwoAddCents,
       startingBalanceCents: startingBalanceCents,

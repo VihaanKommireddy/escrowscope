@@ -20,7 +20,7 @@ export { compareWithStatement } from "./compare.js";
 export { explainVerdict, explainSteps, explainJump, nextSteps, explainServicerLine } from "./explain.js";
 
 // letter.js — the pre-filled letter
-export { buildLetter } from "./letter.js";
+export { buildLetter, letterKind } from "./letter.js";
 
 // dates.js — the 30-day refund clock
 export { refundDeadline } from "./dates.js";

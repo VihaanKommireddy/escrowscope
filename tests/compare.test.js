@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { analyze, compareWithStatement, formatCents } from "../engine/index.js";
+import { analyze, compareWithStatement, formatCents, letterKind, buildLetter } from "../engine/index.js";
+import { paymentToleranceCents, countPaymentParts } from "../engine/analyze.js";
 
 // ---------- accounts used below ----------
 
@@ -103,7 +104,7 @@ function assertWellFormed(comparison) {
     assert.ok(Number.isInteger(row.statementCents));
     assert.ok(Number.isInteger(row.federalCents));
     assert.equal(row.gapCents, row.statementCents - row.federalCents);
-    assert.ok(["match", "differs", "over-limit"].includes(row.status));
+    assert.ok(["match", "differs", "over-limit", "not-compared"].includes(row.status));
     assert.ok(row.note.length > 10);
   }
   for (const flag of comparison.flags) {
@@ -115,7 +116,8 @@ function assertWellFormed(comparison) {
   // Every row that is not a match has a flag pointing at it, and the other way round.
   for (const row of comparison.rows) {
     const flagged = comparison.flags.some((flag) => flag.rowKey === row.key);
-    assert.equal(flagged, row.status !== "match", "row " + row.key + " status " + row.status);
+    const needsFlag = row.status === "differs" || row.status === "over-limit";
+    assert.equal(flagged, needsFlag, "row " + row.key + " status " + row.status);
   }
   if (comparison.flags.length > 0) assert.equal(comparison.overall, "look-here");
   if (!comparison.provided) assert.equal(comparison.overall, "not-provided");
@@ -137,7 +139,7 @@ test("no statement, an empty statement, or only the current payment → not-prov
   const result = analyze(smallShortageAccount());
   for (const statement of [undefined, null, {}, { currentMonthlyEscrowCents: 40000 }, { shortageSpreadMonths: 12 }]) {
     const comparison = compareWithStatement(result, statement);
-    assert.deepStrictEqual(comparison, { provided: false, rows: [], flags: [], overall: "not-provided" });
+    assert.deepStrictEqual(comparison, { provided: false, rows: [], flags: [], nudges: [], overall: "not-provided" });
   }
 });
 
@@ -187,7 +189,9 @@ test("a servicer that rounds to whole dollars still matches (tolerance $7 on bal
 
 test("one cent past each tolerance is flagged", () => {
   const result = analyze(smallShortageAccount());
-  assert.deepStrictEqual(kindsOf(compareWithStatement(result, { newMonthlyEscrowCents: 50101 })), ["PAYMENT_ABOVE_MAX"]);
+  // The maximum here has two rounded parts (bills ÷ 12 + shortage ÷ 12), so the payment tolerance is $2.00 (audit A1).
+  assert.deepStrictEqual(kindsOf(compareWithStatement(result, { newMonthlyEscrowCents: 50200 })), []);
+  assert.deepStrictEqual(kindsOf(compareWithStatement(result, { newMonthlyEscrowCents: 50201 })), ["PAYMENT_ABOVE_MAX"]);
   assert.deepStrictEqual(kindsOf(compareWithStatement(result, { requiredMinimumBalanceCents: 95701 })), ["CUSHION_OVER_CAP"]);
   assert.deepStrictEqual(kindsOf(compareWithStatement(result, { claimedKind: "shortage", claimedAmountCents: 30701 })), ["AMOUNT_DIFFERS"]);
   assert.deepStrictEqual(kindsOf(compareWithStatement(result, { claimedKind: "shortage", claimedAmountCents: 29299 })), ["AMOUNT_DIFFERS"]);
@@ -214,9 +218,10 @@ test("CUSHION_OVER_CAP: a 3-month cushion is $600 over the $1,200 cap; row statu
 test("when the mortgage documents set a lower cushion, the cite points to (c)(8)", () => {
   const account = onTargetAccount();
   account.cushionMonths = 1; // cap $600
-  const comparison = compareWithStatement(analyze(account), { requiredMinimumBalanceCents: 120000 });
+  // ($1,500, not $1,200: $1,200 is this account's low point, which would be the audit-B2 nudge instead.)
+  const comparison = compareWithStatement(analyze(account), { requiredMinimumBalanceCents: 150000 });
   const flag = flagByKind(comparison, "CUSHION_OVER_CAP");
-  assert.equal(flag.amountCents, 60000);
+  assert.equal(flag.amountCents, 90000);
   assert.equal(flag.cite, "12 CFR 1024.17(c)(8)");
 });
 
@@ -353,7 +358,7 @@ test("deficiency + shortage together: the statement may name either part, or the
 
 test("a kind with no amount: compared by kind only", () => {
   const agree = compareWithStatement(analyze(smallShortageAccount()), { claimedKind: "shortage" });
-  assert.deepStrictEqual(agree, { provided: false, rows: [], flags: [], overall: "not-provided" });
+  assert.deepStrictEqual(agree, { provided: false, rows: [], flags: [], nudges: [], overall: "not-provided" });
 
   const disagree = compareWithStatement(analyze(surplusAccount()), { claimedKind: "shortage" });
   assert.deepStrictEqual(kindsOf(disagree), ["KIND_DIFFERS"]);
@@ -363,7 +368,7 @@ test("a kind with no amount: compared by kind only", () => {
 
 test("an amount with no kind cannot be compared and is skipped", () => {
   const comparison = compareWithStatement(analyze(smallShortageAccount()), { claimedAmountCents: 30000 });
-  assert.deepStrictEqual(comparison, { provided: false, rows: [], flags: [], overall: "not-provided" });
+  assert.deepStrictEqual(comparison, { provided: false, rows: [], flags: [], nudges: [], overall: "not-provided" });
 });
 
 // ---------- the monthly payment ----------
@@ -423,15 +428,16 @@ test("a surplus under $50 may be credited against next year's payments, so a sli
 
 test("with a deficiency the servicer picks the number of months (2 or more), so anything from the base up to the maximum matches", () => {
   const result = analyze(deficiencyAndShortageAccount()); // base $500, max $1,975
-  for (const payment of [50000, 77500, 100000, 150000, 197500, 197600]) {
+  // Three rounded parts here, so the payment tolerance is $3.00 (audit A1).
+  for (const payment of [49700, 50000, 77500, 100000, 150000, 197500, 197800]) {
     const comparison = compareWithStatement(result, { newMonthlyEscrowCents: payment });
     assertWellFormed(comparison);
     assert.equal(comparison.overall, "matches", String(payment));
   }
-  const over = compareWithStatement(result, { newMonthlyEscrowCents: 197601 });
+  const over = compareWithStatement(result, { newMonthlyEscrowCents: 197801 });
   assert.deepStrictEqual(kindsOf(over), ["PAYMENT_ABOVE_MAX"]);
-  assert.equal(flagByKind(over, "PAYMENT_ABOVE_MAX").amountCents, 101);
-  const under = compareWithStatement(result, { newMonthlyEscrowCents: 49899 });
+  assert.equal(flagByKind(over, "PAYMENT_ABOVE_MAX").amountCents, 301);
+  const under = compareWithStatement(result, { newMonthlyEscrowCents: 49699 });
   assert.deepStrictEqual(kindsOf(under), ["AMOUNT_DIFFERS"]);
 });
 
@@ -601,4 +607,186 @@ test("every dollar figure in a sentence is written by formatCents (spot check)",
   const result = analyze(onTargetAccount());
   const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 180000 });
   assert.ok(comparison.flags[0].sentence.includes(formatCents(180000)));
+});
+
+// =====================================================================
+// FIX ORDER 1 (math audit, docs/verification/math-audit.md section 5)
+// =====================================================================
+
+// ---------- A1: the payment tolerance is $1.00 per separately rounded part ----------
+
+test("A1 helper: paymentToleranceCents is 100 / 200 / 300 for 1 / 2 / 3 rounded parts", () => {
+  assert.equal(paymentToleranceCents(1), 100);
+  assert.equal(paymentToleranceCents(2), 200);
+  assert.equal(paymentToleranceCents(3), 300);
+  assert.equal(countPaymentParts(analyze(onTargetAccount()).newMonthlyEscrowPayment), 1);
+  assert.equal(countPaymentParts(analyze(smallShortageAccount()).newMonthlyEscrowPayment), 2);
+  assert.equal(countPaymentParts(analyze(deficiencyAndShortageAccount()).newMonthlyEscrowPayment), 3);
+});
+
+test("A1 repro: a lawful whole-dollar statement ($401 + $26 = $427 vs our $425.96) is NOT flagged, and the letter is not a notice of error", () => {
+  const account = {
+    startMonth: 1,
+    startingBalanceCents: 49550,
+    cushionMonths: 2,
+    borrowerCurrent: true,
+    disbursements: [{ label: "Property tax", month: 12, amountCents: 480600 }],
+  };
+  const result = analyze(account);
+  assert.equal(result.baseMonthlyPaymentCents, 40050);
+  assert.equal(result.shortageCents, 30550);
+  assert.equal(result.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents, 42596);
+  const statement = { newMonthlyEscrowCents: 42700, requiredMinimumBalanceCents: 80100, claimedKind: "shortage", claimedAmountCents: 30600, shortageSpreadMonths: 12 };
+  const comparison = compareWithStatement(result, statement);
+  assertWellFormed(comparison);
+  assert.deepStrictEqual(comparison.flags, []);
+  assert.equal(comparison.overall, "matches");
+  assert.match(rowByKey(comparison, "newMonthlyEscrow").note, /rounding/i);
+  assert.match(rowByKey(comparison, "newMonthlyEscrow").note, /60 FR 8812/);
+  assert.equal(letterKind(result, comparison), "REQUEST_FOR_INFORMATION");
+  assert.equal(buildLetter(result, comparison, {}).includes("Notice of error"), false);
+});
+
+test("A1 edges: one part $1.00 ok / $1.01 flag; two parts $2.00 / $2.01; three parts $3.00 / $3.01", () => {
+  const cases = [
+    [onTargetAccount(), 60000, 100],
+    [smallShortageAccount(), 50000, 200],
+    [deficiencyAndShortageAccount(), 197500, 300],
+  ];
+  for (const [account, maximum, tolerance] of cases) {
+    const result = analyze(account);
+    assert.equal(result.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents, maximum);
+    const atEdge = compareWithStatement(result, { newMonthlyEscrowCents: maximum + tolerance });
+    assertWellFormed(atEdge);
+    assert.deepStrictEqual(atEdge.flags, [], "exactly at the edge: no flag");
+    const pastEdge = compareWithStatement(result, { newMonthlyEscrowCents: maximum + tolerance + 1 });
+    assert.deepStrictEqual(kindsOf(pastEdge), ["PAYMENT_ABOVE_MAX"]);
+    assert.equal(flagByKind(pastEdge, "PAYMENT_ABOVE_MAX").amountCents, tolerance + 1);
+  }
+});
+
+// ---------- A5: the 'deficiency' KIND_DIFFERS sentence states the choices correctly ----------
+
+test("A5: a claimed deficiency on a positive balance — no 'has to be spread' claim; the right choices for the tier; the below-$0-on-analysis-day caveat", () => {
+  const large = surplusAccount();
+  large.startingBalanceCents = 10000; // shortage $1,100 ≥ one month ($400)
+  const largeFlag = flagByKind(compareWithStatement(analyze(large), { claimedKind: "deficiency", claimedAmountCents: 110000 }), "KIND_DIFFERS");
+  const small = surplusAccount();
+  small.startingBalanceCents = 100000; // shortage $200 < one month
+  const smallFlag = flagByKind(compareWithStatement(analyze(small), { claimedKind: "deficiency", claimedAmountCents: 20000 }), "KIND_DIFFERS");
+
+  for (const flag of [largeFlag, smallFlag]) {
+    assert.equal(flag.sentence.includes("has to be spread"), false);
+    assert.match(flag.sentence, /really was below \$0 on the day of the analysis/);
+    assert.match(flag.sentence, /even though the projected starting balance typed here is positive/);
+  }
+  assert.match(smallFlag.sentence, /within 30 days/);
+  assert.equal(largeFlag.sentence.includes("within 30 days"), false);
+  assert.match(largeFlag.sentence, /leave it alone, or spread it over at least 12 months/);
+});
+
+// ---------- A6: whole-dollar rounding is attributed to HUD guidance, never stated as settled law ----------
+
+test("A6: no comparison text says a servicer 'may lawfully' round", () => {
+  const result = analyze(largeShortageAccount());
+  const comparison = compareWithStatement(result, { newMonthlyEscrowCents: 58000, shortageSpreadMonths: 6, requiredMinimumBalanceCents: 96000 });
+  const everything = JSON.stringify(comparison);
+  assert.equal(/lawfully/i.test(everything), false);
+});
+
+// ---------- A14: absurd, unvalidated numbers never make compare throw ----------
+
+test("A14: absurd statement numbers are treated as not given — compareWithStatement never throws", () => {
+  const absurd = [2 ** 53, 1e20, NaN, Infinity, -Infinity, -5, 1.5, "500", 1000000001, null, {}, []];
+  const result = analyze(smallShortageAccount());
+  const nothing = { provided: false, rows: [], flags: [], nudges: [], overall: "not-provided" };
+  for (const value of absurd) {
+    for (const field of ["newMonthlyEscrowCents", "requiredMinimumBalanceCents", "currentMonthlyEscrowCents"]) {
+      assert.deepStrictEqual(compareWithStatement(result, { [field]: value }), nothing, field + " = " + String(value));
+    }
+    assert.deepStrictEqual(compareWithStatement(result, { claimedKind: "shortage", claimedAmountCents: value }), nothing, "claimedAmountCents = " + String(value));
+    assert.doesNotThrow(() => compareWithStatement(result, { shortageSpreadMonths: value, lumpSumOfferedOnStatement: value, claimedKind: value }));
+    assert.doesNotThrow(() => compareWithStatement(result, { newMonthlyEscrowCents: 50000, shortageSpreadMonths: value }));
+  }
+  assert.doesNotThrow(() => compareWithStatement(result, { shortageSpreadMonths: 1e20, newMonthlyEscrowCents: 50000 }));
+  assert.equal(compareWithStatement(result, { newMonthlyEscrowCents: 1000000000 }).rows.length, 1, "exactly $10,000,000 is still accepted");
+});
+
+// ---------- B2: "required minimum" that is really the LOW POINT ----------
+
+test("B2: TV01 mix-up — typing the $1,100 low point as the required minimum gives a nudge, not CUSHION_OVER_CAP", () => {
+  const result = analyze(surplusAccount()); // cap $800, low point $1,100
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 110000 });
+  assertWellFormed(comparison);
+  assert.deepStrictEqual(comparison.flags, []);
+  assert.equal(rowByKey(comparison, "requiredMinimumBalance").status, "not-compared");
+  assert.equal(comparison.nudges.length, 1);
+  const nudge = comparison.nudges[0];
+  assert.equal(nudge.kind, "MINIMUM_LOOKS_LIKE_LOW_POINT");
+  assert.equal(nudge.field, "statement.requiredMinimumBalanceCents");
+  // two-sided, with the dollars visible
+  assert.ok(nudge.message.includes("$1,100.00"));
+  assert.match(nudge.message, /lowest projected balance/);
+  assert.match(nudge.message, /check which one you typed/);
+  assert.ok(nudge.message.includes("$300.00") && nudge.message.includes("$800.00"));
+  assert.match(nudge.message, /worth asking your servicer/);
+  // a not-compared row alone is not "matches", and a nudge is never "look-here"
+  assert.equal(comparison.overall, "not-provided");
+  assert.equal(comparison.provided, false);
+  assert.equal(letterKind(result, comparison), "REQUEST_FOR_INFORMATION");
+
+  const withMore = compareWithStatement(result, { requiredMinimumBalanceCents: 110000, claimedKind: "surplus", claimedAmountCents: 30000, newMonthlyEscrowCents: 40000 });
+  assertWellFormed(withMore);
+  assert.equal(withMore.overall, "matches");
+  assert.equal(withMore.nudges.length, 1);
+});
+
+test("B2: a genuine over-cap cushion that is NOT the low point still fires CUSHION_OVER_CAP, with no nudge (example 3)", () => {
+  const comparison = compareWithStatement(analyze(onTargetAccount()), { requiredMinimumBalanceCents: 180000 }); // low point $1,200
+  assert.deepStrictEqual(kindsOf(comparison), ["CUSHION_OVER_CAP"]);
+  assert.deepStrictEqual(comparison.nudges, []);
+});
+
+test("B2: the case the rule could hide — a real 3-month cushion with the balance sitting on it — keeps both sides and the $600 visible", () => {
+  const account = onTargetAccount();
+  account.startingBalanceCents = 240000; // federal low point becomes $1,800 = the statement's minimum; cap $1,200
+  const result = analyze(account);
+  assert.equal(result.lowPoint.projectedBalanceCents, 180000);
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 180000 });
+  assert.deepStrictEqual(comparison.flags, []);
+  const message = comparison.nudges[0].message;
+  assert.ok(message.includes("$1,800.00") && message.includes("$600.00") && message.includes("$1,200.00"));
+  assert.match(message, /If your statement really does list/);
+});
+
+test("B2 boundaries: |typed − low point| = $7.00 → nudge; $7.01 → flag; typed within $7 of the cap → match, no nudge, no flag", () => {
+  const result = analyze(surplusAccount()); // cap 80000, low point 110000
+  for (const typed of [110700, 109300]) {
+    const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: typed });
+    assert.deepStrictEqual(comparison.flags, [], String(typed));
+    assert.equal(comparison.nudges.length, 1, String(typed));
+  }
+  for (const typed of [110701, 109299]) {
+    const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: typed });
+    assert.deepStrictEqual(kindsOf(comparison), ["CUSHION_OVER_CAP"], String(typed));
+    assert.deepStrictEqual(comparison.nudges, []);
+  }
+  const account = surplusAccount();
+  account.startingBalanceCents = 120500; // low point $805: within $7 of the cap AND of the typed value
+  const nearCap = compareWithStatement(analyze(account), { requiredMinimumBalanceCents: 80500 });
+  assert.equal(rowByKey(nearCap, "requiredMinimumBalance").status, "match");
+  assert.deepStrictEqual(nearCap.nudges, []);
+  assert.deepStrictEqual(nearCap.flags, []);
+});
+
+test("B2: when the nudge applies, other sentences do not blame an 'extra cushion'", () => {
+  const result = analyze(surplusAccount());
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 110000, claimedKind: "none" });
+  const flag = flagByKind(comparison, "KIND_DIFFERS");
+  assert.equal(flag.sentence.includes("extra cushion"), false);
+});
+
+test("nudges is ALWAYS present, and empty when there is nothing to nudge", () => {
+  assert.deepStrictEqual(compareWithStatement(analyze(surplusAccount()), undefined).nudges, []);
+  assert.deepStrictEqual(compareWithStatement(analyze(surplusAccount()), { newMonthlyEscrowCents: 40000 }).nudges, []);
 });

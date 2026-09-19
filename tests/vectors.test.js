@@ -66,14 +66,12 @@ for (const vector of research.vectors) {
     for (const key of Object.keys(vector.expected)) {
       if (DOC_ONLY_EXPECTED_KEYS.includes(key)) continue;
       assert.ok(key in result, vector.id + ": the engine's result has no `" + key + "`");
-      if (key === "nearLine" && vector.expected.nearLine !== null) {
-        // The vectors pin three keys of nearLine. The engine also carries
-        // describing keys for the plain-English text (SPEC E3a.6), so compare
-        // the pinned three one by one instead of the whole object.
-        assert.notEqual(result.nearLine, null, vector.id + " → nearLine should be set");
-        for (const pinned of ["line", "distanceCents", "toleranceCents"]) {
-          assert.ok(Object.is(result.nearLine[pinned], vector.expected.nearLine[pinned]), vector.id + " → nearLine." + pinned);
-        }
+      if (key === "nearLine" || key === "paymentJumpDecomposition") {
+        // The vectors PIN some keys of these two objects. The engine also
+        // carries extra, additive keys there (SPEC E3a.6: nearLine's describing
+        // keys; math audit A12: the two added jump parts). So every pinned key
+        // is checked, at every depth, and extra keys are allowed.
+        assertPinnedKeys(result[key], vector.expected[key], vector.id + " → " + key);
         continue;
       }
       assert.deepStrictEqual(result[key], vector.expected[key], vector.id + " → " + key);
@@ -118,6 +116,20 @@ test("TV02 needs $1,040 to start (aggregate), not the $1,130 the banned single-i
   assert.equal(result.requiredStartingBalanceCents, 104000);
   assert.notEqual(result.requiredStartingBalanceCents, reference.singleItemStartingBalanceCents);
 });
+
+// Every key the vector pins must be on the engine's object with the same
+// value (Object.is, so 0 and -0 differ); null must meet null; extras are fine.
+function assertPinnedKeys(actual, expected, where) {
+  if (expected === null || typeof expected !== "object") {
+    assert.ok(Object.is(actual, expected), where + ": expected " + JSON.stringify(expected) + ", engine produced " + JSON.stringify(actual));
+    return;
+  }
+  assert.ok(actual !== null && typeof actual === "object", where + " should be an object");
+  for (const pinned of Object.keys(expected)) {
+    assert.ok(pinned in actual, where + "." + pinned + " is missing");
+    assertPinnedKeys(actual[pinned], expected[pinned], where + "." + pinned);
+  }
+}
 
 // ---------- helpers for readable failure messages ----------
 

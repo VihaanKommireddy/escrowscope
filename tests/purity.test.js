@@ -28,7 +28,7 @@ const EXPECTED_EXPORTS = [
   "analyze", "projectWithPayment", "TOLERANCE_BALANCE_CENTS", "TOLERANCE_PAYMENT_CENTS",
   "compareWithStatement",
   "explainVerdict", "explainSteps", "explainJump", "nextSteps", "explainServicerLine",
-  "buildLetter",
+  "buildLetter", "letterKind",
   "refundDeadline",
   "VECTORS", "VECTORS_META", "REFERENCE_ONLY",
   "runSelfCheck", "accountFromVector", "DOC_ONLY_EXPECTED_KEYS",
@@ -274,6 +274,35 @@ test("no decimal-point numbers and no exponent shortcuts in engine code (vectors
     if (match !== null) {
       const line = code.slice(0, match.index).split("\n").length;
       assert.fail("engine/" + name + " line " + line + " has a non-whole number: " + match[0]);
+    }
+  }
+});
+
+// ---------- wording that must not come back (math audit, fix order 1) ----------
+// These read the RAW source, comments included, because the orders cover both.
+
+test("A10: no engine string or comment says 'Most payment jumps' (it is 'Many': an unsourced 'most' is a factual claim)", () => {
+  for (const name of EXPECTED_FILES) {
+    assert.equal(readEngineFile(name).includes("Most payment jumps"), false, "engine/" + name);
+    assert.equal(readEngineFile(name).toLowerCase().includes("most payment jumps"), false, "engine/" + name);
+  }
+});
+
+test("A6: nothing in engine/ states whole-dollar rounding as settled law ('lawfully round', 'may lawfully', 'could lawfully')", () => {
+  for (const name of EXPECTED_FILES) {
+    if (name === "vectors.js") continue; // generated research text, not ours to reword
+    const match = /lawfully round|may lawfully|could lawfully/i.exec(readEngineFile(name));
+    assert.equal(match, null, "engine/" + name + ": " + (match ? match[0] : ""));
+  }
+});
+
+test("A15: the engine carries no housing-counselor phone number (only contact details printed on the linked official page)", () => {
+  for (const name of EXPECTED_FILES) {
+    if (name === "vectors.js") continue;
+    const source = readEngineFile(name);
+    // "888-995" and "4673", not a bare "995": the year 1995 (HUD's guidance, and its URL) is everywhere.
+    for (const piece of ["HOPE", "888-995", "4673", "PHONE_COUNSELOR"]) {
+      assert.equal(source.includes(piece), false, "engine/" + name + " contains " + piece);
     }
   }
 });

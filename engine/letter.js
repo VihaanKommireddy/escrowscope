@@ -1,12 +1,14 @@
 // engine/letter.js — a neutral "please explain this calculation" letter,
 // pre-filled with the numbers (SPEC B1 bet 4).
 //
-// WHICH LETTER
-//   • Something does not line up (any flag), or a refund looks due →
-//     a NOTICE OF ERROR under 12 CFR 1024.35, which also asks for the
+// WHICH LETTER  (decided in ONE place: letterKind, below)
+//   • A flag asserts a discrepancy between the statement and the federal
+//     math → a NOTICE OF ERROR under 12 CFR 1024.35, which also asks for the
 //     worksheet under 12 CFR 1024.36.
-//   • Everything lines up → asserting an "error" would be wrong, so it is a
-//     plain REQUEST FOR INFORMATION under 12 CFR 1024.36.
+//   • Anything else (a question, a too-close-to-call figure, a refund that
+//     looks due on a statement that matches, or nothing at all) → asserting an
+//     "error" would be wrong, so it is a REQUEST FOR INFORMATION under
+//     12 CFR 1024.36 that carries the same questions.
 // Both carry their own "this letter states arithmetic, not legal conclusions"
 // line (research doc 03 §4). Written fresh in our own words, shaped like the
 // model letter in that doc.
@@ -63,11 +65,44 @@ function billLines(result) {
   return lines;
 }
 
+// ---------------------------------------------------------------------------
+// letterKind — THE one rule for which letter this is (math audit A2).
+// buildLetter below and nextSteps in explain.js both call it; nobody else
+// decides.
+//
+// 12 CFR 1024.35(a) is for a notice that ASSERTS an error: it must include
+// "the error the borrower believes has occurred". So the letter is a notice of
+// error only when a flag asserts a discrepancy between the statement and the
+// federal math:
+//     CUSHION_OVER_CAP · PAYMENT_ABOVE_MAX · KIND_DIFFERS · SPREAD_TOO_SHORT ·
+//     AMOUNT_DIFFERS on the claimed shortage/surplus amount
+// Everything else only ASKS, so it is a request for information (12 CFR
+// 1024.36) that carries the same questions:
+//     a refund that looks due while the statement matches (the 30 days may not
+//     have run) · every too-close-to-call case · LUMP_SUM_OFFERED (SPEC D6: a
+//     question, never a finding) · a payment LOWER than expected (lower is
+//     allowed) · the "is that really the required minimum?" nudge · nothing
+//     to ask at all.
+// ---------------------------------------------------------------------------
+
+const FLAGS_THAT_ASSERT_A_DISCREPANCY = ["CUSHION_OVER_CAP", "PAYMENT_ABOVE_MAX", "KIND_DIFFERS", "SPREAD_TOO_SHORT"];
+
+export function letterKind(result, comparison) {
+  for (const flag of comparison.flags) {
+    if (FLAGS_THAT_ASSERT_A_DISCREPANCY.includes(flag.kind)) return "NOTICE_OF_ERROR";
+    if (flag.kind === "AMOUNT_DIFFERS" && flag.rowKey === "claimedAmount") return "NOTICE_OF_ERROR";
+  }
+  return "REQUEST_FOR_INFORMATION";
+}
+
 // The numbered "what I am asking about" items.
 function questionLines(result, comparison) {
   const items = [];
   for (const flag of comparison.flags) {
     items.push(flag.letterLine);
+  }
+  for (const nudge of comparison.nudges) {
+    items.push(nudge.letterLine);
   }
 
   const near = result.nearLine;
@@ -91,7 +126,7 @@ export function buildLetter(result, comparison, details) {
   const propertyAddress = detailOrBlank(given, "propertyAddress", "[your property address]");
 
   const questions = questionLines(result, comparison);
-  const isNoticeOfError = questions.length > 0;
+  const isNoticeOfError = letterKind(result, comparison) === "NOTICE_OF_ERROR";
   const inputs = result.inputs;
   const low = result.lowPoint;
   const cushionMonthsWords = inputs.cushionMonths === 1 ? "1 month" : inputs.cushionMonths + " months";
@@ -130,13 +165,24 @@ export function buildLetter(result, comparison, details) {
   lines.push("- Result: " + describeResult(result));
   lines.push("");
 
-  if (isNoticeOfError) {
+  if (questions.length > 0) {
+    if (isNoticeOfError) {
+      // 12 CFR 1024.35(a): a notice of error names "the error the borrower
+      // believes has occurred". Say so in plain words.
+      lines.push("I believe the statement contains the error(s) described below.");
+      lines.push("");
+    }
     lines.push("What I am asking about:");
     for (let index = 0; index < questions.length; index++) {
       lines.push(index + 1 + ". " + questions[index]);
     }
     lines.push("");
+  }
+
+  if (isNoticeOfError) {
     lines.push("Please review this calculation. Then either confirm it is correct and explain why, or correct it and send me an updated statement. If you used different bill amounts or dates than the ones above, please send them to me, along with the escrow analysis worksheet.");
+  } else if (questions.length > 0) {
+    lines.push("Please answer the question" + (questions.length === 1 ? "" : "s") + " above, and send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used.");
   } else {
     lines.push("My numbers line up with the statement. For my records, please send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used.");
   }
