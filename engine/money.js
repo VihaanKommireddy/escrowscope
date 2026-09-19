@@ -105,7 +105,9 @@ export function divideRoundHalfUp(cents, divisor) {
 // ---------------------------------------------------------------------------
 
 const PROBLEM_EMPTY = "Please type a dollar amount, like 1234.50.";
-const PROBLEM_NOT_MONEY = "That doesn't look like a dollar amount. Use digits only, like 1234.50.";
+// The example shows a comma on purpose: the form says commas are fine, and
+// parseDollars accepts them. (The old words, "digits only", said the opposite.)
+const PROBLEM_NOT_MONEY = "That doesn't look like a dollar amount. Type a dollar amount like 1,234.50.";
 const PROBLEM_TOO_MANY_DECIMALS =
   "Use at most 2 digits after the decimal point. Dollars and cents, like 1234.50.";
 const PROBLEM_COMMAS =

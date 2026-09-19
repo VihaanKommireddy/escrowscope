@@ -11,6 +11,13 @@
 //   • Servicer-neutral. A mismatch is not proof of a mistake.
 //   • We never promise a refund, never tell anyone what they "should" do,
 //     and this is math, not legal advice.
+//   • "This page", never "we / us / our", in any sentence a visitor can see
+//     (QA audit #14). The page's promise is that nobody is told anything, so
+//     "You told us" is the wrong phrase: say "You ticked …", "you chose …",
+//     "this page …". Comments like this one may still say "we".
+//   • One name for one thing: "escrow payment" (or "the regular escrow
+//     payment", to tell it apart from a shortage or deficiency add-on) and
+//     "the next 12 months".
 //
 // "TOO CLOSE TO CALL" (SPEC E3): the soft wording is used if and only if
 // `result.nearLine` is set. This file never works out "near" on its own.
@@ -68,20 +75,20 @@ function surplusSentences(result) {
 
   if (!result.inputs.borrowerCurrent) {
     return [
-      "There is a surplus of " + amount + ": the account starts the year with that much more than the federal math calls for.",
-      "The refund rule applies only when payments are current. You told us a payment was more than 30 days late, so the servicer may keep the surplus in the account, under the terms of your mortgage documents (" + result.cite + ").",
+      "There is a surplus of " + amount + ": the account starts the next 12 months with that much more than the federal math calls for.",
+      "The refund rule applies only when payments are current. You ticked that a payment was more than 30 days late, so the servicer may keep the surplus in the account, under the terms of your mortgage documents (" + result.cite + ").",
     ];
   }
   if (near !== null) {
     return [
-      "By our math, to the cent, there is a surplus of " + amount + ".",
-      "The rule draws a line at $50.00. At $50 or more, the surplus is refunded within 30 days of the escrow analysis. Under $50, the servicer may refund it or credit it toward next year's payments (" + result.cite + ").",
-      "Our figure is within " + formatCents(near.toleranceCents) + " of that line. " + TOO_CLOSE_SENTENCE,
+      "By this page's math, to the cent, there is a surplus of " + amount + ".",
+      "The rule draws a line at $50.00. At $50 or more, the surplus is refunded within 30 days of the escrow analysis. Under $50, the servicer may refund it or credit it toward next year's escrow payments (" + result.cite + ").",
+      "This page's figure is within " + formatCents(near.toleranceCents) + " of that line. " + TOO_CLOSE_SENTENCE,
     ];
   }
   if (result.classification === "SURPLUS_REFUND_REQUIRED") {
     return [
-      "There is a surplus of " + amount + ": the account starts the year with that much more than the federal math calls for.",
+      "There is a surplus of " + amount + ": the account starts the next 12 months with that much more than the federal math calls for.",
       "The rule says a surplus of $50 or more is refunded within 30 days of the date of the escrow analysis, as long as payments are current (" + result.cite + ").",
     ];
   }
@@ -96,17 +103,17 @@ function deficiencySentences(result) {
   const payment = result.newMonthlyEscrowPayment;
   const near = result.nearLine;
   const sentences = [
-    "Your account starts the year " + amount + " below $0. That is called a deficiency: the servicer paid a bill with its own money.",
+    "Your account starts the next 12 months " + amount + " below $0. That is called a deficiency: the servicer paid a bill with its own money.",
   ];
 
   if (!result.inputs.borrowerCurrent) {
-    sentences.push("You told us a payment was more than 30 days late. In that case this rule does not set how the deficiency is collected. Your mortgage documents control that (12 CFR 1024.17(f)(4)(iii)).");
+    sentences.push("You ticked that a payment was more than 30 days late. In that case this rule does not set how the deficiency is collected. Your mortgage documents control that (12 CFR 1024.17(f)(4)(iii)).");
     return sentences;
   }
 
   sentences.push("The servicer may collect it back in 2 or more equal monthly payments. At the fastest, that is " + formatCents(payment.deficiencySpreadCents) + " a month for 2 months.");
   if (near !== null && near.appliesTo === "deficiency") {
-    sentences.push("Our deficiency figure is within " + formatCents(near.toleranceCents) + " of one month's escrow payment (" + formatCents(near.lineCents) + "). " + TOO_CLOSE_SENTENCE + " It matters for one thing only: whether the servicer may ask for the whole deficiency within 30 days.");
+    sentences.push("This page's deficiency figure is within " + formatCents(near.toleranceCents) + " of one month's escrow payment (" + formatCents(near.lineCents) + "). " + TOO_CLOSE_SENTENCE + " It matters for one thing only: whether the servicer may ask for the whole deficiency within 30 days.");
   } else if (result.deficiencyCents < result.baseMonthlyPaymentCents) {
     sentences.push("Because it is smaller than one month's escrow payment, the servicer may instead ask for it within 30 days.");
   }
@@ -123,12 +130,12 @@ function shortageSentences(result) {
   if (result.deficiencyCents > 0) {
     sentences.push("On top of that, there is a shortage of " + amount + ", measured from $0 up to the target. Splitting the two this way follows " + HUD_GUIDANCE_CITE + ", so no dollar is counted twice.");
   } else {
-    sentences.push("There is a shortage of " + amount + ": the account starts the year that far below the target.");
+    sentences.push("There is a shortage of " + amount + ": the account starts the next 12 months that far below the target.");
   }
   sentences.push("Spread over 12 months, that adds " + formatCents(payment.shortageSpreadOver12Cents) + " a month. That is allowed.");
 
   if (near !== null && near.appliesTo === "shortage") {
-    sentences.push("Our shortage figure is within " + formatCents(near.toleranceCents) + " of one month's escrow payment (" + oneMonth + "). " + TOO_CLOSE_SENTENCE + " It matters for one thing only: whether the servicer may ask for the whole shortage within 30 days.");
+    sentences.push("This page's shortage figure is within " + formatCents(near.toleranceCents) + " of one month's escrow payment (" + oneMonth + "). " + TOO_CLOSE_SENTENCE + " It matters for one thing only: whether the servicer may ask for the whole shortage within 30 days.");
   } else if (result.shortageCents < result.baseMonthlyPaymentCents) {
     sentences.push("Because the shortage is smaller than one month's escrow payment (" + oneMonth + "), the servicer may instead ask for it within 30 days, or leave it alone.");
   } else {
@@ -281,10 +288,10 @@ export function explainSteps(result) {
     stepFourMath = "Starting from $0, the lowest month is " + monthName(lowestStepOne.calendarMonth) + " at " + formatCents(lowestStepOne.step1TrialBalanceCents) + ". Add " + add + " to bring it up to $0.";
   }
 
-  let cushionPlain = "A cushion is extra padding the servicer may hold for surprises. The most the rule allows is one-sixth of the year's bills, which is 2 months of payments. We round this one down, because it is a cap.";
+  let cushionPlain = "A cushion is extra padding the servicer may hold for surprises. The most the rule allows is one-sixth of the year's bills, which is 2 months of escrow payments. This page rounds this one down, because it is a cap.";
   let cushionCite = "12 CFR 1024.17(c)(5)";
   if (months < 2) {
-    cushionPlain = "A cushion is extra padding the servicer may hold for surprises. The federal limit is 2 months of payments, but you told us your mortgage documents allow " + (months === 1 ? "1 month" : "no cushion") + ", and the lower limit wins.";
+    cushionPlain = "A cushion is extra padding the servicer may hold for surprises. The federal limit is 2 months of escrow payments, but you chose " + (months === 1 ? "1 month" : "no cushion") + " as the limit in your mortgage documents, and the lower limit wins.";
     cushionCite = "12 CFR 1024.17(c)(8)";
   }
 
@@ -308,8 +315,8 @@ export function explainSteps(result) {
       url: URL_ECFR,
     },
     {
-      title: "Step 2. Divide by 12 to get the monthly payment",
-      plain: "The regular monthly payment is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top. If it does not divide evenly, we round to the nearest cent. That rounding is our choice. The rule does not mention cents.",
+      title: "Step 2. Divide by 12 to get the escrow payment",
+      plain: "The regular escrow payment each month is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top. If it does not divide evenly, this page rounds to the nearest cent. That rounding is this page's choice. The rule does not mention cents.",
       math: total + " ÷ 12 = " + monthly,
       cite: "12 CFR 1024.17(c)(1)(ii)",
       url: URL_CFPB_RULE,
@@ -323,14 +330,14 @@ export function explainSteps(result) {
     },
     {
       title: "Step 4. Run the 12 months and find the lowest one",
-      plain: "Pretend the account starts at $0. Each month, add the monthly payment and take away that month's bills. Then add just enough to lift the lowest month up to $0.",
+      plain: "Pretend the account starts at $0. Each month, add the escrow payment and take away that month's bills. Then add just enough to lift the lowest month up to $0.",
       math: stepFourMath,
       cite: "12 CFR 1024.17(d)(2)(i)(A)–(B); Appendix E, Steps 1–2",
       url: URL_APPENDIX_E,
     },
     {
       title: "Step 5. Add the cushion to get the target",
-      plain: "Add the cushion on top. The answer is the target: the most the servicer may hold at the start of the year. With that much, the lowest month lands right on the cushion.",
+      plain: "Add the cushion on top. The answer is the target: the most the servicer may hold at the start of the next 12 months. With that much, the lowest month lands right on the cushion.",
       math: add + " + " + cushion + " = " + required,
       cite: "12 CFR 1024.17(d)(2)(i)(C); Appendix E, Step 3",
       url: URL_APPENDIX_E,
@@ -515,7 +522,7 @@ export function nextSteps(result, comparison) {
     if (near.line === "ONE_MONTH_PAYMENT") what = "whether the servicer may ask for the whole " + near.appliesTo + " within 30 days";
     steps.push({
       title: "This one is too close to call",
-      body: "Our figure, to the cent, is " + formatCents(near.amountCents) + ". The line in the rule is " + formatCents(near.lineCents) + ". " + TOO_CLOSE_SENTENCE + " It decides " + what + ". You can ask your servicer for its exact figure.",
+      body: "This page's figure, to the cent, is " + formatCents(near.amountCents) + ". The line in the rule is " + formatCents(near.lineCents) + ". " + TOO_CLOSE_SENTENCE + " It decides " + what + ". You can ask your servicer for its exact figure.",
       url: URL_CFPB_RULE,
     });
   } else if (result.classification === "SURPLUS_REFUND_REQUIRED") {
@@ -552,7 +559,7 @@ export function nextSteps(result, comparison) {
   if (comparison.overall === "matches" && (result.shortageCents > 0 || result.deficiencyCents > 0)) {
     steps.push({
       title: "When the math checks out, the cost is the bills",
-      body: "A higher payment usually means higher tax or insurance bills. Things people look into: shopping for homeowners insurance, a homestead exemption or a property tax appeal with the county, and whether to pay a shortage at once or let it spread. Either way, the base payment follows the bills.",
+      body: "A higher payment usually means higher tax or insurance bills. Things people look into: shopping for homeowners insurance, a homestead exemption or a property tax appeal with the county, and whether to pay a shortage at once or let it spread. Either way, the regular escrow payment follows the bills.",
     });
   }
 

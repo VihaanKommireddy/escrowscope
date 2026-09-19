@@ -586,7 +586,7 @@ export function projectWithPayment(account, monthlyCents) {
 
   const usable = Number.isInteger(monthlyCents) && monthlyCents >= 0 && monthlyCents <= MAX_MONEY_CENTS;
   if (!usable) {
-    throw new RangeError("The monthly payment must be a whole number of cents, from $0 up to $10,000,000.");
+    throw new RangeError("The monthly escrow payment must be a whole number of cents, from $0 up to $10,000,000.");
   }
 
   const billsByMonth = billsForEachMonth(account.disbursements);

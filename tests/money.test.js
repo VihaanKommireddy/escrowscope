@@ -141,7 +141,44 @@ test("parseDollars explains each kind of problem differently", () => {
   assert.match(parseDollars("12.345").problem, /2 digits|cents/i);
   assert.match(parseDollars("10,000,000.01").problem, /10,000,000/);
   assert.match(parseDollars("1234,50").problem, /comma|period/i);
-  assert.match(parseDollars("abc").problem, /digits/i);
+  assert.match(parseDollars("abc").problem, /doesn't look like a dollar amount/i);
+  const problems = ["", "12.345", "10,000,000.01", "1234,50", "abc"].map((typed) => parseDollars(typed).problem);
+  assert.equal(new Set(problems).size, 5, "five kinds of problem, five different messages");
+});
+
+// FIX ORDER 2, QA #14: the form says commas are fine ("Type dollar amounts like
+// 1,234.56") and parseDollars accepts them. The old message said "Use digits
+// only, like 1234.50", which told people the opposite.
+test("QA #14: no problem message says 'digits only', and the not-a-dollar-amount message shows an example WITH a comma", () => {
+  const typedBadly = [undefined, "", "abc", "12.345", "1234,50", "1.2.3", "(5", "$", "99999999999", "10,000,000.01"];
+  for (const typed of typedBadly) {
+    const answer = parseDollars(typed);
+    assert.equal(answer.ok, false);
+    assert.equal(/digits only/i.test(answer.problem), false, answer.problem);
+  }
+  assert.equal(parseDollars("abc").problem, "That doesn't look like a dollar amount. Type a dollar amount like 1,234.50.");
+});
+
+test("QA #14: every example amount a problem message shows is one parseDollars itself accepts", () => {
+  const typedBadly = [undefined, "", "abc", "12.345", "1234,50", "1.2.3", "99999999999"];
+  let examplesChecked = 0;
+  for (const typed of typedBadly) {
+    const message = parseDollars(typed).problem;
+    // An example is a number that follows the word "like": "… like 1,234.50."
+    // ("doesn't look like a dollar amount" has a "like" too, with no number after it.)
+    let from = message.indexOf("like ");
+    while (from !== -1) {
+      let example = message.slice(from + 5).split(" ")[0];
+      while (example.endsWith(".") || example.endsWith(",")) example = example.slice(0, example.length - 1);
+      const startsWithADigit = "0123456789".includes(example.slice(0, 1)) && example !== "";
+      if (startsWithADigit) {
+        assert.equal(parseDollars(example).ok, true, "the message's own example was refused: " + example + " in: " + message);
+        examplesChecked = examplesChecked + 1;
+      }
+      from = message.indexOf("like ", from + 1);
+    }
+  }
+  assert.ok(examplesChecked >= 4, "checked only " + examplesChecked + " examples");
 });
 
 test("parseDollars never echoes what was typed back in the problem text", () => {

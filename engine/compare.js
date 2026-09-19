@@ -237,8 +237,8 @@ function compareCushion(result, statement, rows, flags, nudges) {
   if (status !== "over-limit") return;
 
   let limitWords = "2 months of escrow payments (one-sixth of your yearly bills)";
-  if (months === 1) limitWords = "1 month of escrow payments, the limit you told us your mortgage documents set";
-  if (months === 0) limitWords = "no cushion at all, the limit you told us your mortgage documents set";
+  if (months === 1) limitWords = "1 month of escrow payments, the limit you chose as the one your mortgage documents set";
+  if (months === 0) limitWords = "no cushion at all, the limit you chose as the one your mortgage documents set";
 
   flags.push({
     kind: "CUSHION_OVER_CAP",
@@ -465,12 +465,12 @@ function comparePayment(result, statement, view, rows, flags) {
     federalCents = closestFigure;
     note = "This matches a payment the federal math supports.";
     if (closestFigure === baseCents && (result.shortageCents > 0 || result.deficiencyCents > 0)) {
-      note = "This matches bills ÷ 12 alone. It means the shortage or deficiency is not being collected through the monthly payment.";
+      note = "This matches bills ÷ 12 alone. It means the shortage or deficiency is not being collected through the escrow payment.";
     }
   } else if (deficiencyOutsideTheRule && atLeastBase) {
     status = "match";
     federalCents = result.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents;
-    note = "You told us a payment was more than 30 days late. In that case the federal rule does not limit how the deficiency is collected. Your mortgage documents control that, so we cannot check the part above " + formatCents(federalCents) + ".";
+    note = "You ticked that a payment was more than 30 days late. In that case the federal rule does not limit how the deficiency is collected. Your mortgage documents control that, so this page cannot check the part above " + formatCents(federalCents) + ".";
   } else if (hasDeficiencyRange && atLeastBase) {
     status = "match";
     federalCents = maximumCents;
@@ -610,7 +610,7 @@ function checkLumpSum(result, statement, view, flags) {
     amountCents: shortageCents,
     cite: cite,
     sentence:
-      "You told us the statement offers a pay-it-all-at-once option. By the federal math the shortage is " + formatCents(shortageCents) +
+      "You ticked that the statement offers a pay-it-all-at-once option. By the federal math the shortage is " + formatCents(shortageCents) +
       ", which is more than one month's escrow payment. For a shortage that size, the rule lists two choices for the servicer: leave it alone, or spread it over at least 12 months. The CFPB's mortgage servicing FAQ says the annual statement itself should stick to those choices. You are always free to pay a shortage off early if you want to. A fair question to ask your servicer: \"Why does my annual escrow statement offer a lump-sum option for this shortage?\" (" + cite + ")",
     letterLine:
       "The statement offers a lump-sum option for the shortage. By my math the shortage is " + formatCents(shortageCents) +

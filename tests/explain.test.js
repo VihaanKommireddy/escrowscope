@@ -1,12 +1,21 @@
 // tests/explain.test.js — the words. Two jobs:
 //   1. VOICE: run every research vector (counted from the file) and every
 //      built-in example through every function that produces text, and scan
-//      all of it for words the brand guide bans.
+//      all of it for words the brand guide bans. Then read the engine's own
+//      SOURCE for string literals and scan those too, so a sentence on a
+//      rarely reached branch cannot hide.
 //   2. RULES: the verdict tones (SPEC C4), the too-close-to-call softening
 //      (SPEC E3), the six steps, the payment-jump split, and the next steps.
+//
+// THE "THIS PAGE" VOICE (QA audit #14, the director's ruling): no "we", "us"
+// or "our" in anything a visitor can see. On a page whose promise is that
+// nobody is told anything, "You told us" is the wrong phrase. It is "You
+// ticked …" and "this page …". Code COMMENTS may keep "we"; only strings a
+// visitor can see must change.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
 
 import {
   analyze,
@@ -18,10 +27,13 @@ import {
   explainServicerLine,
   buildLetter,
   projectWithPayment,
+  letterKind,
   validateAccount,
   validateStatement,
   accountFromVector,
   formatCents,
+  parseDollars,
+  refundDeadline,
   VECTORS,
 } from "../engine/index.js";
 import { EXAMPLES } from "../examples.js";
@@ -65,8 +77,52 @@ function statementsFor(result) {
     shortageSpreadMonths: 1,
   };
   const oddOnes = { claimedKind: "none", newMonthlyEscrowCents: result.baseMonthlyPaymentCents, lumpSumOfferedOnStatement: true };
-  return [undefined, {}, agrees, tooMuch, tooLittle, oddOnes];
+
+  // Statements aimed at sentences the six above do not reach (fix order 2).
+  // Each one fills in ONE thing, so the branch for that thing is what speaks.
+  const base = result.baseMonthlyPaymentCents;
+  const most = pay.monthlyEscrowWhileRepayingDeficiencyCents;
+  const lowPointTypedAsMinimum = { requiredMinimumBalanceCents: result.lowPoint.projectedBalanceCents > 0 ? result.lowPoint.projectedBalanceCents : 0 };
+  const basePaymentOnly = { newMonthlyEscrowCents: base };
+  const halfwayToTheMost = { currentMonthlyEscrowCents: base, newMonthlyEscrowCents: base + Math.floor((most - base) / 2) };
+  const aHairOverTheMost = { currentMonthlyEscrowCents: base, newMonthlyEscrowCents: most + 50 };
+  const kindsWithNoAmount = ["surplus", "shortage", "deficiency", "none"].map((claimedKind) => ({ claimedKind: claimedKind }));
+  const amountWithNoKind = { claimedAmountCents: 30000 };
+  const spreadOnly = [1, 6, 11, 24].map((months) => ({ shortageSpreadMonths: months }));
+  const lumpSumOnly = { lumpSumOfferedOnStatement: true };
+
+  return [undefined, {}, agrees, tooMuch, tooLittle, oddOnes]
+    .concat([lowPointTypedAsMinimum, basePaymentOnly, halfwayToTheMost, aHairOverTheMost, amountWithNoKind, lumpSumOnly])
+    .concat(kindsWithNoAmount)
+    .concat(spreadOnly);
 }
+
+// Accounts the vectors and examples do not include: no cushion at all, a
+// 1-month cushion, a payment more than 30 days late, a balance below $0.
+function extraAccounts() {
+  const bills = [
+    { label: "Property tax", month: 5, amountCents: 180000 },
+    { label: "Homeowners insurance", month: 7, amountCents: 120000 },
+    { label: "Property tax", month: 11, amountCents: 180000 },
+  ];
+  const extras = [];
+  for (const cushionMonths of [0, 1, 2]) {
+    for (const borrowerCurrent of [true, false]) {
+      // −$398.00 is a deficiency within $7.00 of one month's escrow payment
+      // ($400.00): the too-close-to-call wording for a deficiency, which no
+      // research vector reaches.
+      for (const startingBalanceCents of [-50000, -39800, 20000, 150000]) {
+        extras.push({
+          name: "extra: cushion " + cushionMonths + ", current " + borrowerCurrent + ", start " + startingBalanceCents,
+          account: { startMonth: 1, startingBalanceCents: startingBalanceCents, cushionMonths: cushionMonths, borrowerCurrent: borrowerCurrent, disbursements: bills },
+        });
+      }
+    }
+  }
+  return extras;
+}
+
+const EXTRA_ACCOUNTS = extraAccounts();
 
 function allSituations() {
   const situations = [];
@@ -79,6 +135,12 @@ function allSituations() {
   }
   for (const example of EXAMPLES) {
     situations.push({ name: example.id, account: example.account, result: analyze(example.account), statement: example.statement });
+  }
+  for (const extra of EXTRA_ACCOUNTS) {
+    const result = analyze(extra.account);
+    for (const statement of statementsFor(result)) {
+      situations.push({ name: extra.name, account: extra.account, result: result, statement: statement });
+    }
   }
   return situations;
 }
@@ -102,19 +164,103 @@ function everyWordFor(situation) {
     nextSteps(result, comparison),
     explainServicerLine(result, account, statement),
     buildLetter(result, comparison, {}),
-    buildLetter(result, comparison, { servicerName: "Example Servicing", loanNumber: "0001234567", borrowerName: "Pat Homeowner", propertyAddress: "1 Main St, Cary, NC", date: "September 19, 2026" }),
+    buildLetter(result, comparison, { servicerName: "Example Servicing", loanNumber: "0001234567", borrowerName: "Pat Homeowner", propertyAddress: "1 Main St, Cary, NC", date: "September 19, 2026", analysisDate: "2026-09-01" }),
     validateAccount(account),
     validateStatement(statement, account),
+    // Pinned by the research vectors, so never reworded; scanned all the same.
+    result.servicerOptions,
+    result.cite,
   ];
+  return collectStrings(produced, []);
+}
+
+// Words that do not depend on a situation: what the engine says about input it
+// cannot use, the refund clock, and the examples' own titles and blurbs.
+function everyWordNotTiedToASituation() {
+  const goodBill = { label: "Property tax", month: 5, amountCents: 180000 };
+  const tooManyBills = [];
+  for (let count = 0; count < 101; count++) tooManyBills.push(goodBill);
+
+  const brokenAccounts = [
+    undefined, null, "account", [], {},
+    { startMonth: 13, startingBalanceCents: 1.5, cushionMonths: 3, borrowerCurrent: "yes", disbursements: [] },
+    { startMonth: 1, startingBalanceCents: 99999999999, disbursements: tooManyBills },
+    { startMonth: 1, startingBalanceCents: 0, disbursements: "bills" },
+    { startMonth: 1, startingBalanceCents: 0, priorYear: "last year", disbursements: [
+      {}, null, { month: 0, amountCents: "12" }, { month: 5, amountCents: 0 }, { month: 5, amountCents: -5 },
+      { month: 5, amountCents: 99999999999 }, { month: 5, amountCents: 100, label: 42 }, { month: 5, amountCents: 100, label: "x".repeat(61) },
+    ] },
+    { startMonth: 1, startingBalanceCents: 0, priorYear: { annualDisbursementsCents: -1 }, disbursements: [goodBill] },
+    // Usable numbers that draw every "are you sure?" nudge.
+    { startMonth: 1, startingBalanceCents: -5000, disbursements: [{ label: "Flood insurance", month: 3, amountCents: 9000 }] },
+    { startMonth: 1, startingBalanceCents: 0, disbursements: [{ month: 3, amountCents: 900000000 }, { month: 4, amountCents: 900000000 }] },
+  ];
+  const goodAccount = { startMonth: 1, startingBalanceCents: 150000, disbursements: [goodBill, { label: "Homeowners insurance", month: 7, amountCents: 120000 }] };
+  const brokenStatements = [
+    "statement", [], 42,
+    { currentMonthlyEscrowCents: "1", newMonthlyEscrowCents: -5, requiredMinimumBalanceCents: 99999999999, claimedAmountCents: 1.5 },
+    { claimedKind: "refund", shortageSpreadMonths: 0, lumpSumOfferedOnStatement: "yes" },
+    { claimedAmountCents: 30000 },
+    { claimedKind: "shortage" },
+    { currentMonthlyEscrowCents: 200000, newMonthlyEscrowCents: 250000 },
+  ];
+
+  const produced = [];
+  for (const account of brokenAccounts) produced.push(validateAccount(account));
+  for (const statement of brokenStatements) {
+    produced.push(validateStatement(statement, goodAccount));
+    produced.push(validateStatement(statement, undefined));
+  }
+  for (const typed of [undefined, "", "   ", "abc", "12.345", "1,23", "1.234,56", "(5", "1.2.3", "99999999999", "$"]) {
+    const answer = parseDollars(typed);
+    assert.equal(answer.ok, false, "expected a problem for: " + typed);
+    produced.push(answer);
+  }
+  produced.push(refundDeadline("2026-09-01"));
+  produced.push(refundDeadline("not a date"));
+  for (const example of EXAMPLES) produced.push([example.title, example.blurb]);
   return collectStrings(produced, []);
 }
 
 const SITUATIONS = allSituations();
 
-test("the scan covers every vector in the file and all three examples", () => {
+// Every string the runtime scan can reach, each with a note of where it came from.
+function allTexts() {
+  const texts = [];
+  for (const situation of SITUATIONS) {
+    for (const text of everyWordFor(situation)) texts.push({ where: situation.name, text: text });
+  }
+  for (const text of everyWordNotTiedToASituation()) texts.push({ where: "no situation", text: text });
+  return texts;
+}
+
+const ALL_TEXTS = allTexts();
+
+test("the scan covers every vector in the file, all three examples, and the extra accounts", () => {
   const names = new Set(SITUATIONS.map((situation) => situation.name));
   assert.ok(VECTORS.length >= 30);
-  assert.equal(names.size, VECTORS.length + 3);
+  assert.equal(names.size, VECTORS.length + 3 + EXTRA_ACCOUNTS.length);
+});
+
+test("the scan reaches both kinds of letter, every flag kind, the mix-up nudge, and every verdict tone", () => {
+  const letterKinds = new Set();
+  const flagKinds = new Set();
+  const nudgeKinds = new Set();
+  const tones = new Set();
+  const rowStatuses = new Set();
+  for (const situation of SITUATIONS) {
+    const comparison = compareWithStatement(situation.result, situation.statement);
+    letterKinds.add(letterKind(situation.result, comparison));
+    tones.add(explainVerdict(situation.result, comparison).tone);
+    for (const flag of comparison.flags) flagKinds.add(flag.kind);
+    for (const nudge of comparison.nudges) nudgeKinds.add(nudge.kind);
+    for (const row of comparison.rows) rowStatuses.add(row.status);
+  }
+  assert.deepStrictEqual([...letterKinds].sort(), ["NOTICE_OF_ERROR", "REQUEST_FOR_INFORMATION"]);
+  assert.deepStrictEqual([...flagKinds].sort(), ["AMOUNT_DIFFERS", "CUSHION_OVER_CAP", "KIND_DIFFERS", "LUMP_SUM_OFFERED", "PAYMENT_ABOVE_MAX", "SPREAD_TOO_SHORT"]);
+  assert.deepStrictEqual([...nudgeKinds], ["MINIMUM_LOOKS_LIKE_LOW_POINT"]);
+  assert.deepStrictEqual([...tones].sort(), ["clear", "flag", "info"]);
+  assert.deepStrictEqual([...rowStatuses].sort(), ["differs", "match", "not-compared", "over-limit"]);
 });
 
 // ---------- 1. voice ----------
@@ -129,16 +275,216 @@ const BANNED = [
 ];
 
 test("no banned word appears in anything the engine can say", () => {
-  let scanned = 0;
-  for (const situation of SITUATIONS) {
-    for (const text of everyWordFor(situation)) {
-      scanned = scanned + 1;
-      for (const pattern of BANNED) {
-        assert.equal(pattern.test(text), false, situation.name + ": " + pattern + " in: " + text);
+  for (const { where, text } of ALL_TEXTS) {
+    for (const pattern of BANNED) {
+      assert.equal(pattern.test(text), false, where + ": " + pattern + " in: " + text);
+    }
+  }
+  assert.ok(ALL_TEXTS.length > 5000, "scanned only " + ALL_TEXTS.length + " strings");
+});
+
+// ---------- 1b. the "this page" voice, and one name for one thing (QA #14) ----------
+
+// WHOLE WORDS ONLY, in any mix of capitals. "us" is banned; "status", "bonus"
+// and "house" are not, and neither is "U.S." (the periods split it into "u"
+// and "s"). A bare "US" with no periods WOULD trip it: write "U.S.".
+const VOICE_BANNED = [
+  // the director's list
+  "we", "us", "our", "ours", "we'll", "we've", "let's", "told us", "tell us",
+  "lawful payment", "escrow year", "computation year", "12-month period", "refund due", "Most payment jumps",
+  // the same family, added so a contraction cannot slip past a whole-word match
+  "we're", "we'd",
+  // one name for one thing: "escrow payment" is the name. ("the regular escrow
+  // payment" where it has to be told apart from a shortage or deficiency add-on.)
+  "monthly escrow deposit", "escrow deposit", "base payment", "paid in", "monthly payment",
+];
+
+// "You told us — that's it." → ["you", "told", "us", "that's", "it"].
+// A word is a run of letters, digits and apostrophes. Everything else (spaces,
+// periods, hyphens, quote marks) splits words. Curly apostrophes count as
+// straight ones, and an apostrophe at the very start or end of a word is a
+// quote mark, so it is dropped.
+function wordsOf(text) {
+  const words = [];
+  for (const piece of text.toLowerCase().replaceAll("’", "'").split(/[^a-z0-9']+/)) {
+    let word = piece;
+    while (word.startsWith("'")) word = word.slice(1);
+    while (word.endsWith("'")) word = word.slice(0, word.length - 1);
+    if (word !== "") words.push(word);
+  }
+  return words;
+}
+
+// Which banned entries appear in this text, as whole words in a row?
+function voiceHits(text) {
+  const spaced = " " + wordsOf(text).join(" ") + " ";
+  return VOICE_BANNED.filter((banned) => spaced.includes(" " + wordsOf(banned).join(" ") + " "));
+}
+
+test("QA #14: the voice check matches WHOLE words only — status, bonus, trust, focus, house, four, hours, sour and U.S. are fine", () => {
+  const innocent = [
+    "The status of your bonus is a matter of trust.", "Focus on the house for four hours.", "A sour note.",
+    "U.S. law", "the U.S. Department of Housing", "U. S. mail", "STATUS", "Housing counselors", "ourselves is one word", "owe", "use", "plus",
+    "yours", "hours", "tour", "flour", "course", "welcome", "well", "weigh", "wed", "were", "lets go",
+    "the 12 months", "a 12-month table", "refund is due", "refunds due dates", "the escrow payment", "equal monthly payments", "monthly escrow payment",
+  ];
+  for (const text of innocent) assert.deepStrictEqual(voiceHits(text), [], text);
+});
+
+test("QA #14: the voice check does trip on every banned entry: any capitals, either apostrophe, next to punctuation", () => {
+  for (const banned of VOICE_BANNED) {
+    const samples = [banned, banned.toUpperCase(), "Well, " + banned + ".", "(" + banned + ")", "\"" + banned + "\" it said", banned.replaceAll("'", "’") + "!"];
+    for (const sample of samples) assert.ok(voiceHits(sample).includes(banned), banned + " was missed in: " + sample);
+  }
+  assert.deepStrictEqual(voiceHits("You told us."), ["us", "told us"]);
+  assert.deepStrictEqual(voiceHits("By our math, we round."), ["we", "our"]);
+  assert.deepStrictEqual(voiceHits("the escrow-year table"), ["escrow year"], "a hyphen joins nothing: the two words still sit in a row");
+});
+
+test("QA #14 (runtime): nothing the engine can say uses we / us / our, or a second name for the escrow payment or the next 12 months", () => {
+  for (const { where, text } of ALL_TEXTS) {
+    assert.deepStrictEqual(voiceHits(text), [], where + ": " + text);
+  }
+});
+
+// ---------- 1c. the same check on the engine's SOURCE ----------
+// The runtime scan only sees sentences some situation reaches. This reads the
+// engine's .js files, pulls out the string literals, and checks those, so a
+// sentence on a rarely reached branch cannot hide.
+//
+// The reader is simple on purpose. For each line of a file:
+//   • skip the line if it is a comment line (it starts with //, /* or *);
+//   • walk along it: a ", ' or ` opens a string and the same mark closes it;
+//     a backslash keeps the character after it (so \" does not close it);
+//   • stop at a // that is outside a string: the rest is a trailing comment.
+//
+// WHAT IT CAN MISS
+//   • A sentence split across two literals, like "you told " + "us": each
+//     piece is checked alone, so a banned PHRASE could hide across the join.
+//     A banned single WORD cannot (unless it were split mid-word).
+//   • A string that runs over more than one line (a multi-line `template`).
+//     The engine has none; a test below keeps it that way.
+//   • Words that are not literals at all: a month name picked from a list, a
+//     dollar amount from formatCents. The runtime scan above covers those.
+//   • A /* block comment */ whose middle lines do not start with "*" would be
+//     read as code. The engine writes // comments only.
+// engine/vectors.js is skipped: it is generated from the research file, which
+// quotes the regulation and is never reworded.
+
+const ENGINE_FOLDER = new URL("../engine/", import.meta.url);
+
+function stringLiteralsOnLine(line) {
+  const literals = [];
+  let index = 0;
+  while (index < line.length) {
+    const character = line[index];
+    if (character === "/" && line[index + 1] === "/") break; // trailing comment
+    const opensAString = character === '"' || character === "'" || character === "`";
+    if (!opensAString) {
+      index = index + 1;
+      continue;
+    }
+    let text = "";
+    index = index + 1;
+    while (index < line.length && line[index] !== character) {
+      if (line[index] === "\\") index = index + 1; // keep whatever follows the backslash
+      text = text + line[index];
+      index = index + 1;
+    }
+    literals.push(text);
+    index = index + 1; // step past the closing mark
+  }
+  return literals;
+}
+
+function isCommentLine(line) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*");
+}
+
+// Every string literal in the engine's own code: [{ where, text }].
+function engineStringLiterals() {
+  const found = [];
+  const names = readdirSync(ENGINE_FOLDER).filter((name) => name.endsWith(".js") && name !== "vectors.js").sort();
+  for (const name of names) {
+    const lines = readFileSync(new URL(name, ENGINE_FOLDER), "utf8").split("\n");
+    for (let index = 0; index < lines.length; index++) {
+      if (isCommentLine(lines[index])) continue;
+      for (const text of stringLiteralsOnLine(lines[index])) {
+        found.push({ where: "engine/" + name + " line " + (index + 1), text: text });
       }
     }
   }
-  assert.ok(scanned > 5000, "scanned only " + scanned + " strings");
+  return found;
+}
+
+const ENGINE_LITERALS = engineStringLiterals();
+
+test("the string-literal reader: reads all three quote marks, keeps \\\" inside a string, and ignores comments", () => {
+  assert.deepStrictEqual(stringLiteralsOnLine('const a = "You told us"; // "we" in a comment'), ["You told us"]);
+  assert.deepStrictEqual(stringLiteralsOnLine("push('one', \"two\", `three`);"), ["one", "two", "three"]);
+  assert.deepStrictEqual(stringLiteralsOnLine('body: "You can ask: \\"What is my balance?\\" " + CAVEAT,'), ['You can ask: "What is my balance?" ']);
+  assert.deepStrictEqual(stringLiteralsOnLine('const URL_X = "https://www.ecfr.gov/current"; // official'), ["https://www.ecfr.gov/current"]);
+  assert.equal(isCommentLine("  // we never promise a refund"), true);
+  assert.equal(isCommentLine("   * we"), true);
+  assert.equal(isCommentLine('  const a = "we";'), false);
+});
+
+test("the string-literal reader sees every engine string whole: no multi-line template strings in engine code", () => {
+  const names = readdirSync(ENGINE_FOLDER).filter((name) => name.endsWith(".js") && name !== "vectors.js");
+  for (const name of names) {
+    const lines = readFileSync(new URL(name, ENGINE_FOLDER), "utf8").split("\n");
+    for (let index = 0; index < lines.length; index++) {
+      if (isCommentLine(lines[index])) continue;
+      const beforeAnyComment = lines[index].split("//")[0];
+      assert.equal(beforeAnyComment.includes("`"), false, "engine/" + name + " line " + (index + 1) + " uses a template string");
+    }
+  }
+  // It found the sentences we know are there, so it is really reading the files.
+  const all = ENGINE_LITERALS.map((literal) => literal.text);
+  assert.ok(all.length > 300, "found only " + all.length + " literals");
+  assert.ok(all.includes("Many payment jumps are lawful. They come from real tax and insurance increases."));
+  assert.ok(all.includes("This letter states arithmetic, not legal conclusions. I am not a lawyer. You may have newer bill amounts than I do, and if so I would like to see them."));
+});
+
+test("QA #14 (source): no string literal in engine/ uses we / us / our, or a second name for the escrow payment or the next 12 months", () => {
+  for (const { where, text } of ENGINE_LITERALS) {
+    assert.deepStrictEqual(voiceHits(text), [], where + ": " + text);
+  }
+});
+
+test("QA #14 (source): the older banned-word list holds for every string literal too, reached or not", () => {
+  for (const { where, text } of ENGINE_LITERALS) {
+    for (const pattern of BANNED) assert.equal(pattern.test(text), false, where + ": " + pattern + " in: " + text);
+  }
+});
+
+test("QA #14: the new wording, sentence by sentence", () => {
+  const all = ALL_TEXTS.map((entry) => entry.text).join("\n");
+  for (const expected of [
+    "You ticked that a payment was more than 30 days late",
+    "You ticked that the statement offers a pay-it-all-at-once option.",
+    "By this page's math, to the cent, there is a surplus of",
+    "This page's figure is within $7.00 of that line.",
+    "This page's deficiency figure is within",
+    "This page's shortage figure is within",
+    "This page's figure, to the cent, is",
+    "This page rounds this one down, because it is a cap.",
+    "this page rounds to the nearest cent. That rounding is this page's choice.",
+    "but you chose 1 month as the limit in your mortgage documents, and the lower limit wins.",
+    "but you chose no cushion as the limit in your mortgage documents, and the lower limit wins.",
+    "1 month of escrow payments, the limit you chose as the one your mortgage documents set.",
+    "no cushion at all, the limit you chose as the one your mortgage documents set.",
+    "so this page cannot check the part above",
+    "Choose yes or no: are you more than 30 days behind on a payment?",
+    "Choose yes or no: does the statement offer a pay-it-all-at-once option?",
+    "That comparison was skipped.",
+    "Add it and this page can compare the dollars too.",
+    "Either way, the regular escrow payment follows the bills.",
+    "Many payment jumps are lawful. They come from real tax and insurance increases.", // an earlier ruling: this sentence stays exactly as it is
+  ]) {
+    assert.ok(all.includes(expected), "nothing the engine said included: " + expected);
+  }
 });
 
 test("'legal advice' and 'financial advice' appear only in the negative", () => {
@@ -591,9 +937,10 @@ test("A1 in explainJump: a leftover inside the scaled payment tolerance reads as
 
 test("A4: step 2 says the REGULAR payment is one-twelfth, and that repayment can be added on top", () => {
   const step = explainSteps(analyze(vectorAccount("TV01")))[1];
-  assert.ok(step.plain.startsWith("The regular monthly payment is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top."));
+  assert.equal(step.title, "Step 2. Divide by 12 to get the escrow payment");
+  assert.ok(step.plain.startsWith("The regular escrow payment each month is one-twelfth of the year's bills. Repaying a shortage or deficiency can be added on top."));
   assert.equal(step.plain.includes("The most a servicer may collect"), false);
-  assert.match(step.plain, /our choice/);
+  assert.match(step.plain, /That rounding is this page's choice\. The rule does not mention cents\./);
 });
 
 test("A6: whole-dollar rounding is attributed to HUD's 1995 guidance (60 FR 8812), never stated as settled law", () => {

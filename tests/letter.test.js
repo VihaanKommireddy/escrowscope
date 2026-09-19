@@ -72,15 +72,16 @@ test("something to ask about → a notice of error under § 1024.35, pre-filled 
   const letter = letterFor("cushion-too-big", {});
   assert.ok(letter.includes("Re: Notice of error under 12 C.F.R. § 1024.35, and request for information under 12 C.F.R. § 1024.36"));
   // the numbers typed
-  assert.ok(letter.includes("- Escrow balance at the start of the year: $1,800.00"));
-  assert.ok(letter.includes("- First month of the escrow year: April"));
+  assert.ok(letter.includes("The numbers I used, taken from the statement's projection for the next 12 months:"));
+  assert.ok(letter.includes("- Escrow balance at the start of the next 12 months: $1,800.00"));
+  assert.ok(letter.includes("- First of those 12 months: April"));
   assert.ok(letter.includes("    Homeowners insurance, June: $2,400.00"));
   assert.ok(letter.includes("    Property tax, October: $2,400.00"));
   assert.ok(letter.includes("    Property tax, March: $2,400.00"));
-  assert.ok(letter.includes("  Total for the year: $7,200.00"));
+  assert.ok(letter.includes("  Total for the 12 months: $7,200.00"));
   // what the method gives
-  assert.ok(letter.includes("- Monthly payment (total ÷ 12): $600.00"));
-  assert.ok(letter.includes("- Most cushion allowed (2 months of payments): $1,200.00"));
+  assert.ok(letter.includes("- Monthly escrow payment (total ÷ 12): $600.00"));
+  assert.ok(letter.includes("- Most cushion allowed (2 months of escrow payments): $1,200.00"));
   assert.ok(letter.includes("- Lowest projected month-end balance: $1,200.00 in June"));
   assert.ok(letter.includes("- Target starting balance: $1,800.00"));
   assert.ok(letter.includes("- Result: no shortage and no surplus"));
@@ -123,7 +124,7 @@ test("unnamed bills are numbered; a 1-month cushion reads '1 month'", () => {
   const result = analyze(account);
   const letter = buildLetter(result, compareWithStatement(result, undefined), {});
   assert.ok(letter.includes("    Bill 1, May: $1,800.00"));
-  assert.ok(letter.includes("- Most cushion allowed (1 month of payments): $400.00"));
+  assert.ok(letter.includes("- Most cushion allowed (1 month of escrow payments): $400.00"));
 });
 
 test("what the person typed stays TEXT: markup is copied as-is, line breaks are flattened, length is capped", () => {

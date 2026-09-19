@@ -71,13 +71,13 @@ export function validateAccount(account) {
 
   // First month of the escrow year.
   if (!isMonth(account.startMonth)) {
-    errors.push(finding("startMonth", "Pick the first month of your new escrow year. It is the first month in your statement's 12-month table."));
+    errors.push(finding("startMonth", "Pick the first month of the next 12 months. It is the first month in your statement's 12-month table."));
   }
 
   // Starting balance. It may be negative (that is a deficiency), so only
   // "missing", "not money" and "absurdly large" are errors.
   if (isMissing(account.startingBalanceCents)) {
-    errors.push(finding("startingBalanceCents", "Type your escrow balance at the start of the new 12 months. Your statement may call it the beginning balance."));
+    errors.push(finding("startingBalanceCents", "Type your escrow balance at the start of the next 12 months. Your statement may call it the beginning balance."));
   } else if (!isWholeNumber(account.startingBalanceCents)) {
     errors.push(finding("startingBalanceCents", "The starting balance needs to be a dollar amount, like 1234.50."));
   } else if (Math.abs(account.startingBalanceCents) > MAX_MONEY_CENTS) {
@@ -95,7 +95,7 @@ export function validateAccount(account) {
 
   // Is the borrower current on payments? Leaving it out means yes.
   if (account.borrowerCurrent !== undefined && typeof account.borrowerCurrent !== "boolean") {
-    errors.push(finding("borrowerCurrent", "Tell us yes or no: are you more than 30 days behind on a payment?"));
+    errors.push(finding("borrowerCurrent", "Choose yes or no: are you more than 30 days behind on a payment?"));
   }
 
   // The bills.
@@ -245,7 +245,7 @@ export function validateStatement(statement, account) {
   }
 
   if (!isMissing(statement.lumpSumOfferedOnStatement) && typeof statement.lumpSumOfferedOnStatement !== "boolean") {
-    errors.push(finding("statement.lumpSumOfferedOnStatement", "Tell us yes or no: does the statement offer a pay-it-all-at-once option?"));
+    errors.push(finding("statement.lumpSumOfferedOnStatement", "Choose yes or no: does the statement offer a pay-it-all-at-once option?"));
   }
 
   if (errors.length === 0) {
@@ -273,10 +273,10 @@ function addStatementWarnings(statement, account, warnings) {
   const hasAmount = !isMissing(statement.claimedAmountCents);
 
   if (hasAmount && !hasKind) {
-    warnings.push(finding("statement.claimedKind", "You typed an amount but did not pick whether it is a shortage, a surplus or a deficiency. We skipped that comparison."));
+    warnings.push(finding("statement.claimedKind", "You typed an amount but did not pick whether it is a shortage, a surplus or a deficiency. That comparison was skipped."));
   }
   if (hasKind && statement.claimedKind !== "none" && !hasAmount) {
-    warnings.push(finding("statement.claimedAmountCents", "You picked what the statement found but did not type the amount. Add it and we can compare the dollars too."));
+    warnings.push(finding("statement.claimedAmountCents", "You picked what the statement found but did not type the amount. Add it and this page can compare the dollars too."));
   }
 
   // The most common entry mistake (research doc 03 §5): typing the WHOLE
