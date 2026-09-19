@@ -183,3 +183,33 @@ at 0). Chrome's install prompt wants 192/512 PNG icons and iOS wants an
 The page still works with the network off after one visit, in most browsers.
 After an update, a returning visitor sees the old version for one more visit
 (cache-first), then the new one.
+
+| # | What | Who |
+|---|---|---|
+| 4.8 | Fix Order 1, engine half, landed as `0677461` (A1–A15 + B2, a named regression test for each). **Verified by the Build Chief from a clean `git archive` snapshot of that commit**, so other agents' in-flight edits could not affect the result: engine-owned tests 448 / 448 pass; `node fuzz.mjs --n 20000 --seed 99` → exit 0, `RESULT: PASS`; `node stage2-compare-checks.mjs` → exit 1, "4 HARD CHECK(S) FAILED", 50 `ok` lines. | Engine Builder built it; Build Chief verified it |
+| 4.9 | Fix Order 1 + 2, page half: `734d2d3`, `b33dc11`, `213b4db` landed (UI Builder reports `tests/pipeline.test.js` 48/48 and a real headless-Chrome pass at 1280 and 320). The trust-panel / service-worker half (`proof.js`, `sw.js`, `sw-register.js`, manifest, `tools/stamp-sw.mjs`, and all the new shell tests) was still uncommitted with a UI helper at the time of this row; whole-suite `npm test` was 530 / 532, both red tests being that unfinished shell work. | UI Builder + its trust helper; counts run by Build Chief |
+| 4.10 | The original Engine Builder ran out of working context after Fix Order 1 and did not start Fix Order 2's engine half (it declined to act on a relayed order it could no longer verify, which was the right call). Build Chief confirmed the gaps on disk (`engine/validate.js` still had a private `MAX_LABEL_LENGTH = 100` and no `MAX_BILL_LABEL_LENGTH` export; engine strings still said "You told us", "By our math", "Tell us yes or no") and spawned a **fresh Engine Finisher** with SPEC Parts C–E, the build contract, the QA audit and the existing test conventions, for: the analysis date in the letter (#6), one exported bill-name limit (#13), the "this page" voice and one-term-per-thing sweep plus the `parseDollars` message (#14), and the over-claim / refund-promise sweeps (#1–#3, #7), each with a runtime scan and a source scan. | Build Chief; Engine Finisher (fresh agent) |
+
+**The deliberate stage2 disagreements after Fix Order 1, exactly as observed
+(4.8).** The auditor's `stage2-compare-checks.mjs` is seeded
+(`seed = 20260919`), so these reproduce. The director ruled each one correct
+new behavior; nobody edited `audit/`; the independent auditor is updating its
+own checks. This is the fixed baseline the Build Chief compares against after
+integration — anything beyond it is a new finding.
+
+- **A1, scaled payment tolerance — three hard FAIL lines, one root cause.**
+  "payment above the maximum by > $1.00 → PAYMENT_ABOVE_MAX": missed 11 of
+  5,000 with the borrower current, 11 of 5,000 not current; and "the faster
+  payment itself (more than $1.00 a month above the 12-month plan)": missed 6
+  of about 10,000. In that third case `SPREAD_TOO_SHORT` still fires, so the
+  visitor still gets a look-here. All are payments $1.01–$3.00 over a maximum
+  built from two or three separately rounded parts.
+- **A12, four-part jump decomposition — one hard FAIL plus a NOTE.** The
+  auditor's check still sums two parts.
+- **B2, the low-point mix-up nudge — NOT a hard failure.** It appears only in
+  the edge tally: with the required minimum typed at exactly cap + $7.01,
+  4,937 of 5,000 are flagged and 63 are not. Those 63 are accounts on or near
+  target, where the federal low point is within $7 of the cap, so the typed
+  figure also sits within $7 of the low point. That is the known limit written
+  down in 4.4. The main check, "cushion over cap by > $7.00", still catches
+  5,000 of 5,000.
