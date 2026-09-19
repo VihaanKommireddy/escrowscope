@@ -21,8 +21,14 @@
 // "TOO CLOSE TO CALL" (SPEC E3): softened if and only if result.nearLine is set.
 
 import { formatCents, MONTH_NAMES } from "./money.js";
+import { dateInWords } from "./dates.js";
 
-const MAX_DETAIL_LENGTH = 200;
+// The longest servicer name, loan number, borrower name or address the letter
+// will print. This limits the LETTER'S OWN detail fields. It is a different
+// thing from a bill's name, which has its own single limit
+// (MAX_BILL_LABEL_LENGTH in validate.js). Bill names reach this file already
+// checked by validateAccount, so they are never cut here.
+const MAX_LETTER_DETAIL_LENGTH = 200;
 
 function monthName(calendarMonth) {
   return MONTH_NAMES[calendarMonth - 1];
@@ -40,8 +46,20 @@ function detailOrBlank(details, name, blank) {
   }
   tidy = tidy.trim();
   if (tidy === "") return blank;
-  if (tidy.length > MAX_DETAIL_LENGTH) tidy = tidy.slice(0, MAX_DETAIL_LENGTH);
+  if (tidy.length > MAX_LETTER_DETAIL_LENGTH) tidy = tidy.slice(0, MAX_LETTER_DETAIL_LENGTH);
   return tidy;
+}
+
+// The date printed on the statement. The page hands over what the visitor
+// typed in its analysis-date box as details.analysisDate, "YYYY-MM-DD". A real
+// date is written out in words ("September 1, 2026"). Missing, or anything that
+// is not a real date, keeps the visible blank. It never throws, and nothing
+// the visitor typed is copied into the letter from here: only a month name
+// and two checked numbers (QA audit #6).
+function statementDateOrBlank(details) {
+  const inWords = dateInWords(details.analysisDate);
+  if (!inWords.ok) return "[date on the statement]";
+  return inWords.display;
 }
 
 function describeResult(result) {
@@ -116,14 +134,20 @@ function questionLines(result, comparison) {
   return items;
 }
 
+// details = { servicerName, loanNumber, borrowerName, propertyAddress, date,
+// analysisDate }, every one optional. The page has no boxes for the name or
+// the address (the director's ruling: nothing personal is typed into this
+// page), so those two normally arrive empty and print as [bracketed] blanks
+// for the visitor to fill in once the letter is in their own hands.
 export function buildLetter(result, comparison, details) {
-  const given = details !== null && typeof details === "object" ? details : {};
+  const given =details !== null && typeof details === "object" ? details : {};
 
   const date = detailOrBlank(given, "date", "[today's date]");
   const servicerName = detailOrBlank(given, "servicerName", "[your servicer's name]");
   const loanNumber = detailOrBlank(given, "loanNumber", "[your loan number]");
   const borrowerName = detailOrBlank(given, "borrowerName", "[your full name]");
   const propertyAddress = detailOrBlank(given, "propertyAddress", "[your property address]");
+  const statementDate = statementDateOrBlank(given);
 
   const questions = questionLines(result, comparison);
   const isNoticeOfError = letterKind(result, comparison) === "NOTICE_OF_ERROR";
@@ -148,7 +172,7 @@ export function buildLetter(result, comparison, details) {
   lines.push("Mortgage loan number: " + loanNumber);
   lines.push("Property: " + propertyAddress);
   lines.push("");
-  lines.push("I am writing about the annual escrow account statement dated [date on the statement] for the property above. I checked its numbers against the method in 12 CFR 1024.17 and Appendix E to that part. I am asking you to review the calculation.");
+  lines.push("I am writing about the annual escrow account statement dated " + statementDate + " for the property above. I checked its numbers against the method in 12 CFR 1024.17 and Appendix E to that part. I am asking you to review the calculation.");
   lines.push("");
   lines.push("The numbers I used, taken from the statement's projection for the coming year:");
   lines.push("- Escrow balance at the start of the year: " + formatCents(inputs.startingBalanceCents));

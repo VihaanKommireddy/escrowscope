@@ -1,4 +1,5 @@
-// engine/dates.js — the refund clock (SPEC D8).
+// engine/dates.js — the refund clock (SPEC D8), and the statement's date
+// written out in words for the letter (dateInWords, QA audit #6).
 //
 // 12 CFR 1024.17(f)(2)(i): a surplus of $50 or more is refunded "within 30
 // days from the date of the analysis". So: analysis date in, the date 30 days
@@ -66,6 +67,23 @@ function readIsoDate(text) {
   return { year: year, month: month, day: day };
 }
 
+// { year: 2026, month: 9, day: 1 } → "September 1, 2026".
+function inWords(year, month, day) {
+  return MONTH_NAMES[month - 1] + " " + day + ", " + year;
+}
+
+// dateInWords: "2026-09-01" → { ok: true, display: "September 1, 2026" }.
+// The letter uses it for "the statement dated …" (QA audit #6). It goes through
+// the same strict reader as the refund clock, so the two can never disagree
+// about what counts as a real date. Anything else (a day that does not exist,
+// text, a number, nothing at all) comes back { ok: false, problem } and never
+// throws, so the letter can keep its visible blank.
+export function dateInWords(isoDate) {
+  const date = readIsoDate(isoDate);
+  if (date === null) return { ok: false, problem: PROBLEM };
+  return { ok: true, display: inWords(date.year, date.month, date.day) };
+}
+
 export function refundDeadline(analysisDate) {
   const start = readIsoDate(analysisDate);
   if (start === null) return { ok: false, problem: PROBLEM };
@@ -88,6 +106,6 @@ export function refundDeadline(analysisDate) {
   return {
     ok: true,
     isoDate: year + "-" + twoDigits(month) + "-" + twoDigits(day),
-    display: MONTH_NAMES[month - 1] + " " + day + ", " + year,
+    display: inWords(year, month, day),
   };
 }

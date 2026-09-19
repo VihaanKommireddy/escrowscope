@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { refundDeadline } from "../engine/index.js";
+import { dateInWords } from "../engine/dates.js";
 
 test("the build contract's example: analysis on 2026-09-01 → refund due by October 1, 2026", () => {
   assert.deepStrictEqual(refundDeadline("2026-09-01"), {
@@ -73,4 +74,35 @@ test("anything that is not a real YYYY-MM-DD date is refused in plain English", 
 
 test("refundDeadline is repeatable", () => {
   assert.deepStrictEqual(refundDeadline("2026-09-01"), refundDeadline("2026-09-01"));
+});
+
+// =====================================================================
+// FIX ORDER 2, QA #6: dateInWords — the statement's date, for the letter.
+// It is imported straight from engine/dates.js (only letter.js uses it, so it
+// is not part of the page's front door, engine/index.js).
+// =====================================================================
+
+test("QA #6: dateInWords turns a real YYYY-MM-DD date into words, full month name, no leading zero", () => {
+  assert.deepStrictEqual(dateInWords("2026-09-01"), { ok: true, display: "September 1, 2026" });
+  assert.deepStrictEqual(dateInWords("2024-02-29"), { ok: true, display: "February 29, 2024" });
+  assert.deepStrictEqual(dateInWords("2026-12-31"), { ok: true, display: "December 31, 2026" });
+});
+
+test("QA #6: dateInWords and refundDeadline read a date the same way: one is ok exactly when the other is", () => {
+  const inputs = [
+    "2026-09-01", "2026-02-28", "2028-02-29", "2026-02-30", "2027-02-29", "2026-13-01", "2026-9-1", "09/01/2026",
+    "", "   ", "<b>x</b>", "x".repeat(5000), null, undefined, 42, {}, [],
+  ];
+  for (const input of inputs) {
+    const words = dateInWords(input);
+    assert.equal(words.ok, refundDeadline(input).ok, String(input).slice(0, 20));
+    if (!words.ok) {
+      assert.equal(typeof words.problem, "string");
+      assert.equal("display" in words, false);
+    }
+  }
+});
+
+test("QA #6: dateInWords is repeatable", () => {
+  assert.deepStrictEqual(dateInWords("2026-09-01"), dateInWords("2026-09-01"));
 });

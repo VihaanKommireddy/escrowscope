@@ -148,6 +148,84 @@ test("buildLetter is repeatable and changes nothing it is given", () => {
 });
 
 // =====================================================================
+// FIX ORDER 2, QA #6: the letter uses the analysis date the visitor typed.
+// The page makes the letter editable and tells the visitor to fill in the
+// parts in [brackets]. There are no name or address boxes on the page (the
+// director's ruling), so those always arrive empty and must stay bracketed.
+// =====================================================================
+
+// Every "[...]" blank in a letter, in the order they appear.
+function blanksIn(letter) {
+  const blanks = [];
+  let from = letter.indexOf("[");
+  while (from !== -1) {
+    const to = letter.indexOf("]", from);
+    blanks.push(letter.slice(from, to + 1));
+    from = letter.indexOf("[", to);
+  }
+  return blanks;
+}
+
+test("QA #6: an analysis date that was given is printed in words, and its blank is gone", () => {
+  const letter = letterFor("holding-too-much", { analysisDate: "2026-09-01" });
+  assert.ok(letter.includes("I am writing about the annual escrow account statement dated September 1, 2026 for the property above."));
+  assert.equal(letter.includes("[date on the statement]"), false);
+  assert.equal(letter.includes("2026-09-01"), false, "the date is written in words, not as typed");
+});
+
+test("QA #6: each example's own details reach the letter (only holding-too-much carries a date)", () => {
+  for (const example of EXAMPLES) {
+    const letter = letterFor(example.id, example.details);
+    const hasDate = typeof example.details.analysisDate === "string";
+    assert.equal(letter.includes("[date on the statement]"), !hasDate, example.id);
+  }
+  assert.ok(letterFor("holding-too-much", EXAMPLES.find((item) => item.id === "holding-too-much").details).includes("dated September 1, 2026 for"));
+});
+
+test("QA #6: no analysis date → the visible blank stays", () => {
+  for (const details of [undefined, null, {}, { analysisDate: "" }, { analysisDate: "   " }, { analysisDate: undefined }]) {
+    const letter = letterFor("holding-too-much", details);
+    assert.ok(letter.includes("statement dated [date on the statement] for the property above."));
+  }
+});
+
+test("QA #6: a garbage analysis date → the visible blank, never a throw, and none of the garbage in the letter", () => {
+  const garbage = ["2026-02-30", "<b>x</b>", "x".repeat(5000), null, 42, {}, [], true, "2026-9-1", "09/01/2026", "2026-09-01T00:00", "September 1, 2026"];
+  const clean = letterFor("holding-too-much", {});
+  for (const analysisDate of garbage) {
+    const letter = letterFor("holding-too-much", { analysisDate: analysisDate });
+    assert.equal(letter, clean, String(analysisDate).slice(0, 20));
+  }
+});
+
+test("QA #6: with nothing given, the blanks are exactly these, and every one is in [brackets]", () => {
+  for (const id of ["jumped-ok", "holding-too-much", "cushion-too-big"]) {
+    const blanks = blanksIn(letterFor(id, {}));
+    assert.deepStrictEqual(blanks, [
+      "[today's date]",
+      "[your servicer's name]",
+      "[the address your servicer lists for error notices and information requests. Check your statement or the servicer's website. It is often not the payment address.]",
+      "[your full name]",
+      "[your property address]",
+      "[your loan number]",
+      "[your property address]",
+      "[date on the statement]",
+      "[your phone number or email]",
+      "[your full name]",
+    ], id);
+  }
+});
+
+test("QA #6: borrowerName and propertyAddress are still supported, and an empty one stays a blank", () => {
+  const filled = letterFor("jumped-ok", { borrowerName: "Pat Homeowner", propertyAddress: "1 Main St, Cary, NC 27511" });
+  assert.ok(filled.includes("From: Pat Homeowner"));
+  assert.ok(filled.includes("Property: 1 Main St, Cary, NC 27511"));
+  const empty = letterFor("jumped-ok", { borrowerName: "", propertyAddress: "" });
+  assert.ok(empty.includes("From: [your full name]"));
+  assert.ok(empty.includes("Property: [your property address]"));
+});
+
+// =====================================================================
 // FIX ORDER 1, A2: notice of error ONLY when a flag asserts a discrepancy
 // =====================================================================
 
