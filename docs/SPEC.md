@@ -503,3 +503,74 @@ The engine stays pure: the date is an input string, never `Date.now()`.
 Statement OCR / parsing, Spanish (unverifiable legal-adjacent translation), any
 AI call, any server, any analytics, any third-party asset, multi-year history.
 Pushing to GitHub or touching `main` — that is the owner's click, not an agent's.
+
+---
+
+## Part E — Amendments from the independent math audit (2026-09-19)
+
+An auditor who never saw the engine rebuilt the math from eCFR, CFPB, Cornell
+LII and HUD's Federal Register notices. All 22 vectors matched its oracle. It
+also found the problems below. Part E wins over Parts A–D.
+
+### E1. The low-point identity in C5 was overstated (MUST fix the TEST, not the engine)
+
+`lowPoint − cushionCap === difference` holds only when the lowest Step 1 trial
+balance is zero or below. When the rounded monthly payment makes 12 payments a
+few cents larger than the annual bills AND no bill outruns the deposits before
+month 12, every Step 1 balance is positive, the Step 2 add is floored at 0, and
+the identity is off by exactly that lowest Step 1 balance (1–6 cents).
+Example: one bill of $1,200.06 in month 12, cushion 2 months, balance $300 →
+difference 9,999 cents, low point − cushion = 10,005 cents.
+
+The property test must assert: if `min(step1) <= 0` the identity is exact;
+otherwise `lowPoint − cushionCap − difference === min(step1)`. **Keep the
+"never below 0" floor on the Step 2 add.**
+
+### E2. Deficiency when the borrower is NOT current (MUST)
+
+§ 1024.17(f)(4)(iii): the deficiency repayment limits apply only if the borrower
+is current; otherwise the servicer may recover the deficiency under the terms of
+the mortgage documents. The "borrower is current" condition exists for surpluses
+((f)(2)(ii)) and deficiencies ((f)(4)(iii)). **It does not exist for shortages**
+((f)(3)) — shortage handling must not change when `borrowerCurrent` is false.
+
+New classifications: `DEFICIENCY_BORROWER_NOT_CURRENT`, and the combined forms
+`DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_LT_ONE_MONTH` /
+`…_AND_SHORTAGE_GE_ONE_MONTH`. In these cases the engine does not invent a
+deficiency repayment schedule (the regulation sets none): deficiency spread
+fields are 0 with `deficiencySpreadMonths: 0`, and the plain-English text says
+the mortgage documents, not this rule, control how that amount is collected.
+New vectors for these cases come from the independent auditor and are
+**appended** to the research JSON (appending is allowed; editing an existing
+vector is not).
+
+### E3. "Too close to call" (MUST)
+
+Cent rounding moves the required balance by −6 to +5 cents against exact
+arithmetic, and HUD lets a servicer round any figure to whole dollars, so a
+lawful statement can differ from ours by up to about $7. That can flip a verdict
+sitting right on a legal line.
+
+`classification` stays cent-exact (TV06/TV07/TV10/TV10b unchanged). Add
+`result.nearLine`: `null`, or `{ line: "SURPLUS_50" | "ONE_MONTH_PAYMENT",
+distanceCents, toleranceCents: 700 }` when the surplus is within $7.00 of $50.00,
+or a shortage/deficiency is within $7.00 of one month's payment. When it is set,
+`explainVerdict`, `nextSteps` and the letter soften: they state our cent-exact
+figure, say it is too close to the line to call, and explain that a servicer
+rounding to whole dollars could lawfully land on either side. No "refund
+REQUIRED" banner inside the band.
+
+### E4. Label guidance as guidance (MUST)
+
+The split "deficiency = the part of the balance below $0; shortage = from
+max(balance, 0) up to the required start" is HUD's 1995 guidance (60 FR 8812,
+8813–14), not regulation text. Read literally, the (b) definitions overlap. C1,
+`explainSteps`, and the show-the-math panel must label it as HUD guidance with
+that cite. C3's cite "HUD 60 FR 8814" becomes "60 FR 8812, 8813–14".
+
+### E5. No negative zero (MUST)
+
+`-min` of 0 is −0 in JavaScript. It passes `===` but fails
+`assert.deepStrictEqual` and can print as "−$0.00". Normalize at the source, and
+add a test that no numeric output is `Object.is(x, -0)` across all vectors and
+the randomized runs. `formatCents(-0)` must print "$0.00".
