@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-labelledby="favTitle">
+  <!-- EscrowScope — favicon build, optimized for 16px.
+       Same ring + ledger-tick concept as logo-final.svg, simplified two
+       ways for tiny rendering: (1) heavier stroke-to-radius ratio (13/25
+       vs 10/27) so the ring doesn't thin to a hairline, (2) the
+       checkpoint dot is dropped as a separate shape — the round line cap
+       on the tick's end does that job instead, since a free-floating
+       ~1px dot disappears at 16px anyway. One fewer element, same read. -->
+  <title id="favTitle">EscrowScope icon (favicon)</title>
+  <g fill="none" stroke="#0C5460" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 62.84 60.17 A 25 25 0 1 1 62.84 39.83"/>
+    <line x1="14" y1="50" x2="86" y2="50"/>
+  </g>
+</svg>

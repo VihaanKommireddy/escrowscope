@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-labelledby="esTitle esDesc">
+  <!-- EscrowScope — production mark, refined from Concept 3 "The Scoped e"
+       A single geometric glyph: an almost-closed ring (the lens / the "e"
+       bowl) with a horizontal ledger tick running through it and ending
+       in a checkpoint dot — "scope" (the ring) fused with "escrow"
+       (the ledger line) in one ownable letterform. Fixed Scope Teal
+       (#0C5460) for light surfaces; see logo-final-mono.svg for a
+       currentColor build. Thick, even stroke weight (10 of 100 units)
+       keeps the silhouette intact down to 16px — see favicon.svg for the
+       further-simplified tiny-size build. -->
+  <title id="esTitle">EscrowScope icon</title>
+  <desc id="esDesc">A ring shaped like the bowl of a lowercase "e" doubling as a lens, crossed by a ledger line that exits the ring and ends in a checkpoint dot.</desc>
+  <g fill="none" stroke="#0C5460" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ring: lens / "e" bowl, open on the right where the ledger line exits -->
+    <path d="M 66.37 59.23 A 27 27 0 1 1 66.37 40.77"/>
+    <!-- ledger tick: runs through the ring and out through the opening -->
+    <line x1="15" y1="50" x2="85" y2="50"/>
+  </g>
+  <!-- checkpoint: the figure being verified -->
+  <circle cx="85" cy="50" r="5.5" fill="#0C5460"/>
+</svg>

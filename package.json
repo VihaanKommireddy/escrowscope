@@ -1,1 +1,10 @@
-{ "type": "module" }
+{
+  "name": "escrowscope",
+  "private": true,
+  "type": "module",
+  "description": "Check your mortgage escrow statement against 12 CFR 1024.17, in your browser.",
+  "scripts": {
+    "test": "node --test tests/",
+    "serve": "node serve.mjs"
+  }
+}
