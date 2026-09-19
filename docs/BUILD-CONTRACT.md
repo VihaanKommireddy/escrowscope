@@ -177,6 +177,20 @@ everywhere; conversion to escrow-year order happens in `readInputs` only.
   `buildLetter` soften, and the UI never shows refund-required banner styling
   or the D8 refund date. The UI styles from the verdict object + `nearLine`,
   never from `classification` alone.
+- **E3a (director's rulings, `da5b2b3`).** `nearLine` is set for a surplus or a
+  deficiency only when `borrowerCurrent` is true; for a shortage always.
+  `distanceCents` is absolute. The band is inclusive (≤ 700: TV28 in, TV29 out).
+  Order: surplus → deficiency → shortage (both in the band → report the
+  deficiency). The $0 line is not a `nearLine`. The shape is exactly three keys
+  — no `side` or other extras (the Build Chief floated `side` in the first
+  relay and retracted it). The soft wording and the UI's calm banner are gated
+  on `result.nearLine !== null` and nothing else; nobody re-derives "near".
+- **Vectors are now 30** (TV22–TV29 appended by the director from the auditor's
+  hand derivations). TV25 pins the Step 2 floor and shows that
+  `lowPoint.lowestTargetBalanceCents` is the target **at the low month**
+  (Step 1 + Step 2 add + cushion = 20,007), not the cushion cap (20,001).
+  Callouts for TV01/TV02 are found by `id`, never by position; no file
+  hard-codes a vector count.
 - **E4.** The deficiency/shortage split is HUD 1995 guidance (60 FR 8812,
   8813–14), labeled as guidance in comments, `explainSteps`, and the
   show-the-math panel. `result.cite` strings expected by the vectors don't change.
