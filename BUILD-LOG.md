@@ -90,3 +90,51 @@ changes, not the engine. Corrected in the relay and in the contract.
   2–11 month spread is outside the listed options; large shortage = do nothing
   / 12+ months only; the CFPB FAQ quote supports wording `LUMP_SUM_OFFERED` as
   a question to ask.
+
+### Phase 4 — Verify, and Fix Order 1 (2026-09-19)
+
+The checkers did not write the code they checked. Rows are added as the work
+happens. "Verified by" says who actually ran it, not who claimed it.
+
+| # | What | Who |
+|---|---|---|
+| 4.1 | Independent math audit, Stage 2 (`06c2a77`): a blind oracle written from the regulation, a fuzz harness in `audit/`, 150,000 random accounts with **zero disagreements in `analyze`**, and 15 defects logged in `docs/verification/math-audit.md` §5 — all in `compareWithStatement` flags and plain-English wording, none in the core math. | Independent math auditor (did not see the engine while building its oracle); committed by the director |
+| 4.2 | Director's own pass: `npm test` 475/475; real browser — three examples correct, 30/30 live proof, request counter 0, XSS attempts inert on every free-text path, works with the server killed, no page-level sideways scroll at 320px. Fixed `package.json` (`node --test tests/` fails on Node 26; now a glob). Found B1–B6. | Director |
+| 4.3 | Build Chief re-ran the suite rather than take 4.2 on trust: `npm test` → 475 tests, 475 pass, 0 fail; working tree clean; all `_dev-*` scratch files gone and never committed. Took a pre-fix baseline of the auditor's harness at engine commit `63e498d`: `node fuzz.mjs --n 20000 --seed 99` → `RESULT: PASS`; `node stage2-compare-checks.mjs` → `ALL HARD CHECKS PASSED`. | Build Chief |
+| 4.4 | Fix Order 1 dispatched. Engine Builder: all 15 audit defects (A1–A15) + the engine half of B2, each with a named regression test. UI Builder: B1, B3, B4, B5, the page half of A2 / A10 / A11 / A15 / B2. B6 (README still the v0.2 text) is left for the director in Phase 5 on his instruction. | Build Chief |
+
+**Build Chief's calls inside Fix Order 1 (4.4):**
+
+- **A15, checked, not guessed.** Director's rule: keep only contact details
+  printed on the official page we link. Build Chief fetched the pages:
+  `consumerfinance.gov/complaint/` prints "(855) 411-2372" → stays, on the
+  complaint step only. `consumerfinance.gov/find-a-housing-counselor/` does not
+  show 888-995-HOPE in its fetched text (same result the auditor got) →
+  removed; the counselor step keeps its link and carries no phone. Two honest
+  limits: that page is partly script-rendered, so a plain fetch may not see
+  everything; and the number is real — a *different* official CFPB page (the
+  "What is a HUD-approved housing counseling agency" explainer) lists it. It
+  could come back later by linking that page instead. `hud.gov`'s counselor
+  page returned almost nothing to a plain fetch, so nothing was taken from it.
+- **B2, the "typed my low point as the required minimum" mix-up.** Director
+  left the design open. Call: it is a **nudge, not a flag** —
+  `comparison.nudges[]`, kind `MINIMUM_LOOKS_LIKE_LOW_POINT`; the cushion row
+  gets the new status `"not-compared"` (neither a match nor over the limit);
+  `overall` is computed from the other rows only; a nudge can never turn the
+  banner amber or turn the letter into a notice of error; the page shows it
+  through the existing inline-warning path. **Known limit, stated on purpose:**
+  a servicer genuinely holding a 3-month cushion, with the balance sitting
+  exactly on it, makes the *federal* low point equal the typed minimum (example
+  3's bills with a $2,400 balance: low point $1,800 = typed $1,800, cap
+  $1,200). The rule cannot tell that apart from a mix-up, so the message is
+  two-sided and keeps the dollars visible: check which line you typed; if the
+  statement really lists that figure as the required minimum, it is $X above
+  one-sixth of the year's bills and worth asking about. Phase 4 QA should read
+  that sentence critically.
+- **A2, one rule not two.** The engine exports a single `letterKind(result,
+  comparison)`; `buildLetter`, `nextSteps` and the page's letter-panel title all
+  read it, so the letter, the next steps and the heading cannot disagree.
+- **B5 and parallel work.** The cache name will be derived from a hash of the
+  precached files, engine files included, so every engine edit makes the stamp
+  stale until `node tools/stamp-sw.mjs` runs. The builders were told to expect
+  that one red shell test; the Build Chief re-stamps last, at integration.
