@@ -490,6 +490,11 @@ export function analyze(account) {
   // month as the lowest Step 1 month, because the projected column is the
   // Step 1 column shifted by the starting balance. Searched over months 1–12
   // only (the starting row is not a month-end of the new year).
+  //
+  // `lowestTargetBalanceCents` is the TARGET at the low month (Step 1 + step-2
+  // add + cushion). It is normally equal to the cushion cap, but not always:
+  // when the step-2 add is floored at $0 it sits a few cents above it (TV25:
+  // 6 + 0 + 20,001 = 20,007). So it is read from the row, not copied from the cap.
   const lowRow = table[lowestStepOne.month - 1];
   const lowPoint = {
     projectedBalanceCents: lowRow.projectedBalanceCents,

@@ -19,6 +19,13 @@ function copy(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// Vectors are always looked up by id, never by their position in the file.
+function byId(id) {
+  const vector = VECTORS.find((item) => item.id === id);
+  assert.ok(vector, "no vector with id " + id);
+  return vector;
+}
+
 test("DOC_ONLY_EXPECTED_KEYS is exactly the two documentation keys", () => {
   assert.deepStrictEqual(DOC_ONLY_EXPECTED_KEYS, ["exactArithmeticReference", "whatGoesWrong"]);
 });
@@ -34,7 +41,7 @@ test("every other expected key in every vector exists on the engine's result", (
 });
 
 test("accountFromVector lifts startMonth next to the inputs", () => {
-  const account = accountFromVector(VECTORS[1]); // TV02, escrow year starts in July
+  const account = accountFromVector(byId("TV02")); // escrow year starts in July
   assert.equal(account.startMonth, 7);
   assert.equal(account.startingBalanceCents, 104000);
   assert.equal(account.disbursements.length, 3);
@@ -47,8 +54,8 @@ test("report shape: totals, skippedKeys, and per-row account / expected / actual
   assert.deepStrictEqual(report.skippedKeys, ["exactArithmeticReference", "whatGoesWrong"]);
   assert.equal(report.results.length, VECTORS.length);
 
-  const first = report.results[0];
-  assert.equal(first.id, "TV01");
+  const first = report.results.find((row) => row.id === "TV01");
+  assert.ok(first, "TV01 should be in the report");
   assert.equal(typeof first.title, "string");
   assert.equal(typeof first.source, "string");
   assert.equal(first.ok, true);
@@ -69,7 +76,7 @@ test("rows say which documentation keys they skipped", () => {
 });
 
 test("a wrong top-level number is caught, with its path", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.expected.surplusCents = 30001;
   const report = runSelfCheck([broken]);
   assert.equal(report.passed, 0);
@@ -81,7 +88,7 @@ test("a wrong top-level number is caught, with its path", () => {
 });
 
 test("a wrong number deep inside a table row is caught", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.expected.table[10].projectedBalanceCents = 1;
   const report = runSelfCheck([broken]);
   assert.equal(report.results[0].ok, false);
@@ -91,7 +98,7 @@ test("a wrong number deep inside a table row is caught", () => {
 });
 
 test("a wrong classification string, cite, or option list is caught", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.expected.classification = "ON_TARGET";
   broken.expected.cite = "12 CFR 1024.17(d)(2)";
   broken.expected.servicerOptions = [];
@@ -101,14 +108,14 @@ test("a wrong classification string, cite, or option list is caught", () => {
 });
 
 test("a missing table row is caught (the table must have all 12 rows)", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.expected.table.push(copy(broken.expected.table[0]));
   const report = runSelfCheck([broken]);
   assert.equal(report.results[0].ok, false);
 });
 
 test("an expected key the engine does not produce is caught, not skipped", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.expected.someNewFieldCents = 5;
   const report = runSelfCheck([broken]);
   assert.deepStrictEqual(report.results[0].mismatches, [
@@ -117,14 +124,14 @@ test("an expected key the engine does not produce is caught, not skipped", () =>
 });
 
 test("1 is not '1': the comparison is strict about types", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.expected.surplusCents = "30000";
   const report = runSelfCheck([broken]);
   assert.equal(report.results[0].ok, false);
 });
 
 test("a wrong number in a published (printed) table is caught", () => {
-  const broken = copy(VECTORS[1]); // TV02 carries Appendix E's three printed tables
+  const broken = copy(byId("TV02")); // TV02 carries Appendix E's three printed tables
   broken.publishedTables.step3[6] = 26001;
   const report = runSelfCheck([broken]);
   assert.deepStrictEqual(report.results[0].mismatches, [
@@ -133,7 +140,7 @@ test("a wrong number in a published (printed) table is caught", () => {
 });
 
 test("a vector the engine refuses (invalid account) is reported as a failure, not a crash", () => {
-  const broken = copy(VECTORS[0]);
+  const broken = copy(byId("TV01"));
   broken.inputs.disbursements = [];
   const report = runSelfCheck([broken]);
   assert.equal(report.failed, 1);
@@ -253,7 +260,7 @@ test("checker: a table with one row too few or one too many fails", () => {
 });
 
 test("checker: the real 12-row table — 11 or 13 rows fail against a real vector", () => {
-  const vector = VECTORS[0];
+  const vector = byId("TV01");
   const real = analyze(accountFromVector(vector));
   const eleven = copy(real);
   eleven.table.pop();
