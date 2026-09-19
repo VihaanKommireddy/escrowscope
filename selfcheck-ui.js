@@ -18,7 +18,7 @@
 //      runSelfCheck (the same function `npm test` runs). If a case does not
 //      match, its row says so in words and lists every differing number.
 
-import { el, svgEl, clear } from "./dom.js";
+import { el, svgEl, clear, scrollRegion } from "./dom.js";
 import {
   runSelfCheck,
   VECTORS,
@@ -234,9 +234,7 @@ function plainLabelFor(path) {
 
 // A wide table inside its own scrolling box, so the page never scrolls sideways.
 function scrollBox(label, table) {
-  return el("div", { className: "table-scroll", attrs: { tabindex: "0", role: "region", "aria-label": label } }, [
-    table,
-  ]);
+  return scrollRegion(label, [table]);
 }
 
 function headerRow(cells) {

@@ -61,6 +61,17 @@ export function svgEl(tag, options = {}, children = []) {
   return node;
 }
 
+// The box around a wide table. On a phone the table scrolls sideways INSIDE this
+// box, so the box must be reachable with the Tab key (tabindex="0") and must say
+// what it is (role="region" plus a name). Every scrolling table on the page is
+// made here, so none of them can forget one of the three attributes.
+export function scrollRegion(label, children = []) {
+  if (typeof label !== "string" || label.trim() === "") {
+    throw new Error("dom.js: a scrolling table box needs a name that says what the table is");
+  }
+  return el("div", { className: "table-scroll", attrs: { tabindex: "0", role: "region", "aria-label": label } }, children);
+}
+
 // Empty a node the safe way (no HTML strings involved).
 export function clear(node) {
   node.replaceChildren();

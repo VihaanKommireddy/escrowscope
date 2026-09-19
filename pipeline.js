@@ -314,6 +314,7 @@ function failure(errors, warnings, inputs) {
     servicerLine: null,
     refund: null,
     letter: "",
+    letterKind: "",
   };
 }
 
@@ -360,6 +361,26 @@ export function runCheck(values) {
 
     const letter = engine.buildLetter(result, comparison, inputs.details);
 
+    // Which kind of letter the engine wrote: "NOTICE_OF_ERROR" only when the
+    // numbers point at a specific problem, otherwise "REQUEST_FOR_INFORMATION".
+    // The letter panel's title comes from this, so it never calls a plain
+    // "please explain" letter a notice of error.
+    let letterKind = "";
+    if (typeof engine.letterKind === "function") {
+      letterKind = engine.letterKind(result, comparison);
+    }
+
+    // Gentle "did you mean…?" notes from the comparison (for example: the number
+    // typed as the required minimum looks like the lowest projected balance).
+    // They join the other soft warnings, so they show under their own box.
+    if (Array.isArray(comparison.nudges)) {
+      for (const nudge of comparison.nudges) {
+        if (nudge && typeof nudge.message === "string" && nudge.message !== "") {
+          warnings.push({ field: typeof nudge.field === "string" ? nudge.field : "", message: nudge.message });
+        }
+      }
+    }
+
     return {
       ok: true,
       errors: [],
@@ -376,6 +397,7 @@ export function runCheck(values) {
       servicerLine: servicerLine,
       refund: refund,
       letter: letter,
+      letterKind: letterKind,
     };
   } catch (problem) {
     const message =

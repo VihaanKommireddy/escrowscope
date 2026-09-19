@@ -372,6 +372,15 @@ code,
   background: var(--color-surface-raised);
 }
 
+/* The box itself takes keyboard focus (so it can be scrolled with the arrow
+   keys), and shows the same ring as every other control when it does. */
+.table-scroll:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+  border-radius: var(--radius-md);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -968,6 +977,38 @@ code,
 
 .field-error:empty {
   display: none;
+}
+
+/* A soft "worth a second look" note under a box. Not an error: neutral ink,
+   an "i" mark, and it never blocks the check. */
+.field-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-info-tint);
+  font-size: var(--text-small);
+  line-height: 1.45;
+}
+
+.field-warning::before {
+  content: "i";
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
 }
 
 .field-error::before,
@@ -1605,10 +1646,16 @@ code,
   color: var(--color-clear);
 }
 
-.status--differs,
-.status--over-limit {
+.status--flag {
   background: var(--color-flag-tint);
   color: var(--color-flag);
+}
+
+/* "Not compared": plain grey with a dash. Never the green tick, never the amber mark. */
+.status--neutral {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-subtle);
+  color: var(--color-muted);
 }
 
 .row-label {

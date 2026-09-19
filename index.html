@@ -63,7 +63,7 @@
         <h2 id="intro-heading">Your escrow payment went up. Is the math right?</h2>
         <div class="intro-copy">
           <p><strong>Escrow</strong> is the part of your mortgage payment that your <strong>servicer</strong> (the company you send the payment to) sets aside to pay your property taxes and insurance. A federal rule limits how much they may collect, and once a year they must send you a statement showing their math.</p>
-          <p>Most payment jumps are lawful: tax or insurance bills went up. Some statements have mistakes. This page tells you which one you are holding, in about two minutes.</p>
+          <p>Many payment jumps are lawful: tax or insurance bills went up. Some statements have mistakes. This page tells you which one you are holding, in about two minutes.</p>
         </div>
 
         <div class="examples">
@@ -152,7 +152,7 @@
                 </div>
                 <div class="field" data-guide-region="required-minimum" data-guide-focus="f-required-minimum">
                   <label class="field-label" for="f-required-minimum"><span class="field-badge" aria-hidden="true">5</span> Required minimum balance <span class="tag tag-optional">optional</span></label>
-                  <p class="hint" id="f-required-minimum-hint">The <strong>cushion</strong>: a safety buffer your servicer says must stay in the account. Also called “Minimum Balance”, “Target Balance”, “Cushion”, or “Two-Month Reserve”. Sometimes it is only highlighted in the forecast table, not named.</p>
+                  <p class="hint" id="f-required-minimum-hint">The <strong>cushion</strong>: a safety buffer your servicer says must stay in the account. Also called “Minimum Balance”, “Target Balance”, “Cushion”, or “Two-Month Reserve”. Sometimes it is only highlighted in the forecast table, not named. <strong>This is not the “lowest projected balance” line.</strong> That line is how low your balance is expected to drop. This box is the floor your servicer wants to keep under it. If your statement only shows a lowest projected balance, leave this box empty.</p>
                   <div class="money"><input class="input input-money" id="f-required-minimum" name="requiredMinimum" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="f-required-minimum-hint f-required-minimum-error"></div>
                   <p class="field-error" id="f-required-minimum-error"></p>
                   <div data-guide-slot></div>
@@ -204,7 +204,7 @@
 
               <div class="field" data-guide-region="analysis-date" data-guide-focus="f-analysis-date">
                 <label class="field-label" for="f-analysis-date"><span class="field-badge" aria-hidden="true">8</span> Date of the analysis</label>
-                <p class="hint" id="f-analysis-date-hint">The date printed near the top of the statement. Also called “Analysis Date” or “Statement Date”. It is only used to work out a refund deadline when a refund is due.</p>
+                <p class="hint" id="f-analysis-date-hint">The date of the analysis. It is usually printed near the top of the statement, though the rule does not require it. Also called “Analysis Date” or “Statement Date”. It is only used to work out a refund deadline when a refund is due.</p>
                 <input class="input input-date num" id="f-analysis-date" name="analysisDate" type="date" autocomplete="off" aria-describedby="f-analysis-date-hint f-analysis-date-error">
                 <p class="field-error" id="f-analysis-date-error"></p>
                 <div data-guide-slot></div>
@@ -283,6 +283,7 @@
               <div><dt>RESPA and Regulation X</dt><dd>RESPA is the federal law that sets the rules for mortgage escrow accounts. Regulation X is the detailed rule written under it. The escrow section is “12 CFR 1024.17”.</dd></div>
               <div><dt>CFPB</dt><dd>The Consumer Financial Protection Bureau: the federal agency that writes these rules and takes complaints from consumers.</dd></div>
               <div><dt>Notice of error</dt><dd>A letter you send your servicer asking them to look at a specific mistake. They have set deadlines to answer it.</dd></div>
+              <div><dt>Request for information</dt><dd>A letter asking your servicer for the worksheet behind your statement, or for an explanation of a number. It does not say anything is wrong. They generally have set deadlines to answer it.</dd></div>
               <div><dt>HUD-approved housing counselor</dt><dd>A trained advisor, approved by the Department of Housing and Urban Development, who gives free or low-cost independent help with your mortgage.</dd></div>
             </dl>
           </details>
@@ -356,7 +357,7 @@
 
         <section class="result-block" id="sec-letter" aria-labelledby="sec-letter-h">
           <h3 id="sec-letter-h">A letter you can send</h3>
-          <p class="block-lede">A calm, neutral letter asking your servicer to explain or correct the calculation. It states arithmetic, not legal conclusions. Read it, change anything you like, and decide for yourself whether to send it.</p>
+          <p class="block-lede" id="letter-lede">A calm, neutral letter asking your servicer to explain the calculation. It states arithmetic, not legal conclusions. Read it, change anything you like, and decide for yourself whether to send it.</p>
           <div class="letter-details">
             <div class="field">
               <label class="field-label" for="f-servicer-name">Your servicer’s name <span class="tag tag-optional">optional</span></label>
@@ -406,7 +407,7 @@
       <div class="wrap">
         <span class="eyebrow">Check the checker</span>
         <h2 id="selfcheck-heading">Don’t take our word for it.</h2>
-        <p class="section-lede">A tool that checks someone else’s math should let you check its own. This button runs this page’s calculator against a set of cases that were worked out from the regulation by hand, right here on your device, and shows you every number.</p>
+        <p class="section-lede">A tool that checks someone else’s math should let you check its own. This button runs this page’s calculator against a set of worked cases, right here on your device, and shows you every number. Some of the cases were worked out from the regulation by hand before this calculator existed. Others were added later by an independent checker who had not seen the calculator’s code. The exact count of each is listed below.</p>
         <div id="selfcheck"></div>
       </div>
     </section>

@@ -14,10 +14,14 @@
 // servicers use, so nothing here is needed to use the form.
 
 import { el, clear } from "./dom.js";
-import { formatCents, MONTH_NAMES, escrowToCalendarMonth } from "./engine/index.js";
+import { formatCents, MONTH_NAMES, escrowToCalendarMonth, analyze } from "./engine/index.js";
 
-// The nine regions. `key` and `number` are fixed: index.html uses the same
-// keys in data-guide-region and prints the same numbers next to the labels.
+// The nine regions, in the order the form asks for them. `key` is fixed:
+// index.html uses the same keys in data-guide-region. `number` is the number a
+// region has when ALL nine boxes are on the page. One box (the pay-in-full
+// question) is only shown for a shortage, so the numbers people actually see
+// come from numberVisibleRegions() below: 1, 2, 3… with no gaps, the same on
+// the form and on the sample statement.
 // `lookFor` = names real servicers use (research doc 03, sections 1.5 and 5).
 // `where`   = one plain sentence about where that number usually sits.
 export const GUIDE_REGIONS = [
@@ -71,14 +75,14 @@ export const GUIDE_REGIONS = [
     where: "It is often a tear-off coupon, or a line that offers to take the whole shortage now.",
     // In the form, box 7 only appears once box 6 says there is a shortage.
     revealedBy: "claimed",
-    hiddenNote: "Box 7 only shows up in the form after box 6 says there is a shortage. Here is box 6.",
+    hiddenNote: "That box only shows up in the form after you say the statement shows a shortage. Here is that question.",
   },
   {
     key: "analysis-date",
     number: 8,
     name: "Date of the analysis",
     lookFor: ["Analysis Date", "Statement Date"],
-    where: "It is printed near the top of the first page, close to your loan number.",
+    where: "It is usually printed near the top of the first page, close to your loan number. The rule does not require it, so some statements leave it out.",
   },
   {
     key: "bills",
@@ -113,6 +117,67 @@ function findRegion(key) {
     if (region.key === key) return region;
   }
   return null;
+}
+
+// ───────────────────────── Numbering the boxes ─────────────────────────
+
+// Give every box that is on the page a number: 1, 2, 3… with no gaps.
+// `hiddenKeys` lists the boxes that are NOT on the page right now. They get no
+// number at all. Returns a plain object: { "current-payment": 1, … }.
+// No DOM here, so tests/shell.test.js can check it in Node.
+export function numberVisibleRegions(hiddenKeys) {
+  const hidden = Array.isArray(hiddenKeys) ? hiddenKeys : [];
+  const numbers = {};
+  let next = 1;
+  for (const region of GUIDE_REGIONS) {
+    if (hidden.includes(region.key)) continue;
+    numbers[region.key] = next;
+    next = next + 1;
+  }
+  return numbers;
+}
+
+// Which boxes are hidden in the form right now (a `hidden` attribute on the
+// box or on something around it)?
+function hiddenRegionKeys(form) {
+  const keys = [];
+  for (const region of GUIDE_REGIONS) {
+    const wrapper = form.querySelector('[data-guide-region="' + region.key + '"]');
+    if (wrapper && wrapper.closest("[hidden]")) keys.push(region.key);
+  }
+  return keys;
+}
+
+// Write the numbers onto the page: the badge next to each form label, the badge
+// on each region of the sample statement, and the region's spoken name. A region
+// whose box is hidden is taken off the sample too, so the two always agree.
+// Only text and the `hidden` attribute change here. No style attributes.
+export function renumberBoxes({ panel, form }) {
+  if (!form) return;
+  const numbers = numberVisibleRegions(hiddenRegionKeys(form));
+
+  for (const region of GUIDE_REGIONS) {
+    const number = numbers[region.key];
+    const isShown = number !== undefined;
+    const numberText = isShown ? String(number) : "";
+
+    const wrapper = form.querySelector('[data-guide-region="' + region.key + '"]');
+    if (wrapper) {
+      for (const badgeNode of wrapper.querySelectorAll(".field-badge, .guide-region-static .guide-badge")) {
+        badgeNode.textContent = numberText;
+      }
+    }
+
+    if (!panel) continue;
+    const button = panel.querySelector('.guide-region[data-region="' + region.key + '"]');
+    if (!button) continue;
+    const holder = button.closest(".guide-coupon") || button;
+    holder.hidden = !isShown;
+    const badgeNode = button.querySelector(".guide-badge");
+    if (badgeNode) badgeNode.textContent = numberText;
+    const spokenRest = button.getAttribute("data-spoken") || region.name;
+    button.setAttribute("aria-label", numberText + ". " + spokenRest + ". Go to this box in the form.");
+  }
 }
 
 // Money from the example, or a plain "not shown" when the example has no value.
@@ -176,6 +241,7 @@ function prefersReducedMotion() {
 // text so the eye knows where on the paper it is. Everything else is left out
 // to keep the snippet short on a phone.
 const SNIPPET_NEIGHBORS = {
+  "required-minimum": ["low-point-line"],
   "starting-balance": ["start-month"],
   "start-month": ["starting-balance"],
   "lump-sum": ["claimed"],
@@ -209,6 +275,7 @@ function makeRegion(view, key, valueText, bodyChildren) {
         attrs: {
           type: "button",
           "data-region": key,
+          "data-spoken": region.name + ", " + valueText,
           "aria-label": region.number + ". " + region.name + ", " + valueText + ". Go to this box in the form.",
         },
       },
@@ -366,6 +433,26 @@ function buildSummarySection(view) {
 
   const minimumText = moneyText(statement.requiredMinimumBalanceCents);
 
+  // People often copy the LOWEST PROJECTED BALANCE into the "required minimum"
+  // box by mistake. Real statements print both, close together, so the sample
+  // does too: the low point as a plain, struck-through-looking line with the
+  // words "not this one", and the required minimum as the numbered region.
+  // The low point is worked out by the engine from the same example, so it
+  // always agrees with the example button.
+  let lowPointLine = null;
+  if (view.mode === "panel" || isDrawn(view, "low-point-line")) {
+    let lowPointText = NOT_SHOWN;
+    try {
+      lowPointText = moneyText(analyze(view.example.account).lowPoint.projectedBalanceCents);
+    } catch (problem) {
+      lowPointText = NOT_SHOWN;
+    }
+    lowPointLine = el("div", { className: "guide-not-this" }, [
+      el("span", { className: "guide-not-this-line" }, [labelSpan("Lowest projected balance"), valueSpan(lowPointText)]),
+      el("span", { className: "guide-not-this-tag", text: "Not this one. The form does not ask for it." }),
+    ]);
+  }
+
   const claimedBody = [labelSpan(claimedLabel), valueSpan(amountText)];
   if (repayLine !== "") {
     claimedBody.push(el("span", { className: "guide-sub", text: repayLine }));
@@ -400,6 +487,7 @@ function buildSummarySection(view) {
   return el("div", { className: "guide-section" }, [
     sectionHead("Escrow account summary"),
     el("p", { className: "guide-story", text: story }),
+    lowPointLine,
     makeRegion(view, "required-minimum", minimumText, [labelSpan("Required minimum balance"), valueSpan(minimumText)]),
     makeRegion(view, "claimed", spokenClaim, claimedBody),
     coupon,
@@ -681,4 +769,7 @@ export function initGuide({ panel, form, example }) {
     if (goingTo && form.contains(goingTo)) return;
     setActiveRegion(buttons, scrollBox, null);
   });
+
+  // Number the boxes that are on the page right now (see renumberBoxes).
+  renumberBoxes({ panel: panel, form: form });
 }

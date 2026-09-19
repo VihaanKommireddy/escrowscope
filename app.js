@@ -29,7 +29,7 @@ import {
   setStale,
   flashVerdict,
 } from "./render.js";
-import { initGuide } from "./guide.js";
+import { initGuide, renumberBoxes } from "./guide.js";
 import { initProofPanel } from "./proof.js";
 import { initSelfCheck } from "./selfcheck-ui.js";
 import { registerServiceWorker } from "./sw-register.js";
@@ -299,6 +299,10 @@ function syncConditionalFields() {
   byId("claimed-amount-field").hidden = !(owesMoney || kind === "surplus");
   byId("spread-months-field").hidden = !owesMoney;
   byId("lump-sum-field").hidden = kind !== "shortage";
+
+  // A box just appeared or disappeared, so count the visible boxes again. The
+  // little numbers on the form and on the sample statement change together.
+  renumberBoxes({ panel: byId("guide-panel"), form: form });
 }
 
 function updateBillsTotal() {
@@ -413,6 +417,49 @@ function showErrors(errors, withSummary) {
   summary.focus({ preventScroll: true });
 }
 
+// ─────────────────────────── soft warnings under a box ───────────────────────────
+// Warnings never block the check. Each one is shown in the results AND right
+// under the box it is about, tied to that box for screen readers.
+
+function describedByTokens(control) {
+  const current = control.getAttribute("aria-describedby") || "";
+  return current.split(" ").filter(function (token) {
+    return token !== "";
+  });
+}
+
+function clearWarnings() {
+  for (const note of Array.from(document.querySelectorAll(".field-warning"))) {
+    const control = byId(note.getAttribute("data-for"));
+    if (control) {
+      const kept = describedByTokens(control).filter(function (token) {
+        return token !== note.id;
+      });
+      control.setAttribute("aria-describedby", kept.join(" "));
+    }
+    note.remove();
+  }
+}
+
+function showWarnings(warnings) {
+  clearWarnings();
+  for (const warning of warnings) {
+    const controlId = fieldToId(warning.field);
+    const control = controlId ? byId(controlId) : null;
+    const slot = errorSlotFor(warning.field, controlId);
+    if (!control || !slot) continue;
+
+    const noteId = controlId + "-warning";
+    let note = byId(noteId);
+    if (!note) {
+      note = el("p", { className: "field-warning", attrs: { id: noteId, "data-for": controlId } });
+      slot.after(note);
+      control.setAttribute("aria-describedby", describedByTokens(control).concat([noteId]).join(" "));
+    }
+    note.textContent = note.textContent === "" ? warning.message : note.textContent + " " + warning.message;
+  }
+}
+
 // A link in the error summary (or a nudge) moves focus INTO the box, not just near it.
 function handleJumpLinkClick(event) {
   const link = event.target.closest('a[href^="#f-"], a[href^="#bill-"], a[href="#add-bill"]');
@@ -435,6 +482,7 @@ function showResults(check, moveFocus) {
   byId("print-date").textContent = "Made on " + todayInWords() + ". Math, not legal advice.";
   setStale(false);
   renderResults(check, { fieldToId: fieldToId });
+  showWarnings(check.warnings);
 
   if (moveFocus) {
     const heading = byId("verdict-heading");
@@ -644,6 +692,7 @@ function clearForm() {
   byId("f-loan-number").value = "";
   writeFormValues(blankFormValues());
   clearErrors();
+  clearWarnings();
   hasCheckedOnce = false;
   lastGoodCheck = null;
   byId("results").hidden = true;

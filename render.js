@@ -3,7 +3,7 @@
 // from the engine (through pipeline.js) and is placed on the page as plain text.
 // This file only decides WHERE things go and adds short labels around them.
 
-import { el, svgEl, clear } from "./dom.js";
+import { el, svgEl, clear, scrollRegion } from "./dom.js";
 import { formatCents, MONTH_NAMES } from "./engine/index.js";
 import { renderBalanceChart, renderJumpBar } from "./chart.js";
 
@@ -28,6 +28,8 @@ const ICON_PATHS = {
   // Balance below zero.
   below: ["M4 9h16", "M12 11v8", "M7.5 15l4.5 4.5 4.5-4.5"],
   differs: ["M5 9h14", "M5 15h14", "M15 5L9 19"],
+  // A plain dash: "not compared". Deliberately neither a tick nor a flag.
+  dash: ["M6 12h12"],
   // A level balance beam: "too close to call".
   scale: ["M12 5v14", "M5 8h14", "M8 19h8", "M5 8l-2 5h4z", "M19 8l-2 5h4z"],
 };
@@ -239,11 +241,27 @@ function renderThreeNumbers(check) {
 
 // ─────────────────────────── statement vs federal math ───────────────────────────
 
+// What each comparison result looks like. `look` picks the chip's style:
+//   "match" = green tick, "flag" = amber mark, "neutral" = plain grey, no mark of either kind.
 const STATUS_WORDS = {
-  match: { text: "Matches", iconName: "check" },
-  differs: { text: "Differs", iconName: "differs" },
-  "over-limit": { text: "Over the limit", iconName: "flag" },
+  match: { text: "Matches", iconName: "check", look: "match" },
+  differs: { text: "Differs", iconName: "differs", look: "flag" },
+  "over-limit": { text: "Over the limit", iconName: "flag", look: "flag" },
+  // The engine could not fairly compare this line (for example, the number typed
+  // as the "required minimum" looks like the lowest projected balance instead).
+  "not-compared": { text: "Not compared", iconName: "dash", look: "neutral" },
 };
+
+// A status this page has never heard of must never show up blank, and must
+// never borrow the green tick. It gets the neutral look and plain words.
+const UNKNOWN_STATUS = { text: "See the note on this line", iconName: "dash", look: "neutral" };
+
+export function statusWords(status) {
+  if (typeof status === "string" && Object.prototype.hasOwnProperty.call(STATUS_WORDS, status)) {
+    return STATUS_WORDS[status];
+  }
+  return UNKNOWN_STATUS;
+}
 
 const FLAG_TAGS = {
   CUSHION_OVER_CAP: "Cushion above the limit",
@@ -260,8 +278,8 @@ function moneyCell(cents) {
 }
 
 function statusChip(status) {
-  const words = STATUS_WORDS[status] || { text: String(status), iconName: "info" };
-  return el("span", { className: "status status--" + status }, [icon(words.iconName), words.text]);
+  const words = statusWords(status);
+  return el("span", { className: "status status--" + words.look }, [icon(words.iconName), words.text]);
 }
 
 function renderCompare(check) {
@@ -307,16 +325,7 @@ function renderCompare(check) {
     head,
     body,
   ]);
-  box.append(
-    el(
-      "div",
-      {
-        className: "table-scroll",
-        attrs: { tabindex: "0", role: "region", "aria-label": "Your statement compared with the federal math" },
-      },
-      [table]
-    )
-  );
+  box.append(scrollRegion("Your statement compared with the federal math, as a table", [table]));
 
   if (comparison.flags.length > 0) {
     const list = el("ul", { className: "flag-list" });
@@ -514,16 +523,21 @@ function renderSteps(check) {
 
 // ─────────────────────────── what you can do next ───────────────────────────
 
-// "888-995-HOPE (4673)" → a link a phone can dial. Only the digits are used;
-// if they don't add up to a 10-digit number, the phone is shown as plain text.
-function phoneNode(phone) {
+// A phone number the engine sent with a next step → something a phone can dial.
+// Returns the digits for a tel: link, or "" when the text is not a plain
+// 10-digit US number (then it is shown as words only, never as a broken link).
+export function dialableDigits(phone) {
+  if (typeof phone !== "string") return "";
   let digits = "";
-  for (const character of String(phone)) {
+  for (const character of phone) {
     if (character >= "0" && character <= "9") digits = digits + character;
   }
-  if (digits.length !== 10) {
-    return el("span", { className: "num", text: "Phone: " + phone });
-  }
+  return digits.length === 10 ? digits : "";
+}
+
+function phoneNode(phone) {
+  const digits = dialableDigits(phone);
+  if (digits === "") return el("span", { className: "num", text: "Phone: " + phone });
   return el("a", { className: "num", text: "Call " + phone, attrs: { href: "tel:+1" + digits } });
 }
 
@@ -537,10 +551,11 @@ function renderNext(check) {
       el("p", { className: "next-body", text: step.body }),
     ]);
     const links = el("p", { className: "next-links" });
-    if (step.url) {
+    if (typeof step.url === "string" && step.url.trim() !== "") {
       links.append(el("a", { text: "Open the official page", attrs: { href: step.url, rel: "noopener noreferrer" } }));
     }
-    if (step.phone) {
+    // Most steps have no phone number. Only a real, non-empty one is shown.
+    if (typeof step.phone === "string" && step.phone.trim() !== "") {
       links.append(phoneNode(step.phone));
     }
     if (links.childNodes.length > 0) item.append(links);
@@ -551,7 +566,41 @@ function renderNext(check) {
 
 // ─────────────────────────── letter ───────────────────────────
 
+// The engine writes one of two kinds of letter (SPEC fix A2):
+//   a NOTICE OF ERROR, only when the numbers point at a specific problem, or
+//   a REQUEST FOR INFORMATION, which just asks the servicer to explain.
+// The panel's title and first sentence follow the kind. If the kind is ever
+// missing or new, the neutral wording is used: it never claims an error.
+const LETTER_ENDING =
+  " It states arithmetic, not legal conclusions. Read it, change anything you like, and decide for yourself whether to send it.";
+
+export function letterPanelWords(letterKind) {
+  if (letterKind === "NOTICE_OF_ERROR") {
+    return {
+      title: "A letter asking your servicer to look at a possible error",
+      lede:
+        "This letter is a “notice of error”: it points to specific numbers on your statement and asks your servicer to explain them or correct them. A gap is a question to ask, not proof of a mistake." +
+        LETTER_ENDING,
+    };
+  }
+  if (letterKind === "REQUEST_FOR_INFORMATION") {
+    return {
+      title: "A letter asking your servicer to explain",
+      lede:
+        "This letter is a “request for information”: it asks your servicer to explain its numbers or send the worksheet behind them. It does not say anything is wrong." +
+        LETTER_ENDING,
+    };
+  }
+  return {
+    title: "A letter you can send",
+    lede: "A calm, neutral letter asking your servicer to explain the calculation." + LETTER_ENDING,
+  };
+}
+
 function renderLetter(check) {
+  const words = letterPanelWords(check.letterKind);
+  byId("sec-letter-h").textContent = words.title;
+  byId("letter-lede").textContent = words.lede;
   byId("letter-text").value = check.letter;
   byId("letter-print").textContent = check.letter;
 }

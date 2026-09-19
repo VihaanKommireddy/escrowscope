@@ -656,3 +656,37 @@ button.guide-region:hover {
   outline-offset: 6px;
   border-radius: var(--radius-sm);
 }
+
+/* ───────────────────────── "Not this one": the low-point line ───────────────────────── */
+
+/* Real statements print the LOWEST PROJECTED BALANCE close to the REQUIRED
+   MINIMUM BALANCE, and people copy the wrong one. The sample shows both and
+   makes them look different in three ways that do not rely on color: the
+   low-point line has no number badge, its figures are crossed through, and it
+   carries the words "Not this one". */
+.guide-not-this {
+  display: grid;
+  gap: 2px;
+  margin-block: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dotted var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+
+.guide-not-this-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.guide-not-this-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+}

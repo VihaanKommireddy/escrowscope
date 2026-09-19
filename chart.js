@@ -21,7 +21,7 @@
 // turn into specks. Instead we measure the box, draw for that exact width, and
 // draw again whenever the box changes size. Text stays 11px or bigger.
 
-import { el, svgEl, clear } from "./dom.js";
+import { el, svgEl, clear, scrollRegion } from "./dom.js";
 import { formatCents, MONTH_NAMES } from "./engine/index.js";
 
 // ───────────────────────── 1. Shared helpers ─────────────────────────
@@ -1029,10 +1029,7 @@ function buildBalanceTable(data) {
     body,
   ]);
 
-  return el("div", {
-    className: "table-scroll",
-    attrs: { tabindex: "0", role: "region", "aria-label": "Month-by-month balances, as a table" },
-  }, [table]);
+  return scrollRegion("Your escrow balance month by month, as a table", [table]);
 }
 
 // A balance cell. The lowest month is marked with words, not only a tint.
