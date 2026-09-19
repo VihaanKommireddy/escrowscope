@@ -47,9 +47,16 @@ work happens, in order.
 | 3.5 | Builder commits seen on `v1` since 3.4: `9af8504` engine core (money, validate, analyze, selfcheck), `842a6eb` UI shell (markup, tokens + components, pipeline seam, renderer, app wiring), `92ae611` Part E in analyze (E1–E5 + nine bug guards as named tests), `3b3293b` compare.js (six flag kinds incl. D6). Commit messages are the builders' own claims; the Build Chief has not yet run the suite against them. | Engine Builder, UI Builder |
 | 3.6 | Director appended auditor-written vectors TV22–TV29 and the additive `expected.nearLine` key (`da5b2b3`), plus SPEC E3a. Build Chief checked the file (30 vectors; `engine/vectors.js` stale until regenerated), hand-checked TV25 against E1 (lowest Step 1 balance +6¢ → Step 2 add 0 → target at the low month 20,007¢), relayed regeneration + E3a + TV25 to the Engine Builder and the count / scratch-file rules to the UI Builder, and updated contract section 4b. No builder wrote or edited a vector. | Build Chief |
 
-**A second correction of the Build Chief's own (3.6):** the first Part E relay
-floated an optional `side` field on `nearLine`. SPEC E3a rules the shape is
-exactly three keys, so that suggestion was retracted in the second relay.
+| 3.7 | SPEC E3a.6 landed (`5f301d4`) minutes after relay 3.6: extra descriptive keys on `nearLine` and the `result.inputs` echo are allowed; vectors pin only three keys. Build Chief sent both builders a correction, told the Engine Builder to prove with deliberately broken fake results that `runSelfCheck` ignores extra keys but still fails on missing keys, wrong values, null-vs-object, wrong table length and `-0`, and rewrote contract 4b to match. | Build Chief |
+
+**The `nearLine.side` back-and-forth, stated plainly (3.4 → 3.7):** the first
+Part E relay floated an optional `side` field; relay 3.6 retracted it, reading
+E3a's "the shape stays `{ line, distanceCents, toleranceCents }`" as "exactly
+three keys"; E3a.6 then ruled extras are fine, so relay 3.7 reversed the
+retraction. Net effect on the code should be nil (the engine shipped `side`
+throughout), but the Engine Builder received a wrong instruction for a few
+minutes. Phase 4 should confirm the four extra keys are present and that the
+explain text still uses them.
 
 **A mistake of the Build Chief's, caught by the audit (3.4):** the original
 Engine Builder brief repeated SPEC C5's property `lowPoint − cushionCap ===

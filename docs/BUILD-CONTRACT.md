@@ -181,10 +181,18 @@ everywhere; conversion to escrow-year order happens in `readInputs` only.
   deficiency only when `borrowerCurrent` is true; for a shortage always.
   `distanceCents` is absolute. The band is inclusive (≤ 700: TV28 in, TV29 out).
   Order: surplus → deficiency → shortage (both in the band → report the
-  deficiency). The $0 line is not a `nearLine`. The shape is exactly three keys
-  — no `side` or other extras (the Build Chief floated `side` in the first
-  relay and retracted it). The soft wording and the UI's calm banner are gated
-  on `result.nearLine !== null` and nothing else; nobody re-derives "near".
+  deficiency). The $0 line is not a `nearLine`. The soft wording and the UI's calm banner are
+  gated on `result.nearLine !== null` and nothing else; nobody re-derives "near".
+- **E3a.6 (`5f301d4`).** The vectors pin only `line`, `distanceCents`,
+  `toleranceCents`. The engine may carry descriptive extras on `nearLine`
+  (`appliesTo`, `side`, `amountCents`, `lineCents`) and an echo of the
+  normalized account at `result.inputs`; extra keys are not a mismatch. So
+  `runSelfCheck` compares **every expected key, recursively** — extra actual
+  keys ignored at every depth; a missing key, a different value or type, null
+  vs object, or `-0` vs `0` is a mismatch; arrays (`table`, `servicerOptions`)
+  stay strict on length and order. `result.inputs` follows typed bill order, so
+  it alone is excluded, by name, from the bill-permutation property. The UI
+  never branches on the extra keys and never computes pass/fail itself.
 - **Vectors are now 30** (TV22–TV29 appended by the director from the auditor's
   hand derivations). TV25 pins the Step 2 floor and shows that
   `lowPoint.lowestTargetBalanceCents` is the target **at the low month**
