@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { validateAccount, validateStatement } from "../engine/index.js";
+import { validateAccount, validateStatement, MAX_BILL_LABEL_LENGTH } from "../engine/index.js";
+import { MAX_BILL_LABEL_LENGTH as MAX_BILL_LABEL_LENGTH_FROM_VALIDATE } from "../engine/validate.js";
 import { VECTORS } from "../engine/vectors.js";
 import { accountFromVector } from "../engine/index.js";
 import { EXAMPLES } from "../examples.js";
@@ -185,14 +186,63 @@ test("bill month missing or outside 1–12", () => {
   }
 });
 
-test("bill label that is not text, or is far too long", () => {
+test("bill label that is not text", () => {
   const account = goodAccount();
   account.disbursements[0].label = 42;
   assert.deepStrictEqual(fieldsOf(validateAccount(account).errors), ["disbursements.0.label"]);
-  account.disbursements[0].label = "x".repeat(101);
-  assert.deepStrictEqual(fieldsOf(validateAccount(account).errors), ["disbursements.0.label"]);
-  account.disbursements[0].label = "x".repeat(100);
+});
+
+// =====================================================================
+// FIX ORDER 2, QA #13: ONE bill-name length limit, everywhere.
+// Before: 60 in the page's box, 100 here, 120 from a loaded file, 200 in the
+// letter. Now: MAX_BILL_LABEL_LENGTH = 60, exported, and nothing else.
+// =====================================================================
+
+test("QA #13: the one limit is 60, and engine/index.js hands out the same constant validate.js defines", () => {
+  assert.equal(MAX_BILL_LABEL_LENGTH, 60);
+  assert.equal(MAX_BILL_LABEL_LENGTH_FROM_VALIDATE, MAX_BILL_LABEL_LENGTH);
+});
+
+test("QA #13: a bill name of exactly 60 passes; 61 fails under that row's NAME box, in plain English", () => {
+  for (let row = 0; row < 3; row++) {
+    const account = goodAccount();
+    account.disbursements[row].label = "x".repeat(60);
+    assert.deepStrictEqual(validateAccount(account).errors, [], "60 in row " + row);
+
+    account.disbursements[row].label = "x".repeat(61);
+    const errors = validateAccount(account).errors;
+    assert.deepStrictEqual(fieldsOf(errors), ["disbursements." + row + ".label"]);
+    assertPlainEnglish(errors);
+    assert.ok(errors[0].message.includes("60"), "the message says the limit: " + errors[0].message);
+    assert.equal(errors[0].message.includes("x".repeat(10)), false, "the message never repeats what was typed");
+  }
+});
+
+test("QA #13: a far-too-long name is one tidy error, not a crash (5,000 and 1,000,000 characters)", () => {
+  for (const size of [5000, 1000000]) {
+    const account = goodAccount();
+    account.disbursements[1].label = "x".repeat(size);
+    assert.deepStrictEqual(fieldsOf(validateAccount(account).errors), ["disbursements.1.label"]);
+  }
+});
+
+test("QA #13: length is counted the way an HTML maxlength counts it (UTF-16 units), so the box and the engine agree", () => {
+  const house = "\u{1F3E0}"; // one picture character, but 2 UTF-16 units: "\u{1F3E0}".length === 2
+  assert.equal(house.length, 2);
+  const account = goodAccount();
+  account.disbursements[0].label = house.repeat(30); // 60 units: the most a maxlength="60" box lets in
   assert.deepStrictEqual(validateAccount(account).errors, []);
+  account.disbursements[0].label = house.repeat(30) + "x"; // 61 units
+  assert.deepStrictEqual(fieldsOf(validateAccount(account).errors), ["disbursements.0.label"]);
+});
+
+test("QA #13: every vector's and example's bill names fit the one limit", () => {
+  const accounts = VECTORS.map((vector) => accountFromVector(vector)).concat(EXAMPLES.map((example) => example.account));
+  for (const account of accounts) {
+    for (const bill of account.disbursements) {
+      if (typeof bill.label === "string") assert.ok(bill.label.length <= MAX_BILL_LABEL_LENGTH, bill.label);
+    }
+  }
 });
 
 test("a label that looks like HTML is just a label (the engine never treats text as markup)", () => {

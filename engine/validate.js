@@ -15,7 +15,20 @@
 import { MAX_MONEY_CENTS, divideRoundHalfUp } from "./money.js";
 
 const MAX_BILLS = 100;
-const MAX_LABEL_LENGTH = 100;
+
+// THE one limit on how long a bill's name may be, for the whole project (QA
+// audit #13). The page's name box uses it as its `maxlength`, a loaded numbers
+// file is held to it, and this file enforces it. No other file in engine/ has
+// a label-length number of its own (tests/purity.test.js checks).
+//
+// HOW LENGTH IS COUNTED: with JavaScript's `.length`, which counts UTF-16
+// units. Most characters are 1 unit; an emoji is usually 2. That is on purpose:
+// it is exactly how a browser counts for an HTML `maxlength`, so whatever the
+// name box lets someone type, this check accepts, and the two can never
+// disagree. Counting "real" characters instead would accept names from a
+// loaded file that the box itself could not hold.
+export const MAX_BILL_LABEL_LENGTH = 60;
+
 const MAX_SPREAD_MONTHS = 360; // 30 years; nobody spreads a shortage longer than the loan
 
 const SMALL_BILL_CENTS = 10000; // $100 — below this for a whole year, ask "monthly or yearly?"
@@ -133,8 +146,11 @@ function checkOneBill(bill, index, errors) {
   if (row.label !== undefined) {
     if (typeof row.label !== "string") {
       errors.push(finding(labelField, "The name of this bill needs to be plain text."));
-    } else if (row.label.length > MAX_LABEL_LENGTH) {
-      errors.push(finding(labelField, "That name is too long. Please use 100 letters or fewer."));
+    } else if (row.label.length > MAX_BILL_LABEL_LENGTH) {
+      // The field is this row's NAME box, so the page can put the message
+      // right under it. The limit is written from the constant, so the words
+      // can never drift away from the number.
+      errors.push(finding(labelField, "That name is too long. Please keep it to " + MAX_BILL_LABEL_LENGTH + " characters or fewer, spaces included."));
     }
   }
 }

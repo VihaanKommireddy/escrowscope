@@ -7,8 +7,9 @@
 // money.js — dollars-as-text ↔ whole cents, and month helpers
 export { parseDollars, formatCents, calendarToEscrowMonth, escrowToCalendarMonth, MONTH_NAMES } from "./money.js";
 
-// validate.js — plain-English problems with what was typed
-export { validateAccount, validateStatement } from "./validate.js";
+// validate.js — plain-English problems with what was typed, and the one limit
+// on a bill name's length (the page uses the same number for its name box)
+export { validateAccount, validateStatement, MAX_BILL_LABEL_LENGTH } from "./validate.js";
 
 // analyze.js — the 12 CFR 1024.17 math
 export { analyze, projectWithPayment, TOLERANCE_BALANCE_CENTS, TOLERANCE_PAYMENT_CENTS } from "./analyze.js";

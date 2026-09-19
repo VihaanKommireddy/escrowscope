@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { analyze, compareWithStatement, buildLetter, letterKind, nextSteps, accountFromVector, VECTORS } from "../engine/index.js";
+import {
+  analyze, compareWithStatement, buildLetter, letterKind, nextSteps, accountFromVector, validateAccount, VECTORS, MAX_BILL_LABEL_LENGTH,
+} from "../engine/index.js";
 import { EXAMPLES } from "../examples.js";
 
 function letterFor(exampleId, details) {
@@ -223,6 +225,22 @@ test("QA #6: borrowerName and propertyAddress are still supported, and an empty 
   const empty = letterFor("jumped-ok", { borrowerName: "", propertyAddress: "" });
   assert.ok(empty.includes("From: [your full name]"));
   assert.ok(empty.includes("Property: [your property address]"));
+});
+
+// =====================================================================
+// FIX ORDER 2, QA #13: one bill-name limit. The letter has no second cap of
+// its own: a name the engine accepts is printed whole.
+// =====================================================================
+
+test("QA #13: the longest bill name the engine accepts is printed whole in the letter", () => {
+  const example = EXAMPLES.find((item) => item.id === "jumped-ok");
+  const account = JSON.parse(JSON.stringify(example.account));
+  const longName = "n".repeat(MAX_BILL_LABEL_LENGTH);
+  account.disbursements[0].label = longName;
+  assert.deepStrictEqual(validateAccount(account).errors, []);
+  const result = analyze(account);
+  const letter = buildLetter(result, compareWithStatement(result, example.statement), {});
+  assert.ok(letter.includes("    " + longName + ", "));
 });
 
 // =====================================================================

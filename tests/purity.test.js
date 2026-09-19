@@ -24,7 +24,7 @@ const EXPECTED_FILES = [
 
 const EXPECTED_EXPORTS = [
   "parseDollars", "formatCents", "calendarToEscrowMonth", "escrowToCalendarMonth", "MONTH_NAMES",
-  "validateAccount", "validateStatement",
+  "validateAccount", "validateStatement", "MAX_BILL_LABEL_LENGTH",
   "analyze", "projectWithPayment", "TOLERANCE_BALANCE_CENTS", "TOLERANCE_PAYMENT_CENTS",
   "compareWithStatement",
   "explainVerdict", "explainSteps", "explainJump", "nextSteps", "explainServicerLine",
@@ -305,6 +305,73 @@ test("A15: the engine carries no housing-counselor phone number (only contact de
       assert.equal(source.includes(piece), false, "engine/" + name + " contains " + piece);
     }
   }
+});
+
+// ---------- QA #13: one bill-name length limit, and no second one ----------
+// Reads the engine's CODE (comments and string contents blanked, so a number
+// inside a sentence is not a false alarm).
+//
+// WHAT THIS CAN MISS: a cap that never says "label" on its own line, for
+// example `const name = bill.label;` on one line and `name.slice(0, 80)` on
+// the next. It is a tripwire for the obvious way a second limit comes back,
+// not a proof. The behavior tests in tests/validate.test.js (60 passes, 61
+// fails) and tests/letter.test.js (a 60-character bill name is printed whole)
+// are the real check.
+
+// One file's code in → what it found. `definitions` are constants with LABEL
+// in their name; `problems` are lines about a label that carry a number of 2
+// or more digits (60, 100, 120, 200 …) or that cut the text short.
+function scanForLabelLimits(name, code) {
+  const definitions = [];
+  const problems = [];
+  const codeLines = code.split("\n");
+  for (let index = 0; index < codeLines.length; index++) {
+    const line = codeLines[index];
+    if (!/label/i.test(line)) continue;
+    const where = "engine/" + name + " line " + (index + 1) + ": " + line.trim();
+    if (/\bconst\s+[A-Z_]*LABEL[A-Z_]*\s*=/.test(line)) {
+      definitions.push(name + ": " + line.trim());
+    } else if (/\d\d/.test(line)) {
+      problems.push("a second label-length number? " + where);
+    } else if (/\.(slice|substring|substr)\s*\(/.test(line)) {
+      problems.push("a label is being cut short? " + where);
+    }
+  }
+  return { definitions: definitions, problems: problems };
+}
+
+test("QA #13: the label-limit tripwire trips on the old code, and stays quiet on ordinary label code", () => {
+  const oldStyle = codeOnly([
+    "const MAX_LABEL_LENGTH = 100;",
+    "if (row.label.length > 120) return;",
+    "const shown = bill.label.slice(0, limit);",
+    "const name = bill.label.trim() === \"\" ? \"Bill \" + (index + 1) : bill.label.trim(); // up to 100",
+    "rows.push({ key: \"claimedAmount\", label: \"Over by 100 dollars\" });",
+  ].join("\n"));
+  const found = scanForLabelLimits("sample.js", oldStyle);
+  assert.deepStrictEqual(found.definitions, ["sample.js: const MAX_LABEL_LENGTH = 100;"]);
+  assert.equal(found.problems.length, 2);
+  assert.match(found.problems[0], /line 2/);
+  assert.match(found.problems[1], /line 3/);
+});
+
+test("QA #13: engine/ has ONE bill-label length limit: MAX_BILL_LABEL_LENGTH = 60 in validate.js, and no other label-length number", () => {
+  let definitions = [];
+  for (const name of EXPECTED_FILES) {
+    if (name === "vectors.js") continue; // generated data
+    const found = scanForLabelLimits(name, CODE.get(name));
+    assert.deepStrictEqual(found.problems, []);
+    definitions = definitions.concat(found.definitions);
+  }
+  assert.deepStrictEqual(definitions, ["validate.js: export const MAX_BILL_LABEL_LENGTH = 60;"]);
+
+  // The letter's 200 is about a DIFFERENT thing (servicer name, loan number …)
+  // and says so in its name.
+  const letterCode = CODE.get("letter.js");
+  assert.ok(letterCode.includes("const MAX_LETTER_DETAIL_LENGTH = 200;"));
+  assert.equal(/\bMAX_DETAIL_LENGTH\b/.test(letterCode), false, "the old, vaguer name is gone");
+  // The old private constant is gone too.
+  assert.equal(/\bMAX_LABEL_LENGTH\b/.test(CODE.get("validate.js")), false);
 });
 
 test("the generated vectors file is data only: three exported constants and nothing else", () => {
