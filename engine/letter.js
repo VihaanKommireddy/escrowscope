@@ -129,7 +129,7 @@ function questionLines(result, comparison) {
   } else if (near !== null) {
     items.push("By my math the " + near.appliesTo + " is " + formatCents(near.amountCents) + " to the cent, and one month's escrow payment is " + formatCents(near.lineCents) + ". Those are within a few dollars of each other, and I understand that rounding could put your figure on either side. Please tell me your exact figure and which repayment choices you are applying.");
   } else if (result.classification === "SURPLUS_REFUND_REQUIRED") {
-    items.push("By my math the account has a surplus of " + formatCents(result.surplusCents) + ". 12 CFR 1024.17(f)(2)(i) says a surplus of $50 or more is refunded within 30 days of the escrow analysis. If the refund has been sent, please tell me the date and how it was sent. If not, please tell me when it will be.");
+    items.push("By my math the account has a surplus of " + formatCents(result.surplusCents) + ". 12 CFR 1024.17(f)(2)(i) says a surplus of $50 or more is refunded within 30 days of the escrow analysis. If the refund has been sent, please tell me the date and how it was sent. If it has not, please tell me how the surplus is being handled.");
   }
   return items;
 }

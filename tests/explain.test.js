@@ -326,7 +326,7 @@ test("QA #14: the voice check matches WHOLE words only — status, bonus, trust,
     "The status of your bonus is a matter of trust.", "Focus on the house for four hours.", "A sour note.",
     "U.S. law", "the U.S. Department of Housing", "U. S. mail", "STATUS", "Housing counselors", "ourselves is one word", "owe", "use", "plus",
     "yours", "hours", "tour", "flour", "course", "welcome", "well", "weigh", "wed", "were", "lets go",
-    "the 12 months", "a 12-month table", "refund is due", "refunds due dates", "the escrow payment", "equal monthly payments", "monthly escrow payment",
+    "the 12 months", "a 12-month table", "refunds due dates", "the escrow payment", "equal monthly payments", "monthly escrow payment",
   ];
   for (const text of innocent) assert.deepStrictEqual(voiceHits(text), [], text);
 });
@@ -487,6 +487,109 @@ test("QA #14: the new wording, sentence by sentence", () => {
   }
 });
 
+// ---------- 1d. two sweeps: privacy claims (QA #1–#3) and refund promises (QA #7) ----------
+// Both run on every string the engine can produce AND on every string literal
+// in its source, plus the examples' titles and blurbs (examples.js is outside
+// engine/, so its text is added by hand here).
+
+// Same whole-word matching as the voice check, for any list of phrases.
+function phraseHits(text, phrases) {
+  const spaced = " " + wordsOf(text).join(" ") + " ";
+  return phrases.filter((phrase) => spaced.includes(" " + wordsOf(phrase).join(" ") + " "));
+}
+
+function everyStringToSweep() {
+  const exampleTexts = [];
+  for (const example of EXAMPLES) {
+    exampleTexts.push({ where: "examples.js " + example.id + " title", text: example.title });
+    exampleTexts.push({ where: "examples.js " + example.id + " blurb", text: example.blurb });
+  }
+  return ALL_TEXTS.concat(ENGINE_LITERALS).concat(exampleTexts);
+}
+
+// QA #1–#3. What this page does or does not send is explained, with its
+// mechanism and its limits, in ONE place: the page's privacy panel. The engine
+// is pure math and words about escrow, so it makes no privacy claim at all:
+// not "nothing is sent", not "no server", not "works offline". (A claim the
+// engine cannot prove is a claim it must not make.) Words like "send" and
+// "sent" are fine on their own: the letter asks the servicer to send things.
+const PRIVACY_CLAIMS = [
+  "server", "servers", "offline", "internet", "network", "fetch", "fetched", "fetches", "upload", "uploaded", "uploads",
+  "tracking", "tracked", "cookies", "analytics",
+  "nothing is sent", "nothing was sent", "nothing gets sent", "never sent", "not sent anywhere", "sent anywhere",
+  "cannot send", "can't send", "could not send", "never leaves", "leaves your device", "leave your device",
+  "stays on your device", "stays in your browser", "your device", "your browser",
+];
+
+test("QA #1–#3 sweep: no engine string makes a privacy or offline claim (cannot send, nothing is sent, no server, works offline)", () => {
+  for (const { where, text } of everyStringToSweep()) {
+    assert.deepStrictEqual(phraseHits(text, PRIVACY_CLAIMS), [], where + ": " + text);
+  }
+  // The check has teeth: it trips on the sentences the QA audit quoted.
+  for (const overClaim of [
+    "There is no account, no server, and no tracking.",
+    "After your first visit it works with the internet turned off.",
+    "0: nothing has been sent or fetched",
+    "Nothing was sent anywhere.",
+    "Nothing you type leaves your device.",
+  ]) {
+    assert.notDeepStrictEqual(phraseHits(overClaim, PRIVACY_CLAIMS), [], overClaim);
+  }
+});
+
+// QA #7 / SPEC A7: never promise a refund. Saying what the RULE says is fine
+// ("The rule says a surplus of $50 or more is refunded within 30 days …").
+// A flat statement about THIS visitor's account is not.
+const REFUND_PROMISES = [
+  "refund due", "refund is due", "refund will be", "refund is coming", "refund is on its way", "watch for the refund", "your refund",
+  "you are owed", "you're owed", "owed to you", "owes you", "owe you",
+  "you will get", "you'll get", "you will receive", "you'll receive", "you get back", "money back",
+  "must pay you", "has to pay you", "must refund", "has to refund", "must be refunded", "has to be refunded", "will be refunded",
+  "entitled to", "you are entitled", "you're entitled", "you deserve",
+];
+
+test("QA #7 sweep: no engine string, example title or blurb promises a refund or says money is owed", () => {
+  for (const { where, text } of everyStringToSweep()) {
+    assert.deepStrictEqual(phraseHits(text, REFUND_PROMISES), [], where + ": " + text);
+  }
+  for (const promise of ["Refund due by October 1, 2026", "You are owed $300.00.", "Your servicer must pay you back.", "You're entitled to a refund.", "That leaves a $300 surplus, which has to be refunded."]) {
+    assert.notDeepStrictEqual(phraseHits(promise, REFUND_PROMISES), [], promise);
+  }
+});
+
+test("QA #7 sweep: every sentence that says a surplus 'is refunded' names its source: the rule, or the paragraph of 12 CFR 1024.17", () => {
+  let seen = 0;
+  for (const { where, text } of everyStringToSweep()) {
+    // One string can hold several sentences; check each sentence by itself.
+    for (const sentence of text.split(/(?<=[.?!])\s+/)) {
+      if (!wordsOf(sentence).includes("refunded")) continue;
+      seen = seen + 1;
+      const lower = sentence.toLowerCase();
+      const namesItsSource = lower.includes("the rule") || lower.includes("12 cfr 1024.17");
+      assert.ok(namesItsSource, where + ": " + sentence);
+    }
+  }
+  assert.ok(seen > 50, "saw only " + seen + " such sentences");
+});
+
+test("QA #7: the refund next step is titled for the RULE, and the letter asks how the surplus is being handled without presuming a refund is coming", () => {
+  const holding = exampleById("holding-too-much");
+  const result = analyze(holding.account);
+  const comparison = compareWithStatement(result, holding.statement);
+  const step = nextSteps(result, comparison)[0];
+  assert.equal(step.title, "The 30-day refund rule");
+  assert.ok(step.body.startsWith("The rule says a surplus of $50 or more is refunded within 30 days of the date of the escrow analysis."));
+  for (const situation of SITUATIONS) {
+    const situationComparison = compareWithStatement(situation.result, situation.statement);
+    for (const nextStep of nextSteps(situation.result, situationComparison)) {
+      assert.equal(nextStep.title.toLowerCase().includes("the refund"), false, situation.name + ": " + nextStep.title);
+    }
+  }
+  const letter = buildLetter(result, comparison, {});
+  assert.ok(letter.includes("If the refund has been sent, please tell me the date and how it was sent. If it has not, please tell me how the surplus is being handled."));
+  assert.equal(letter.includes("when it will be"), false);
+});
+
 test("'legal advice' and 'financial advice' appear only in the negative", () => {
   let seen = 0;
   for (const situation of SITUATIONS) {
@@ -625,7 +728,7 @@ test("E3: TV26, TV27, TV28 (inside the band) get the softened wording and NO ref
 
       const steps = nextSteps(result, comparison);
       assert.equal(steps[0].title, "This one is too close to call", id);
-      assert.equal(steps.some((step) => step.title === "Watch for the refund"), false, id);
+      assert.equal(steps.some((step) => step.title === "The 30-day refund rule"), false, id);
 
       const letter = buildLetter(result, comparison, {});
       assert.match(letter, /rounding could put your figure on either side/, id);
@@ -645,7 +748,7 @@ test("E3: TV29 (one cent outside the band) and TV01 get the normal refund-requir
     assert.equal(verdict.tooCloseToCall, false, id);
     assert.equal(verdict.body.includes("too close to call"), false, id);
     assert.match(verdict.body, /refunded within 30 days/, id);
-    assert.equal(nextSteps(result, comparison)[0].title, "Watch for the refund", id);
+    assert.equal(nextSteps(result, comparison)[0].title, "The 30-day refund rule", id);
     assert.match(buildLetter(result, comparison, {}), /If the refund has been sent, please tell me the date/, id);
   }
 });
@@ -846,7 +949,7 @@ test("nextSteps by outcome", () => {
   assert.ok(titlesFor(ok, {}).includes("Add your statement's numbers"));
 
   const holding = exampleById("holding-too-much");
-  assert.equal(titlesFor(holding, holding.statement)[0], "Watch for the refund");
+  assert.equal(titlesFor(holding, holding.statement)[0], "The 30-day refund rule");
 
   const cushion = exampleById("cushion-too-big");
   const flagged = titlesFor(cushion, cushion.statement);
@@ -999,7 +1102,7 @@ test("A10: 'Many payment jumps are lawful' — never 'Most'", () => {
 test("A11: the analysis date is 'usually' printed on the statement", () => {
   const result = analyze(vectorAccount("TV01"));
   const step = nextSteps(result, compareWithStatement(result, undefined))[0];
-  assert.equal(step.title, "Watch for the refund");
+  assert.equal(step.title, "The 30-day refund rule");
   assert.match(step.body, /That date is usually printed on your statement\./);
 });
 

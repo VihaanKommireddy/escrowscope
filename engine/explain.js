@@ -82,7 +82,7 @@ function surplusSentences(result) {
   if (near !== null) {
     return [
       "By this page's math, to the cent, there is a surplus of " + amount + ".",
-      "The rule draws a line at $50.00. At $50 or more, the surplus is refunded within 30 days of the escrow analysis. Under $50, the servicer may refund it or credit it toward next year's escrow payments (" + result.cite + ").",
+      "The rule draws a line at $50.00. At $50 or more, the rule says the surplus is refunded within 30 days of the escrow analysis. Under $50, the servicer may refund it or credit it toward next year's escrow payments (" + result.cite + ").",
       "This page's figure is within " + formatCents(near.toleranceCents) + " of that line. " + TOO_CLOSE_SENTENCE,
     ];
   }
@@ -518,7 +518,9 @@ export function nextSteps(result, comparison) {
   const flagKinds = comparison.flags.map((flag) => flag.kind);
 
   if (near !== null) {
-    let what = "whether a refund is due (at $50 or more) or a refund or credit is the servicer's choice (under $50)";
+    // Worded as what the RULE's line decides, never as "a refund is due" to
+    // this visitor (SPEC A7: never promise a refund; QA audit #7).
+    let what = "whether the rule calls for a refund (at $50 or more) or leaves a refund or credit to the servicer (under $50)";
     if (near.line === "ONE_MONTH_PAYMENT") what = "whether the servicer may ask for the whole " + near.appliesTo + " within 30 days";
     steps.push({
       title: "This one is too close to call",
@@ -527,7 +529,9 @@ export function nextSteps(result, comparison) {
     });
   } else if (result.classification === "SURPLUS_REFUND_REQUIRED") {
     steps.push({
-      title: "Watch for the refund",
+      // The title names the RULE. The old one ("Watch for the refund") read
+      // as a promise that money is coming (SPEC A7; QA audit #7).
+      title: "The 30-day refund rule",
       body: "The rule says a surplus of $50 or more is refunded within 30 days of the date of the escrow analysis. That date is usually printed on your statement. If it has passed and nothing has arrived, you can call your servicer and ask when the refund was sent.",
       url: URL_CFPB_RULE,
     });

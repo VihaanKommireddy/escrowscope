@@ -52,7 +52,7 @@ export const EXAMPLES = [
     id: "holding-too-much",
     title: "They're holding too much",
     blurb:
-      "The owner's hand-worked test case #1. The account never drops below $1,100, but the most cushion the law allows is $800. That leaves a $300 surplus, which has to be refunded.",
+      "The owner's hand-worked test case #1. The account never drops below $1,100, but the most cushion the law allows is $800. That leaves a $300 surplus. The rule says a surplus of $50 or more is refunded within 30 days, as long as payments are current.",
     // Same account as test vector TV01.
     account: {
       startMonth: 1,
