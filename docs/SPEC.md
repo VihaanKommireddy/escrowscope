@@ -593,3 +593,10 @@ the randomized runs. `formatCents(-0)` must print "$0.00".
 Vectors TV22–TV29 (appended 2026-09-19 by the director from the independent
 auditor's hand derivations) pin E1–E3. The additive key `expected.nearLine` was
 added to TV01–TV21; a script proved no pre-existing value changed.
+6. The engine may add descriptive keys to `nearLine` beyond the three pinned
+   ones (it ships `appliesTo`, `side`, `amountCents`, `lineCents`, which the
+   plain-English text uses). The vectors pin only `line`, `distanceCents`,
+   `toleranceCents`; extra keys are not a mismatch. Same for `result.inputs`
+   (an echo of the normalized account): it follows the typed bill order, so it
+   is excluded from "bill order changes nothing" checks. Every math field must
+   still be order-proof.
