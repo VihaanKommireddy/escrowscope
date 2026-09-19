@@ -78,8 +78,14 @@ to read.
   `script-src 'self'`, `style-src 'self'`, `img-src 'self' data:`,
   `manifest-src 'self'`, `worker-src 'self'`, **`connect-src 'none'`**,
   `form-action 'none'`, `base-uri 'none'`. With `connect-src 'none'` the browser
-  itself refuses `fetch`, `XMLHttpRequest`, `WebSocket`, `sendBeacon` from the
-  page. The page could not leak data even if the code tried.
+  itself refuses background connections from the page: `fetch`,
+  `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`.
+  **What that does NOT cover (corrected 2026-09-19 after the independent QA
+  audit):** a link navigation or `window.open` with data in the URL, a
+  same-origin GET with data in the query string, and the service worker (a
+  `<meta>` CSP governs the document, not `sw.js`). Those are closed by the code
+  itself and enforced by `tests/shell.test.js`, not by the browser. Every
+  sentence on the page must claim only what the mechanism proves.
 - No `localStorage` / cookies by default. Numbers live in memory and vanish on
   reload. (An explicit "remember on this device" toggle may be added; off by
   default.)
