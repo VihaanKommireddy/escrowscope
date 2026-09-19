@@ -366,3 +366,140 @@ falls in the **GE** tier (TV10 / TV10b).
 (randomized: identity `lowPoint − C == difference`; adding $x to the balance
 moves difference by exactly $x; permuting bill order changes nothing; all
 outputs are integers; a second, differently-written oracle agrees).
+
+---
+
+## Part D — Director's amendments (2026-09-19, evening run)
+
+The owner's instruction for this run: change the map wherever it makes the
+product much better and clearly different from anything else out there. These
+amendments are binding, same as Parts A–C. Where D conflicts with B or C, D wins.
+
+**MUST** = ships in v1. **SHOULD** = build it if it lands clean; cut it (and say
+so in BUILD-LOG.md) rather than ship it half-working.
+
+### D1. "Check the checker" — the page proves its own math, live (MUST)
+
+No other escrow tool lets you verify the tool. Ours does, on the visitor's device.
+
+- `engine/vectors.js` — an ES module (`export const VECTORS = [...]`, plus the
+  `meta` block) generated from `docs/research/01-test-vectors.json` by
+  `tools/make-vectors.mjs` (zero deps, run by hand). `tests/vectors-sync.test.js`
+  fails if the two ever drift. The research JSON stays the source of truth and
+  is never edited to make a test pass.
+- `engine/selfcheck.js` — `runSelfCheck(vectors) → { total, passed, failed,
+  results: [{ id, title, source, ok, mismatches: [{ path, expected, actual }] }] }`.
+  Compares **every** expected field and every table row. Pure. `npm test` uses
+  this same function, so the browser proof and the test suite are one check,
+  not two.
+- UI: a section titled along the lines of "Don't take our word for it." One
+  button runs all 22 cases in the browser and lists them with pass marks. Each
+  row opens to show inputs → expected → what the engine produced. Two rows are
+  called out: **TV02** ("the worked example printed in the regulation itself,
+  Appendix E") and **TV01** ("worked by hand from the regulation before any code
+  existed").
+- **No lazy loading anywhere.** Every script the page will ever need loads up
+  front (static imports). That is what keeps the privacy panel's "requests since
+  load" counter honestly at 0 no matter what the visitor clicks.
+
+### D2. "Where do I find this?" — the statement guide (MUST)
+
+The target user has never heard of RESPA and is holding a confusing letter. The
+two-minute promise dies if they can't find the numbers.
+
+- A **generic sample statement drawn in HTML/CSS** (no image, no real servicer's
+  name, logo, or layout trade dress), with numbered regions that match the form
+  fields. Focusing a form field highlights its region; clicking a region focuses
+  its field. Build it from research doc 03 §1 (federal floor, the two real
+  layouts, the label dictionary).
+- On narrow screens it becomes a per-field "Where is this on my statement?"
+  disclosure showing just that region.
+- The visual guide is an enhancement. The accessible equivalent is each field's
+  helper text with its "also called…" aliases, which must stand on its own.
+- The numbers printed on the sample statement must be one of the built-in
+  examples (D3) so everything on the page agrees with everything else.
+
+### D3. Three built-in examples, engine-verified (MUST)
+
+`examples.js` exports three complete scenarios (account + statement fields):
+
+1. **"My payment jumped, and the math checks out"** — a shortage caused by bills
+   going up; statement agrees with the federal math → green. This is the most
+   common real outcome and the page must be excellent at it.
+2. **"They're holding too much"** — the owner's hand-derived test case #1
+   (TV01): $4,800 bills, $800 cap, low point $1,100 in November, $300 surplus,
+   refund required.
+3. **"The cushion is too big"** — servicer used a cushion above 1/6 of the
+   annual bills → amber CUSHION_OVER_CAP + PAYMENT_ABOVE_MAX with the dollars
+   per year.
+
+`tests/examples.test.js` runs each through the engine and asserts the verdict,
+so an example can never silently disagree with the math.
+
+### D4. Live what-if (MUST)
+
+After the first successful check, any edit re-runs the math (debounced ~250 ms)
+and updates the results in place: "what if my tax bill is really $4,100?" Only
+the verdict line is announced to screen readers (`aria-live="polite"`), not the
+whole results region. Any "updated" flash respects `prefers-reduced-motion`.
+Validation errors while editing show inline and keep the last good results
+visible but marked stale; they never blank the page.
+
+### D5. The servicer's line on the chart (MUST)
+
+If the user typed the new monthly escrow payment, the chart draws a second line:
+starting balance + (servicer's payment − bills), month by month, next to the
+federal line. Where the servicer's low point sits above the legal cushion, label
+the gap in dollars ("held above the legal cushion: $X"). Same data in the table
+alternative. Engine support: `projectWithPayment(account, monthlyCents) → [12
+projected balances in cents]`, pure, exported from `engine/index.js`.
+
+If the payment the user typed already includes a shortage add-on, the label
+must say so (the line shows what the account will actually hold, which is the
+point).
+
+### D6. Two more flags in `compareWithStatement` (MUST)
+
+Add to the statement inputs: `shortageSpreadMonths` (already there) and
+`lumpSumOfferedOnStatement` (boolean, optional — "Does the statement offer a
+'pay the shortage in full' option?").
+
+- `SPREAD_TOO_SHORT` — the statement repays a shortage over fewer months than
+  § 1024.17(f)(3) allows: for a shortage ≥ one month's escrow payment, anything
+  under 12 months; for a smaller shortage, anything from 2 to 11 months (a
+  30-day lump sum is allowed in that tier). Cite the exact paragraph.
+- `LUMP_SUM_OFFERED` — shortage ≥ one month's escrow payment and the annual
+  statement itself offers a lump-sum option. Per the CFPB servicing FAQ quoted in
+  research doc 01 §6 the listed options are exclusive. Word it as **a question
+  to ask the servicer**, never as a proven violation.
+
+Before coding either rule, re-read research doc 01 §6–§7 and follow the quoted
+text, not this summary. If the reg notes disagree with this section, the reg
+notes win — record the difference in BUILD-LOG.md.
+
+### D7. Keep your numbers without us keeping them (SHOULD)
+
+"Download my numbers" writes a small JSON file to the visitor's device; "Load a
+numbers file" reads one back with `FileReader`. No storage, no upload. File
+contents are untrusted input: they go through `validateAccount` and reach the
+DOM only via `value` / `textContent`. If the strict CSP blocks the download in
+any major browser, cut the feature rather than loosen the CSP.
+
+### D8. The refund clock (SHOULD)
+
+Optional field: the analysis date printed on the statement. When the verdict is
+`SURPLUS_REFUND_REQUIRED`, show the date 30 days after it (§ 1024.17(f)(2)(i)).
+The engine stays pure: the date is an input string, never `Date.now()`.
+
+### D9. Honest records (MUST)
+
+- `BUILD-LOG.md` — appended as the work happens: which agent built what.
+- `AI-DISCLOSURE-LOG.md` (repo root) — plain statement of what AI wrote (all of
+  v1), what the owner wrote by hand (everything in `v0/`, test case #1), and
+  what the owner directed. No spin in either direction.
+
+### D10. Still out of scope
+
+Statement OCR / parsing, Spanish (unverifiable legal-adjacent translation), any
+AI call, any server, any analytics, any third-party asset, multi-year history.
+Pushing to GitHub or touching `main` — that is the owner's click, not an agent's.
