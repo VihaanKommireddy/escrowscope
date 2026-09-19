@@ -77,12 +77,13 @@ function blankFormValues() {
   return values;
 }
 
-function prefersReducedMotion() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
+// Jumps to the error box and to the verdict are instant, never animated. That
+// respects "reduce motion" for everyone, and an animated scroll can stall when
+// a tab is in the background, which would leave the result out of sight.
+// ("instant" and not "auto": "auto" would hand the choice back to the CSS,
+// which asks for smooth scrolling on in-page links.)
 function scrollBehavior() {
-  return prefersReducedMotion() ? "auto" : "smooth";
+  return "instant";
 }
 
 // ─────────────────────────── bill rows ───────────────────────────
@@ -503,6 +504,17 @@ function buildExampleButtons() {
   });
 }
 
+// A link such as ./#example-2 opens the page with that example already run.
+// Handy for sharing "look at this case" and for demos. Nothing is read from the
+// address except that one small number.
+function runExampleFromAddress() {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#example-")) return;
+  const number = Number(hash.slice("#example-".length));
+  const buttons = byId("example-buttons").querySelectorAll(".example-card");
+  if (Number.isInteger(number) && buttons[number - 1]) buttons[number - 1].click();
+}
+
 function unpressExamples() {
   for (const button of byId("example-buttons").querySelectorAll(".example-card")) {
     button.setAttribute("aria-pressed", "false");
@@ -689,6 +701,8 @@ function start() {
   initProofPanel(byId("proof-panel"));
   initSelfCheck(byId("selfcheck"));
   registerServiceWorker();
+
+  runExampleFromAddress();
 }
 
 start();

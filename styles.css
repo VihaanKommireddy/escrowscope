@@ -914,6 +914,8 @@ code,
   top: calc(var(--space-2) + 24px);
   transform: translateY(-50%);
   font-family: var(--font-mono);
+  font-size: 17px;
+  line-height: 1;
   color: var(--color-muted);
   pointer-events: none;
 }
@@ -1206,6 +1208,7 @@ code,
 /* Error summary (focus lands here after a failed check) */
 
 .error-summary {
+  scroll-margin-top: var(--space-4);
   margin-top: var(--space-5);
   padding: var(--space-4) var(--space-5);
   border: 2px solid var(--color-error);
@@ -1228,9 +1231,11 @@ code,
   padding-left: 28px;
 }
 
-.error-summary-list a {
-  display: inline-block;
+.error-summary-list li {
   padding-block: 4px;
+}
+
+.error-summary-list a {
   color: var(--color-error);
   font-weight: var(--weight-semibold);
 }
@@ -1385,6 +1390,25 @@ code,
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tone);
+}
+
+/* Phones: the icon sits above the words so the sentence gets the full width. */
+@media (max-width: 559px) {
+  .verdict {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) var(--space-5);
+    border-left-width: 6px;
+  }
+
+  .verdict-mark {
+    width: 44px;
+    height: 44px;
+  }
+
+  .verdict-body {
+    font-size: var(--text-body);
+  }
 }
 
 @media (min-width: 900px) {
