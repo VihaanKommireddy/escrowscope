@@ -514,6 +514,19 @@ function renderSteps(check) {
 
 // ─────────────────────────── what you can do next ───────────────────────────
 
+// "888-995-HOPE (4673)" → a link a phone can dial. Only the digits are used;
+// if they don't add up to a 10-digit number, the phone is shown as plain text.
+function phoneNode(phone) {
+  let digits = "";
+  for (const character of String(phone)) {
+    if (character >= "0" && character <= "9") digits = digits + character;
+  }
+  if (digits.length !== 10) {
+    return el("span", { className: "num", text: "Phone: " + phone });
+  }
+  return el("a", { className: "num", text: "Call " + phone, attrs: { href: "tel:+1" + digits } });
+}
+
 function renderNext(check) {
   const box = byId("next-body");
   clear(box);
@@ -528,7 +541,7 @@ function renderNext(check) {
       links.append(el("a", { text: "Open the official page", attrs: { href: step.url, rel: "noopener noreferrer" } }));
     }
     if (step.phone) {
-      links.append(el("span", { className: "num", text: "Phone: " + step.phone }));
+      links.append(phoneNode(step.phone));
     }
     if (links.childNodes.length > 0) item.append(links);
     list.append(item);

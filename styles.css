@@ -911,7 +911,7 @@ code,
   content: "$";
   position: absolute;
   left: 14px;
-  top: calc(var(--space-2) + 24px);
+  top: calc(var(--space-2) + 23px);
   transform: translateY(-50%);
   font-family: var(--font-mono);
   font-size: 17px;
@@ -1249,10 +1249,6 @@ code,
 }
 
 .print-header {
-  display: none;
-}
-
-.print-only {
   display: none;
 }
 
@@ -1872,6 +1868,7 @@ code,
 .next-links {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-1) var(--space-5);
   margin-top: var(--space-2);
 }

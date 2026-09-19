@@ -15,7 +15,7 @@
 
 // Change this name whenever ANY file on the list changes. A new name makes the
 // browser build a fresh box and throw the old one away (see "activate").
-const CACHE_NAME = "escrowscope-v1-2026-09-19a";
+const CACHE_NAME = "escrowscope-v1-2026-09-19b";
 
 // The app shell: site files only. Never docs/, tests/, v0/ or tools/.
 // One relative URL per line (the shell test parses this list).
