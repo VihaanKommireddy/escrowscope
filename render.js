@@ -536,41 +536,11 @@ function renderNext(check) {
   box.append(list);
 }
 
-// ─────────────────────────── letter + printed inputs ───────────────────────────
+// ─────────────────────────── letter ───────────────────────────
 
 function renderLetter(check) {
   byId("letter-text").value = check.letter;
   byId("letter-print").textContent = check.letter;
-}
-
-function inputLine(label, value) {
-  return el("div", { className: "receipt-row" }, [el("dt", { text: label }), el("dd", { text: value })]);
-}
-
-// Printed report only: what was typed, so a counselor can see the inputs.
-function renderTypedNumbers(check) {
-  const account = check.account;
-  const statement = check.statement;
-  const box = byId("inputs-body");
-  clear(box);
-  const list = el("dl", { className: "receipt-rows" });
-  list.append(inputLine("Starting balance", formatCents(account.startingBalanceCents)));
-  list.append(inputLine("First month", monthName(account.startMonth)));
-  for (const row of check.result.table) {
-    if (row.disbursementCents > 0) {
-      list.append(inputLine("Bills paid in " + monthName(row.calendarMonth), formatCents(row.disbursementCents)));
-    }
-  }
-  if (typeof statement.currentMonthlyEscrowCents === "number") {
-    list.append(inputLine("Statement: current escrow payment", formatCents(statement.currentMonthlyEscrowCents)));
-  }
-  if (typeof statement.newMonthlyEscrowCents === "number") {
-    list.append(inputLine("Statement: new escrow payment", formatCents(statement.newMonthlyEscrowCents)));
-  }
-  if (typeof statement.requiredMinimumBalanceCents === "number") {
-    list.append(inputLine("Statement: required minimum balance", formatCents(statement.requiredMinimumBalanceCents)));
-  }
-  box.append(list);
 }
 
 // ─────────────────────────── public ───────────────────────────
@@ -590,7 +560,6 @@ export function renderResults(check, options) {
   renderSteps(check);
   renderNext(check);
   renderLetter(check);
-  renderTypedNumbers(check);
 }
 
 // Only the letter changes when the servicer name or loan number is typed.
