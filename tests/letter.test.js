@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   analyze, compareWithStatement, buildLetter, letterKind, nextSteps, accountFromVector, validateAccount, VECTORS, MAX_BILL_LABEL_LENGTH,
 } from "../engine/index.js";
+import { FLAGS_THAT_ASSERT_A_DISCREPANCY } from "../engine/letter.js";
 import { EXAMPLES } from "../examples.js";
 
 function letterFor(exampleId, details) {
@@ -242,6 +243,164 @@ test("QA #13: the longest bill name the engine accepts is printed whole in the l
   const result = analyze(account);
   const letter = buildLetter(result, compareWithStatement(result, example.statement), {});
   assert.ok(letter.includes("    " + longName + ", "));
+});
+
+// =====================================================================
+// FIX ORDER 3, N4: in a NOTICE OF ERROR, pure questions get their own heading.
+// "I believe the statement contains the error(s) described below" must only
+// sit above items that really assert an error.
+// FIX ORDER 3, N5: with nothing compared, the letter must not say "My numbers
+// line up with the statement."
+// =====================================================================
+
+const ERRORS_HEADING = "I believe the statement contains the error(s) described below.";
+const QUESTIONS_HEADING = "I also have these questions:";
+const ASKING_HEADING = "What I am asking about:";
+
+function tv(id) {
+  return accountFromVector(VECTORS.find((vector) => vector.id === id));
+}
+
+// The numbered lines ("1. …", "2. …") that follow a heading, up to the next blank line.
+function numberedLinesAfter(letter, heading) {
+  const lines = letter.split("\n");
+  let index = lines.indexOf(heading);
+  assert.notEqual(index, -1, "heading not found: " + heading);
+  index = index + 1;
+  while (lines[index] === "") index = index + 1; // the blank line under the errors heading
+  const found = [];
+  while (index < lines.length && lines[index] !== "") {
+    found.push(lines[index]);
+    index = index + 1;
+  }
+  return found;
+}
+
+test("N4: a notice of error that also carries questions — errors under 'I believe…', questions under their own heading, each list numbered from 1", () => {
+  // TV11: shortage $1,200 ≥ one month's payment; cap $960. An over-cap cushion (an error)
+  // plus a lump-sum offer (a question, never a finding).
+  const result = analyze(tv("TV11"));
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 196000, lumpSumOfferedOnStatement: true });
+  assert.deepStrictEqual(comparison.flags.map((flag) => flag.kind), ["CUSHION_OVER_CAP", "LUMP_SUM_OFFERED"]);
+  assert.equal(letterKind(result, comparison), "NOTICE_OF_ERROR");
+  const letter = buildLetter(result, comparison, {});
+
+  const errors = numberedLinesAfter(letter, ERRORS_HEADING);
+  assert.deepStrictEqual(errors, ["1. " + comparison.flags[0].letterLine]);
+  const questions = numberedLinesAfter(letter, QUESTIONS_HEADING);
+  assert.deepStrictEqual(questions, ["1. " + comparison.flags[1].letterLine]);
+  assert.ok(letter.indexOf(ERRORS_HEADING) < letter.indexOf(QUESTIONS_HEADING));
+  assert.equal(letter.includes(ASKING_HEADING), false, "a notice uses the two headings above instead");
+  assert.match(letter, /Please also answer the question above\./);
+});
+
+test("N4: refund timing and the confirm-the-minimum line ride along as QUESTIONS in a notice of error", () => {
+  // TV01 (refund rule applies): a payment far over the maximum is the error; the refund timing is a question.
+  const result = analyze(tv("TV01"));
+  const comparison = compareWithStatement(result, { newMonthlyEscrowCents: 90000 });
+  assert.equal(letterKind(result, comparison), "NOTICE_OF_ERROR");
+  const letter = buildLetter(result, comparison, {});
+  assert.deepStrictEqual(numberedLinesAfter(letter, ERRORS_HEADING).length, 1);
+  const questions = numberedLinesAfter(letter, QUESTIONS_HEADING);
+  assert.equal(questions.length, 1);
+  assert.match(questions[0], /^1\. By my math the account has a surplus of \$300\.00\./);
+
+  // CUSHION_MAYBE_OVER_CAP (a question) next to PAYMENT_ABOVE_MAX (an error).
+  const withMaybe = compareWithStatement(result, { requiredMinimumBalanceCents: 110000, newMonthlyEscrowCents: 90000 });
+  assert.deepStrictEqual(withMaybe.flags.map((flag) => flag.kind).sort(), ["CUSHION_MAYBE_OVER_CAP", "PAYMENT_ABOVE_MAX"]);
+  const maybeLetter = buildLetter(result, withMaybe, {});
+  const maybeErrors = numberedLinesAfter(maybeLetter, ERRORS_HEADING);
+  assert.equal(maybeErrors.length, 1);
+  assert.match(maybeErrors[0], /^1\. The statement sets the new monthly escrow payment at \$900\.00\./);
+  const maybeQuestions = numberedLinesAfter(maybeLetter, QUESTIONS_HEADING);
+  assert.equal(maybeQuestions.length, 2);
+  assert.match(maybeQuestions[0], /^1\. The statement lists a required minimum balance of \$1,100\.00\..*Please confirm the required minimum balance/);
+  assert.match(maybeQuestions[1], /^2\. By my math the account has a surplus/);
+  assert.match(maybeLetter, /Please also answer the questions above\./);
+});
+
+test("N4: a too-close-to-call figure is a question too", () => {
+  const result = analyze(tv("TV06")); // surplus within $7.00 of the $50 line
+  const comparison = compareWithStatement(result, { newMonthlyEscrowCents: 999900 });
+  assert.equal(letterKind(result, comparison), "NOTICE_OF_ERROR");
+  const letter = buildLetter(result, comparison, {});
+  assert.equal(numberedLinesAfter(letter, ERRORS_HEADING).length, 1);
+  assert.match(numberedLinesAfter(letter, QUESTIONS_HEADING)[0], /rounding could put your figure on either side/);
+});
+
+test("N4: a notice with errors only has no questions heading; a letter with only questions has no errors heading", () => {
+  const notice = letterFor("cushion-too-big", {});
+  assert.equal(numberedLinesAfter(notice, ERRORS_HEADING).length, 3);
+  assert.equal(notice.includes(QUESTIONS_HEADING), false);
+  assert.equal(notice.includes("Please also answer"), false);
+
+  const request = letterFor("holding-too-much", {}); // matches; the refund timing is the only item
+  assert.equal(request.includes(ERRORS_HEADING), false);
+  assert.equal(request.includes(QUESTIONS_HEADING), false);
+  const asked = numberedLinesAfter(request, ASKING_HEADING);
+  assert.equal(asked.length, 1);
+  assert.match(asked[0], /^1\. By my math the account has a surplus of \$300\.00\./);
+});
+
+test("N4: across every vector and a spread of statements, no question ever sits under the errors heading", () => {
+  let noticesWithQuestions = 0;
+  for (const vector of VECTORS) {
+    const result = analyze(accountFromVector(vector));
+    const statements = [
+      undefined,
+      { newMonthlyEscrowCents: 999900 },
+      { newMonthlyEscrowCents: 999900, lumpSumOfferedOnStatement: true, shortageSpreadMonths: 6 },
+      { requiredMinimumBalanceCents: result.cushionCapCents + 50000, lumpSumOfferedOnStatement: true },
+      { requiredMinimumBalanceCents: result.lowPoint.projectedBalanceCents > 0 ? result.lowPoint.projectedBalanceCents : 0, newMonthlyEscrowCents: 999900 },
+    ];
+    for (const statement of statements) {
+      const comparison = compareWithStatement(result, statement);
+      const letter = buildLetter(result, comparison, {});
+      const isNotice = letterKind(result, comparison) === "NOTICE_OF_ERROR";
+      assert.equal(letter.includes(ERRORS_HEADING), isNotice, vector.id);
+      if (!isNotice) {
+        assert.equal(letter.includes(QUESTIONS_HEADING), false, vector.id);
+        continue;
+      }
+      // Under the errors heading: exactly the letter lines of the flags that assert a discrepancy.
+      const assertingLines = comparison.flags
+        .filter((flag) => FLAGS_THAT_ASSERT_A_DISCREPANCY.includes(flag.kind) || (flag.kind === "AMOUNT_DIFFERS" && flag.rowKey === "claimedAmount"))
+        .map((flag) => flag.letterLine);
+      const errors = numberedLinesAfter(letter, ERRORS_HEADING);
+      assert.deepStrictEqual(errors, assertingLines.map((line, index) => index + 1 + ". " + line), vector.id);
+      if (letter.includes(QUESTIONS_HEADING)) noticesWithQuestions = noticesWithQuestions + 1;
+    }
+  }
+  assert.ok(noticesWithQuestions > 10, "only " + noticesWithQuestions + " notices carried questions");
+});
+
+test("N5: with no statement numbers typed, the letter does not say 'My numbers line up with the statement.'", () => {
+  for (const statement of [undefined, {}, { currentMonthlyEscrowCents: 40000 }]) {
+    const example = EXAMPLES.find((item) => item.id === "jumped-ok");
+    const result = analyze(example.account);
+    const comparison = compareWithStatement(result, statement);
+    assert.equal(comparison.overall, "not-provided");
+    const letter = buildLetter(result, comparison, {});
+    assert.equal(letter.includes("My numbers line up with the statement."), false);
+    assert.ok(letter.includes("\nFor my records, please send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used."));
+  }
+});
+
+test("N5: 'My numbers line up with the statement.' appears only when the comparison really is 'matches'", () => {
+  let said = 0;
+  for (const vector of VECTORS) {
+    const result = analyze(accountFromVector(vector));
+    const pay = result.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents;
+    for (const statement of [undefined, {}, { newMonthlyEscrowCents: pay }, { newMonthlyEscrowCents: pay + 99900 }, { requiredMinimumBalanceCents: result.cushionCapCents }]) {
+      const comparison = compareWithStatement(result, statement);
+      const letter = buildLetter(result, comparison, {});
+      if (letter.includes("My numbers line up with the statement.")) {
+        assert.equal(comparison.overall, "matches", vector.id);
+        said = said + 1;
+      }
+    }
+  }
+  assert.ok(said > 10, "the sentence was reached only " + said + " times");
 });
 
 // =====================================================================

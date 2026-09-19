@@ -99,8 +99,10 @@ function billLines(result) {
 //     a refund that looks due while the statement matches (the 30 days may not
 //     have run) · every too-close-to-call case · LUMP_SUM_OFFERED (SPEC D6: a
 //     question, never a finding) · a payment LOWER than expected (lower is
-//     allowed) · the "is that really the required minimum?" nudge · nothing
-//     to ask at all.
+//     allowed) · the "is that really the required minimum?" nudge ·
+//     CUSHION_MAYBE_OVER_CAP (the page cannot tell a real oversized cushion
+//     from a number typed into the wrong box, so it only asks the servicer to
+//     confirm) · nothing to ask at all.
 // ---------------------------------------------------------------------------
 
 // An explicit list, on purpose: a new flag kind is a QUESTION until someone
@@ -123,11 +125,29 @@ export function letterKind(result, comparison) {
   return "REQUEST_FOR_INFORMATION";
 }
 
-// The numbered "what I am asking about" items.
+// A letter can carry two kinds of numbered item (auditor's finding N4):
+//   ERRORS     the letter lines of flags that assert a discrepancy. In a notice
+//              of error they sit under "I believe the statement contains the
+//              error(s) described below."
+//   QUESTIONS  everything that only asks: a flag that is not on the list above
+//              (a lump-sum offer, a payment LOWER than expected, the
+//              cannot-tell cushion flag), the mix-up nudge, a too-close-to-call
+//              figure, and the timing of a refund. A question must never sit
+//              under "I believe … error(s)", so in a notice of error they get
+//              their own heading.
+// Each list is numbered from 1.
+function errorLines(comparison) {
+  const items = [];
+  for (const flag of comparison.flags) {
+    if (flagAssertsADiscrepancy(flag)) items.push(flag.letterLine);
+  }
+  return items;
+}
+
 function questionLines(result, comparison) {
   const items = [];
   for (const flag of comparison.flags) {
-    items.push(flag.letterLine);
+    if (!flagAssertsADiscrepancy(flag)) items.push(flag.letterLine);
   }
   for (const nudge of comparison.nudges) {
     items.push(nudge.letterLine);
@@ -142,6 +162,13 @@ function questionLines(result, comparison) {
     items.push("By my math the account has a surplus of " + formatCents(result.surplusCents) + ". 12 CFR 1024.17(f)(2)(i) says a surplus of $50 or more is refunded within 30 days of the escrow analysis. If the refund has been sent, please tell me the date and how it was sent. If it has not, please tell me how the surplus is being handled.");
   }
   return items;
+}
+
+// "1. …", "2. …": one numbered line for each item.
+function pushNumbered(lines, items) {
+  for (let index = 0; index < items.length; index++) {
+    lines.push(index + 1 + ". " + items[index]);
+  }
 }
 
 // details = { servicerName, loanNumber, borrowerName, propertyAddress, date,
@@ -159,6 +186,7 @@ export function buildLetter(result, comparison, details) {
   const propertyAddress = detailOrBlank(given, "propertyAddress", "[your property address]");
   const statementDate = statementDateOrBlank(given);
 
+  const errors = errorLines(comparison);
   const questions = questionLines(result, comparison);
   const isNoticeOfError = letterKind(result, comparison) === "NOTICE_OF_ERROR";
   const inputs = result.inputs;
@@ -199,26 +227,40 @@ export function buildLetter(result, comparison, details) {
   lines.push("- Result: " + describeResult(result));
   lines.push("");
 
-  if (questions.length > 0) {
-    if (isNoticeOfError) {
-      // 12 CFR 1024.35(a): a notice of error names "the error the borrower
-      // believes has occurred". Say so in plain words.
-      lines.push("I believe the statement contains the error(s) described below.");
+  const questionWord = questions.length === 1 ? "question" : "questions";
+
+  if (isNoticeOfError) {
+    // 12 CFR 1024.35(a): a notice of error names "the error the borrower
+    // believes has occurred". Say so in plain words, and put ONLY the errors
+    // under it. Questions get their own heading (auditor's finding N4).
+    lines.push("I believe the statement contains the error(s) described below.");
+    lines.push("");
+    pushNumbered(lines, errors);
+    lines.push("");
+    if (questions.length > 0) {
+      lines.push("I also have these questions:");
+      pushNumbered(lines, questions);
       lines.push("");
     }
+  } else if (questions.length > 0) {
     lines.push("What I am asking about:");
-    for (let index = 0; index < questions.length; index++) {
-      lines.push(index + 1 + ". " + questions[index]);
-    }
+    pushNumbered(lines, questions);
     lines.push("");
   }
 
+  const worksheetRequest = "please send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used.";
   if (isNoticeOfError) {
-    lines.push("Please review this calculation. Then either confirm it is correct and explain why, or correct it and send me an updated statement. If you used different bill amounts or dates than the ones above, please send them to me, along with the escrow analysis worksheet.");
+    let closing = "Please review this calculation. Then either confirm it is correct and explain why, or correct it and send me an updated statement. If you used different bill amounts or dates than the ones above, please send them to me, along with the escrow analysis worksheet.";
+    if (questions.length > 0) closing = closing + " Please also answer the " + questionWord + " above.";
+    lines.push(closing);
   } else if (questions.length > 0) {
-    lines.push("Please answer the question" + (questions.length === 1 ? "" : "s") + " above, and send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used.");
+    lines.push("Please answer the " + questionWord + " above, and send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used.");
+  } else if (comparison.overall === "matches") {
+    lines.push("My numbers line up with the statement. For my records, " + worksheetRequest);
   } else {
-    lines.push("My numbers line up with the statement. For my records, please send me the escrow analysis worksheet for this statement, including the bill amounts and dates you used.");
+    // Nothing from the statement was typed, so nothing was compared, and the
+    // letter must not claim the numbers "line up" (auditor's finding N5).
+    lines.push("For my records, " + worksheetRequest);
   }
   lines.push("");
   lines.push("This letter states arithmetic, not legal conclusions. I am not a lawyer. You may have newer bill amounts than I do, and if so I would like to see them.");

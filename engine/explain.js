@@ -201,6 +201,16 @@ function shortFlagPhrase(flag) {
 //   tooCloseToCall       true exactly when result.nearLine is set.
 // ---------------------------------------------------------------------------
 
+// Did the homeowner type the statement's SURPLUS, and did it match the federal
+// math? compare.js writes the kind they picked onto the row (`claimedKind`),
+// so nothing here has to guess from a label.
+function statementShowsAMatchingSurplus(comparison) {
+  for (const row of comparison.rows) {
+    if (row.key === "claimedAmount" && row.claimedKind === "surplus" && row.status === "match") return true;
+  }
+  return false;
+}
+
 export function explainVerdict(result, comparison) {
   const tooCloseToCall = result.nearLine !== null;
   const hasFlags = comparison.overall === "look-here";
@@ -228,7 +238,15 @@ export function explainVerdict(result, comparison) {
   let headline = outcomeHeadline(result);
   if (matches) headline = "Your statement's math matches the federal method.";
   if (matches && refundRequired) {
-    headline = "Your statement matches the federal math. It shows a surplus of " + formatCents(result.surplusCents) + ", which the rule says is refunded within 30 days.";
+    // "It shows a surplus" is only true if the homeowner typed the statement's
+    // surplus and it matched. If they typed only the payment, the statement
+    // has shown nothing about a surplus: say the federal math found it
+    // (auditor's finding N3). Either way this states what the RULE says and
+    // never promises this visitor money (SPEC A7).
+    headline = "The numbers you typed match the federal math. The federal math also finds a surplus of " + formatCents(result.surplusCents) + ", which the rule says is refunded within 30 days.";
+    if (statementShowsAMatchingSurplus(comparison)) {
+      headline = "Your statement matches the federal math. It shows a surplus of " + formatCents(result.surplusCents) + ", which the rule says is refunded within 30 days.";
+    }
   }
   if (nearTheFiftyLine && !hasFlags) {
     headline = "The federal math finds a surplus of " + formatCents(result.surplusCents) + ". That is too close to the $50 line to call.";

@@ -704,6 +704,50 @@ test("SURPLUS_REFUND_REQUIRED always surfaces the 30-day rule in amber, even whe
   }
 });
 
+// FIX ORDER 3, N3: "It shows a surplus of $300.00" is only true when the
+// homeowner typed a surplus and it matched. With only the payment typed, the
+// statement has "shown" nothing about a surplus.
+test("N3: the matches + refund headline says 'It shows' ONLY when a surplus was typed and matched", () => {
+  const account = exampleById("holding-too-much").account; // TV01: federal surplus $300.00
+
+  const paymentOnly = verdictFor(account, { newMonthlyEscrowCents: 40000 });
+  assert.equal(paymentOnly.tone, "flag", "the 30-day rule still surfaces in amber");
+  assert.equal(paymentOnly.headline, "The numbers you typed match the federal math. The federal math also finds a surplus of $300.00, which the rule says is refunded within 30 days.");
+  assert.equal(paymentOnly.headline.includes("It shows"), false);
+
+  const surplusTyped = verdictFor(account, { newMonthlyEscrowCents: 40000, claimedKind: "surplus", claimedAmountCents: 30000 });
+  assert.equal(surplusTyped.headline, "Your statement matches the federal math. It shows a surplus of $300.00, which the rule says is refunded within 30 days.");
+
+  // The claimed row can "match" without being a surplus: a claimed deficiency of $5.00 on a
+  // balance that is not below $0 is within $7.00 of the federal $0.00 deficiency.
+  const otherKindTyped = verdictFor(account, { newMonthlyEscrowCents: 40000, claimedKind: "deficiency", claimedAmountCents: 500 });
+  assert.equal(otherKindTyped.headline.includes("It shows"), false, otherKindTyped.headline);
+
+  // Whatever was typed, it states what the RULE says and never promises this visitor money.
+  for (const verdict of [paymentOnly, surplusTyped, otherKindTyped]) {
+    assert.match(verdict.headline, /which the rule says is refunded within 30 days\.$/);
+  }
+});
+
+test("N3: across every situation, 'It shows a surplus' appears only with a matching claimed-surplus row", () => {
+  let withIt = 0;
+  let without = 0;
+  for (const situation of SITUATIONS) {
+    const comparison = compareWithStatement(situation.result, situation.statement);
+    const headline = explainVerdict(situation.result, comparison).headline;
+    const surplusRowMatches = comparison.rows.some((row) => row.key === "claimedAmount" && row.claimedKind === "surplus" && row.status === "match");
+    if (headline.includes("It shows a surplus")) {
+      assert.ok(surplusRowMatches, situation.name + ": " + headline);
+      withIt = withIt + 1;
+    }
+    if (headline.includes("The federal math also finds a surplus")) {
+      assert.equal(surplusRowMatches, false, situation.name);
+      without = without + 1;
+    }
+  }
+  assert.ok(withIt > 0 && without > 0, "both headlines were reached: " + withIt + " / " + without);
+});
+
 test("a refund is described as what the RULE says, never promised", () => {
   const verdict = verdictFor(exampleById("holding-too-much").account, {});
   assert.match(verdict.body, /The rule says/);
