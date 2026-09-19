@@ -374,7 +374,7 @@ test("table rows: deposit is always bills ÷ 12, bills land in their month, targ
     const row = result.table[index];
     assert.equal(row.month, index + 1);
     assert.equal(row.depositCents, result.baseMonthlyPaymentCents);
-    assert.equal(row.targetBalanceCents - row.projectedBalanceCents, -result.differenceCents);
+    assert.equal(row.projectedBalanceCents - row.targetBalanceCents, result.differenceCents);
     billsSeen = billsSeen + row.disbursementCents;
   }
   assert.equal(billsSeen, result.annualDisbursementsCents);
