@@ -908,6 +908,9 @@ function start() {
   // browser asks first, but only when there is something to lose.
   window.addEventListener("beforeunload", function (event) {
     if (!formHasContent()) return;
+    // Browsers only ever ask when the visitor has really touched the page. If
+    // they have not (an example opened from a link, say), asking is pointless.
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     event.preventDefault();
     event.returnValue = "";
   });

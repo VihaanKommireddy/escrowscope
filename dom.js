@@ -8,7 +8,7 @@
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
-// Attributes we refuse to set from script, on purpose.
+// Attributes this file refuses to set from script, on purpose.
 //  - "style"  would be blocked by the CSP anyway (style-src 'self').
 //  - "on..."  would be an inline event handler (also blocked, also unsafe).
 function assertSafeAttributeName(name) {

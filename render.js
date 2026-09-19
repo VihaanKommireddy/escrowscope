@@ -389,7 +389,7 @@ function renderJumpBlock(check) {
   renderJumpBar(box, check.jump);
 }
 
-// ─────────────────────────── your lawful payment ───────────────────────────
+// ─────────────────────────── the payment the federal math gives ───────────────────────────
 
 function receiptRow(label, cents, isTotal) {
   return el("div", { className: isTotal ? "receipt-row is-total" : "receipt-row" }, [

@@ -237,7 +237,7 @@ export function readInputs(values) {
     if (calendarMonth === null || calendarMonth < 1 || calendarMonth > 12) {
       errors.push({ field: prefix + ".month", message: "Pick the month this bill gets paid." });
     } else if (startMonthIsGood) {
-      // The user picks calendar months; the engine counts from the escrow year's first month.
+      // The user picks calendar months; the engine counts from the first of the next 12 months.
       entry.month = engine.calendarToEscrowMonth(calendarMonth, startMonth);
     }
     disbursements.push(entry);
