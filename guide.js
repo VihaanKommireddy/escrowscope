@@ -173,10 +173,10 @@ export function renumberBoxes({ panel, form }) {
     if (!button) continue;
     const holder = button.closest(".guide-coupon") || button;
     holder.hidden = !isShown;
+    // The badge is part of the button's spoken name, so changing its text
+    // renames the button too. Nothing else to keep in step.
     const badgeNode = button.querySelector(".guide-badge");
     if (badgeNode) badgeNode.textContent = numberText;
-    const spokenRest = button.getAttribute("data-spoken") || region.name;
-    button.setAttribute("aria-label", numberText + ". " + spokenRest + ". Go to this box in the form.");
   }
 }
 
@@ -275,13 +275,17 @@ function makeRegion(view, key, valueText, bodyChildren) {
         attrs: {
           type: "button",
           "data-region": key,
-          "data-spoken": region.name + ", " + valueText,
-          "aria-label": region.number + ". " + region.name + ", " + valueText + ". Go to this box in the form.",
         },
       },
       [
-        badge(region.number),
+        // No aria-label: the button's spoken name is built from what is printed
+        // on it (the number, then the statement words), so it always STARTS with
+        // the visible text. People who use voice control can say what they see
+        // (WCAG 2.5.3, Label in Name). The hidden words after it add the form's
+        // own name for the box and say what the button does.
+        el("span", { className: "guide-badge", text: region.number }),
         body,
+        el("span", { className: "visually-hidden", text: ". " + region.name + ". Go to this box in the form." }),
         // Shown by CSS only while this region is the active one. Text, not just
         // color, so the highlight works for people who cannot see the teal.
         el("span", { className: "guide-here", text: "You are here", attrs: { "aria-hidden": "true" } }),

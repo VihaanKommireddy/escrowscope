@@ -12,8 +12,12 @@ import assert from "node:assert/strict";
 
 import { EXAMPLES } from "../examples.js";
 import { VECTORS, accountFromVector } from "../engine/index.js";
+import { letterPanelWords, statusWords, dialableDigits } from "../render.js";
+import { GUIDE_REGIONS, numberVisibleRegions } from "../guide.js";
 import {
   BILL_KINDS,
+  MAX_BILL_NAME_LENGTH,
+  looksUnfinished,
   emptyValues,
   exampleToValues,
   readInputs,
@@ -506,7 +510,7 @@ test("a loaded file is untrusted: wrong files are refused, odd contents are boxe
   assert.equal(loaded.values.unknownKey, undefined);
   assert.equal({}.polluted, undefined);
   assert.equal(loaded.values.bills.length, 1);
-  assert.equal(loaded.values.bills[0].name.length, 120, "long text is cut short");
+  assert.equal(loaded.values.bills[0].name.length, MAX_BILL_NAME_LENGTH, "a long name is cut to the one name limit");
   assert.equal(loaded.values.bills[0].amount, "");
   assert.equal(loaded.values.bills[0].month, "5");
   assert.equal(loaded.values.bills[0].extra, undefined);
@@ -519,4 +523,142 @@ test("a loaded file is untrusted: wrong files are refused, odd contents are boxe
   const tooManyRows = { kind: "escrowscope-numbers", version: 1, values: { bills: [] } };
   for (let count = 0; count < 500; count++) tooManyRows.values.bills.push({ amount: "1", month: "1" });
   assert.equal(fileTextToValues(JSON.stringify(tooManyRows)).values.bills.length, 24);
+});
+
+// ─────────────────────────── fix orders 1 and 2 (2026-09-19) ───────────────────────────
+
+// A2: the letter is only called a notice of error when the engine says it is one.
+test("A2: which letter it is comes from the engine, and the panel is worded from that", () => {
+  const explain = runCheck(exampleToValues(exampleById("holding-too-much")));
+  assert.equal(explain.letterKind, "REQUEST_FOR_INFORMATION");
+  const error = runCheck(exampleToValues(exampleById("cushion-too-big")));
+  assert.equal(error.letterKind, "NOTICE_OF_ERROR");
+
+  const asking = letterPanelWords("REQUEST_FOR_INFORMATION");
+  assert.equal(asking.title, "A letter asking your servicer to explain");
+  assert.ok(!/notice of error/i.test(asking.title + asking.lede), "a please-explain letter is never called a notice of error");
+  assert.ok(/request for information/i.test(asking.lede));
+
+  const notice = letterPanelWords("NOTICE_OF_ERROR");
+  assert.ok(/notice of error/i.test(notice.lede));
+
+  for (const odd of [undefined, "", null, "SOMETHING_NEW", 7]) {
+    const words = letterPanelWords(odd);
+    assert.ok(words.title.length > 0 && words.lede.length > 0, "never blank");
+    assert.ok(!/notice of error/i.test(words.title + words.lede), "an unknown kind never claims an error");
+  }
+  for (const words of [asking, notice, letterPanelWords("")]) {
+    assert.ok(words.lede.includes("[brackets]"), "the lede tells people to fill in the parts in [brackets]");
+  }
+  assert.equal(runCheck(emptyValues()).letterKind, "", "no letter kind when there are no results");
+});
+
+// B2: the lowest projected balance typed into "required minimum" is a likely mix-up, not an accusation.
+test("B2: a low point typed as the required minimum gives a gentle warning on that box, not a cushion flag", () => {
+  const values = exampleToValues(exampleById("holding-too-much")); // TV01: low point $1,100, cap $800
+  const before = runCheck(values);
+  values.requiredMinimum = "1,100.00";
+  const check = runCheck(values);
+  assert.equal(check.ok, true);
+
+  const onTheBox = check.warnings.filter((warning) => warning.field === "statement.requiredMinimumBalanceCents");
+  assert.equal(onTheBox.length, 1, "exactly one warning, mapped to the required-minimum box");
+  assert.ok(onTheBox[0].message.length > 0);
+  assert.ok(!check.comparison.flags.some((flag) => flag.kind === "CUSHION_OVER_CAP"), "no cushion accusation");
+  const row = check.comparison.rows.find((entry) => entry.key === "requiredMinimumBalance");
+  assert.equal(row.status, "not-compared");
+  assert.equal(check.comparison.overall, before.comparison.overall, "the mix-up does not turn the comparison into look-here");
+  assert.equal(check.verdict.tone, before.verdict.tone, "and does not change the banner's tone");
+});
+
+test("B2: a comparison status the page has never heard of is never blank and never a match", () => {
+  assert.deepEqual(
+    [statusWords("match").text, statusWords("differs").text, statusWords("over-limit").text, statusWords("not-compared").text],
+    ["Matches", "Differs", "Over the limit", "Not compared"]
+  );
+  assert.equal(statusWords("not-compared").look, "neutral");
+  assert.notEqual(statusWords("not-compared").iconName, "check");
+  for (const odd of [undefined, null, "", "MATCH", "matches", "toString", "__proto__", "constructor", 3, {}]) {
+    const words = statusWords(odd);
+    assert.ok(words.text.length > 0, "never blank");
+    assert.notEqual(words.text, "Matches");
+    assert.notEqual(words.look, "match");
+    assert.notEqual(words.iconName, "check");
+  }
+});
+
+// A15: only contact details the engine really sent are shown.
+test("A15: a next step without a phone number is fine, and no invented number appears", () => {
+  for (const example of EXAMPLES) {
+    const check = runCheck(exampleToValues(example));
+    for (const step of check.next) {
+      assert.ok(step.phone === undefined || (typeof step.phone === "string" && step.phone.trim() !== ""));
+      assert.ok(!JSON.stringify(step).includes("HOPE"), "the counselor step carries a link, not the HOPE number");
+    }
+  }
+  assert.equal(dialableDigits("855-411-2372"), "8554112372");
+  for (const notDialable of [undefined, null, "", "call them", "888-995-HOPE", 8554112372, "411"]) {
+    assert.equal(dialableDigits(notDialable), "", "shown as words, never as a broken tel: link");
+  }
+});
+
+// B3: only the boxes on the page get a number, and the form and the guide share one numbering.
+test("B3: box numbers have no gaps whether the pay-in-full box is hidden or shown", () => {
+  const allShown = numberVisibleRegions([]);
+  const couponHidden = numberVisibleRegions(["lump-sum"]);
+  for (const numbers of [allShown, couponHidden]) {
+    const used = Object.values(numbers).sort((a, b) => a - b);
+    assert.deepEqual(used, used.map((unused, index) => index + 1), "1, 2, 3… with no gaps and no repeats");
+  }
+  assert.equal(Object.keys(allShown).length, GUIDE_REGIONS.length);
+  assert.equal(couponHidden["lump-sum"], undefined, "a hidden box has no number at all");
+  assert.equal(couponHidden["claimed"], 6);
+  assert.equal(couponHidden["analysis-date"], 7, "the box after the hidden one moves up: no jump from 6 to 8");
+  assert.equal(couponHidden["bills"], 8);
+  assert.equal(allShown["analysis-date"], 8);
+  assert.doesNotThrow(() => numberVisibleRegions(undefined));
+});
+
+test("B3: the form in index.html lists its boxes in the same order as the guide numbers them", async () => {
+  // A source scan: the numbering only reads right if the page order matches GUIDE_REGIONS.
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const keysInPageOrder = [];
+  for (const piece of html.split('data-guide-region="').slice(1)) {
+    keysInPageOrder.push(piece.slice(0, piece.indexOf('"')));
+  }
+  assert.deepEqual(keysInPageOrder, GUIDE_REGIONS.map((region) => region.key));
+});
+
+// #12: a half-typed amount is not an error yet.
+test("#12: amounts that are still being typed are recognised, finished ones are not", () => {
+  for (const partial of ["1,", "1,2", "12,34", "1,234.", "-", "$", "(", "1,234,5"]) {
+    assert.equal(looksUnfinished(partial), true, partial);
+  }
+  for (const done of ["", "1,234", "1234.5", "1,234.56", "abc", "12.345", "1.2.3"]) {
+    assert.equal(looksUnfinished(done), false, done);
+  }
+  assert.doesNotThrow(() => looksUnfinished(undefined));
+});
+
+// #13: one name-length limit everywhere.
+test("#13: a bill name has ONE length limit: typed, loaded from a file, and reported on the name", () => {
+  assert.equal(MAX_BILL_NAME_LENGTH, 60);
+  const values = goodValues();
+  values.bills[0] = { kind: "other", name: "n".repeat(MAX_BILL_NAME_LENGTH), amount: "1,800", month: "5" };
+  assert.equal(runCheck(values).ok, true, "exactly at the limit is fine");
+
+  values.bills[0].name = "n".repeat(MAX_BILL_NAME_LENGTH + 1);
+  const tooLong = runCheck(values);
+  assert.equal(tooLong.ok, false);
+  assert.ok(fieldsOf(tooLong).includes("disbursements.0.label"), "reported against the NAME, not the amount");
+
+  const fromFile = fileTextToValues(valuesToFileText(values));
+  assert.equal(fromFile.values.bills[0].name.length, MAX_BILL_NAME_LENGTH, "a file cannot smuggle in a longer name");
+});
+
+// #6: the analysis date reaches the letter's details.
+test("#6: the typed analysis date is handed to the letter", () => {
+  const inputs = readInputs(exampleToValues(exampleById("holding-too-much")));
+  assert.equal(inputs.details.analysisDate, "2026-09-01");
 });

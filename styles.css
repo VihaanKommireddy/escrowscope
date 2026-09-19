@@ -56,13 +56,16 @@
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
-  --text-display: 44px;
-  --text-h1: 32px;
-  --text-h2: 24px;
-  --text-h3: 18px;
-  --text-body: 16px;
-  --text-small: 14px;
-  --text-micro: 12px;
+  /* rem, not px: 1rem is whatever text size the visitor picked in their browser
+     (16px unless they changed it), so a larger default makes this page larger
+     too. The smallest size was raised from 12px to 13px for this audience. */
+  --text-display: 2.75rem;
+  --text-h1: 2rem;
+  --text-h2: 1.5rem;
+  --text-h3: 1.125rem;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-micro: 0.8125rem;
 
   --weight-regular: 400;
   --weight-medium: 500;
@@ -1100,6 +1103,70 @@ code,
   color: var(--color-muted);
 }
 
+/* A calm note under a box ("This page guessed this month…"). */
+.field-note {
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-flag-mark);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1.45;
+}
+
+/* "If the buttons on this page do nothing…". The words are in index.html so they
+   exist even when no script runs. They stay folded away for the first few
+   seconds (scripts on a slow phone need a moment), then unfold by themselves
+   unless app.js has finished starting and hidden them. Nothing moves: the delay
+   is the only "animation", so it is fine for people who ask for less motion. */
+.page-problem {
+  max-height: 0;
+  margin: 0;
+  overflow: hidden;
+  animation: page-problem-unfold 0s linear 6s forwards;
+}
+
+.page-problem.is-shown {
+  animation: none;
+}
+
+.page-problem.is-shown,
+.page-alert {
+  max-height: none;
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 2px solid var(--color-flag-mark);
+  border-radius: var(--radius-md);
+  background: var(--color-flag-tint);
+  font-weight: var(--weight-semibold);
+}
+
+@keyframes page-problem-unfold {
+  to {
+    max-height: 40em;
+    margin-top: var(--space-5);
+    padding: var(--space-4);
+    border: 2px solid var(--color-flag-mark);
+    border-radius: var(--radius-md);
+    background: var(--color-flag-tint);
+    font-weight: var(--weight-semibold);
+  }
+}
+
+.page-alert {
+  margin-block: var(--space-5);
+}
+
+.form-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-height: 0;
+  margin-top: var(--space-3);
+  font-weight: var(--weight-semibold);
+}
+
 /* Bill rows */
 
 .bill-rows {
@@ -1272,11 +1339,10 @@ code,
   padding-left: 28px;
 }
 
-.error-summary-list li {
-  padding-block: 4px;
-}
-
 .error-summary-list a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--color-error);
   font-weight: var(--weight-semibold);
 }
@@ -1528,6 +1594,13 @@ code,
   gap: var(--space-2);
   margin-top: var(--space-2);
   padding-left: 20px;
+}
+
+.nudges a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--weight-semibold);
 }
 
 /* The three numbers: a ledger strip */
@@ -2072,6 +2145,67 @@ code,
   color: var(--color-muted);
 }
 
+/* ───────────────────────── 10b. Forced colors (Windows High Contrast) ───────────────────────── */
+
+/* In this mode the browser throws away background tints and box-shadows. Every
+   state that leaned on one gets a real outline or border here, using the
+   system's own color names so it fits whatever theme the visitor chose. */
+@media (forced-colors: active) {
+  .example-card[aria-pressed="true"],
+  .choice:has(input:checked) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .verdict,
+  .flag-card,
+  .refund-clock,
+  .error-summary,
+  .field-warning,
+  .field-note,
+  .stale-note,
+  .page-alert,
+  .page-problem.is-shown {
+    border: 2px solid CanvasText;
+  }
+
+  .verdict-mark,
+  .field-badge,
+  .field-error::before,
+  .field-warning::before,
+  .stale-mark,
+  .error-summary-title::before {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+    background: CanvasText;
+    color: Canvas;
+  }
+
+  .status {
+    border: 1px solid CanvasText;
+  }
+
+  .input[aria-invalid="true"] {
+    outline: 2px solid Mark;
+    outline-offset: 1px;
+  }
+
+  .disclosure > summary::before {
+    forced-color-adjust: none;
+    background:
+      linear-gradient(CanvasText, CanvasText) center / 16px 2px no-repeat,
+      linear-gradient(CanvasText, CanvasText) center / 2px 16px no-repeat;
+  }
+
+  .disclosure[open] > summary::before {
+    background: linear-gradient(CanvasText, CanvasText) center / 16px 2px no-repeat;
+  }
+
+  .tick-rule {
+    forced-color-adjust: none;
+  }
+}
+
 /* ───────────────────────── 11. Print ───────────────────────── */
 
 /* "Print this report" gives ONE page a housing counselor can read: the verdict,
@@ -2121,9 +2255,10 @@ code,
   .btn,
   .eyebrow,
   .nudges,
-  .flag-list,
-  .block-note,
   .block-lede,
+  .page-problem,
+  .page-alert,
+  #render-problem,
   .step-toggle,
   .step-body > p:first-child,
   .balance-chart__figure,
@@ -2345,8 +2480,38 @@ code,
     min-width: 0;
   }
 
-  /* The verdict sentence above already explains each gap; the notes under the
-     row names are left out of the printout to keep it to one page. */
+  /* The flag sentences and the caveat under them are printed, so a counselor
+     sees WHY a line says "Over the limit", not just the chip. */
+  .flag-list {
+    gap: 2pt;
+    margin-top: 4pt;
+  }
+
+  .flag-card {
+    gap: 0;
+    padding: 2pt 6pt;
+    border-left-width: 3pt;
+    font-size: 7.5pt;
+    line-height: 1.28;
+    break-inside: avoid;
+  }
+
+  .flag-card-tag {
+    font-size: 6.5pt;
+  }
+
+  .flag-card-amount {
+    font-size: 8.5pt;
+  }
+
+  .block-note {
+    max-width: none;
+    margin-top: 3pt;
+    font-size: 7.5pt;
+  }
+
+  /* The flag sentences say the same thing as the notes under the row names,
+     in more detail, so the row notes are left out of the printout. */
   .row-note {
     display: none;
   }

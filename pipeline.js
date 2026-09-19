@@ -25,6 +25,12 @@ export const BILL_KINDS = [
 
 export const MAX_BILL_ROWS = 24;
 
+// The longest name a bill may have. ONE limit, used for the name box on the
+// form, for names read from a numbers file, and by the engine's own validation.
+// (The engine owns the number; 60 is only a fallback if it is ever missing.)
+export const MAX_BILL_NAME_LENGTH =
+  typeof engine.MAX_BILL_LABEL_LENGTH === "number" ? engine.MAX_BILL_LABEL_LENGTH : 60;
+
 const CLAIMED_KINDS = ["shortage", "surplus", "deficiency", "none"];
 
 // ─────────────────────────── values ───────────────────────────
@@ -210,6 +216,14 @@ export function readInputs(values) {
     const bill = bills[index] || {};
     const prefix = "disbursements." + index;
     const entry = { label: labelForBill(bill), month: undefined, amountCents: undefined };
+
+    // One limit for a bill's name, wherever the name came from (typed or loaded).
+    if (entry.label.length > MAX_BILL_NAME_LENGTH) {
+      errors.push({
+        field: prefix + ".label",
+        message: "That name is too long. Keep it to " + MAX_BILL_NAME_LENGTH + " characters or fewer.",
+      });
+    }
 
     if (isBlank(bill.amount)) {
       errors.push({ field: prefix + ".amountCents", message: "Type this bill’s amount, or remove the row." });
@@ -406,6 +420,30 @@ export function runCheck(values) {
   }
 }
 
+// Is this dollar amount probably still being typed? While someone types 1,234
+// the box passes through "1," and "1,2", which are not valid amounts YET. Live
+// what-if uses this to stay quiet for a moment instead of flashing an error.
+// It only ever delays a message: pressing "Check the math" still checks everything.
+export function looksUnfinished(text) {
+  const typed = String(text === undefined || text === null ? "" : text).trim();
+  if (typed === "") return false;
+  const last = typed[typed.length - 1];
+  if (last === "," || last === "." || last === "-" || last === "\u2212" || last === "$" || last === "(") return true;
+
+  // A comma group that is still short: "1,2" or "12,34" (before any decimal point).
+  const whole = typed.split(".")[0];
+  const groups = whole.split(",");
+  if (groups.length > 1) {
+    const lastGroup = groups[groups.length - 1];
+    let allDigits = lastGroup.length > 0;
+    for (const character of lastGroup) {
+      if (character < "0" || character > "9") allDigits = false;
+    }
+    if (allDigits && lastGroup.length < 3) return true;
+  }
+  return false;
+}
+
 // The live "Total for the year" under the bills. Rows that are blank or not a
 // positive amount yet are skipped, so the total never shows nonsense mid-typing.
 export function billsTotal(values) {
@@ -511,7 +549,7 @@ export function fileTextToValues(text) {
       if (bill === null || typeof bill !== "object") continue;
       values.bills.push({
         kind: shortText(bill.kind),
-        name: shortText(bill.name),
+        name: shortText(bill.name).slice(0, MAX_BILL_NAME_LENGTH),
         amount: shortText(bill.amount),
         month: shortText(bill.month),
       });

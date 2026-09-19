@@ -989,7 +989,7 @@ function buildBalanceTable(data) {
 
   const headRow = el("tr", {}, [
     el("th", { text: "Month", attrs: { scope: "col" } }),
-    el("th", { className: "balance-table__numhead", text: "Paid in", attrs: { scope: "col" } }),
+    el("th", { className: "balance-table__numhead", text: "Escrow payment", attrs: { scope: "col" } }),
     el("th", { className: "balance-table__numhead", text: "Bills paid out", attrs: { scope: "col" } }),
     el("th", { className: "balance-table__numhead", text: "Balance by the federal math", attrs: { scope: "col" } }),
     line ? el("th", { className: "balance-table__numhead", text: "Balance with your servicer's payment", attrs: { scope: "col" } }) : null,

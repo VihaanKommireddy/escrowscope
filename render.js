@@ -173,7 +173,7 @@ function renderRefundClock(check) {
   }
   box.hidden = false;
   box.append(
-    el("span", { className: "eyebrow", text: "Refund due by" }),
+    el("span", { className: "eyebrow", text: "If this surplus is right, the 30-day refund window ends" }),
     el("span", { className: "refund-date", text: check.refund.display }),
     el("span", {
       className: "small muted",
@@ -379,7 +379,7 @@ function renderJumpBlock(check) {
     box.append(
       el("p", {
         className: "block-lede",
-        text: "Type both your current and your new monthly escrow payment in Part 1, and this section will split the change into its causes: bills going up, a shortage being repaid, and anything the math can’t explain.",
+        text: "Type both your current and your new escrow payment in Part 1, and this section will split the change into its causes: bills going up, a shortage being repaid, and anything the math can’t explain.",
       })
     );
     section.setAttribute("class", "result-block is-empty");
@@ -410,7 +410,7 @@ function renderPayment(check) {
   const hasDeficiency = payment.deficiencySpreadCents > 0 && payment.deficiencySpreadMonths > 0;
 
   const spreadRows = el("dl", { className: "receipt-rows" });
-  spreadRows.append(receiptRow("Base payment: the year’s bills ÷ 12", payment.baseMonthlyCents, false));
+  spreadRows.append(receiptRow("Escrow payment for the bills: the year’s bills ÷ 12", payment.baseMonthlyCents, false));
   if (hasShortage) {
     spreadRows.append(receiptRow("Shortage, spread over 12 months", payment.shortageSpreadOver12Cents, false));
   }
@@ -424,7 +424,7 @@ function renderPayment(check) {
     );
   }
   spreadRows.append(
-    receiptRow("Monthly escrow payment", payment.monthlyEscrowWhileRepayingDeficiencyCents, true)
+    receiptRow("Escrow payment each month", payment.monthlyEscrowWhileRepayingDeficiencyCents, true)
   );
 
   let firstTitle = "By the federal math";
@@ -438,7 +438,7 @@ function renderPayment(check) {
       el("div", { className: "receipt" }, [
         el("h4", { className: "receipt-title", text: "After the deficiency is repaid" }),
         el("dl", { className: "receipt-rows" }, [
-          receiptRow("Monthly escrow payment", payment.monthlyEscrowAfterDeficiencyRepaidCents, true),
+          receiptRow("Escrow payment each month", payment.monthlyEscrowAfterDeficiencyRepaidCents, true),
         ]),
       ])
     );
@@ -449,8 +449,8 @@ function renderPayment(check) {
       el("div", { className: "receipt" }, [
         el("h4", { className: "receipt-title", text: "If you pay the amount owed in one lump sum" }),
         el("dl", { className: "receipt-rows" }, [
-          receiptRow("Base payment: the year’s bills ÷ 12", payment.baseMonthlyCents, false),
-          receiptRow("Monthly escrow payment", payment.baseMonthlyCents, true),
+          receiptRow("Escrow payment for the bills: the year’s bills ÷ 12", payment.baseMonthlyCents, false),
+          receiptRow("Escrow payment each month", payment.baseMonthlyCents, true),
         ]),
       ])
     );
@@ -572,7 +572,7 @@ function renderNext(check) {
 // The panel's title and first sentence follow the kind. If the kind is ever
 // missing or new, the neutral wording is used: it never claims an error.
 const LETTER_ENDING =
-  " It states arithmetic, not legal conclusions. Read it, change anything you like, and decide for yourself whether to send it.";
+  " It states arithmetic, not legal conclusions. You can edit it right here: fill in the parts in [brackets], change anything you like, and decide for yourself whether to send it.";
 
 export function letterPanelWords(letterKind) {
   if (letterKind === "NOTICE_OF_ERROR") {
@@ -597,36 +597,55 @@ export function letterPanelWords(letterKind) {
   };
 }
 
-function renderLetter(check) {
+// `keepText` is true once the visitor has edited the letter: the title and the
+// first sentence still follow the numbers, but their words are left alone.
+function renderLetter(check, keepText) {
   const words = letterPanelWords(check.letterKind);
   byId("sec-letter-h").textContent = words.title;
   byId("letter-lede").textContent = words.lede;
+  if (keepText) return;
+  // The engine's letter goes in through .value only: it is text, never HTML.
   byId("letter-text").value = check.letter;
-  byId("letter-print").textContent = check.letter;
 }
 
 // ─────────────────────────── public ───────────────────────────
 
-// Draw everything for one successful check. `options.fieldToId` lets the
-// nudges link back to the right box in the form.
+// Draw everything for one successful check.
+//   options.fieldToId   lets the nudges link back to the right box in the form
+//   options.keepLetter  true once the visitor has edited the letter themselves
+// Every step runs inside its own try/catch, so one broken step can never leave
+// the page half new and half old without saying so. Returns true only when
+// EVERY step worked; the caller marks the results as out of date otherwise.
 export function renderResults(check, options) {
   const settings = options || {};
-  renderVerdict(check);
-  renderRefundClock(check);
-  renderNudges(check, settings.fieldToId);
-  renderThreeNumbers(check);
-  renderCompare(check);
-  renderChartBlock(check);
-  renderJumpBlock(check);
-  renderPayment(check);
-  renderSteps(check);
-  renderNext(check);
-  renderLetter(check);
+  const steps = [
+    function () { renderVerdict(check); },
+    function () { renderRefundClock(check); },
+    function () { renderNudges(check, settings.fieldToId); },
+    function () { renderThreeNumbers(check); },
+    function () { renderCompare(check); },
+    function () { renderChartBlock(check); },
+    function () { renderJumpBlock(check); },
+    function () { renderPayment(check); },
+    function () { renderSteps(check); },
+    function () { renderNext(check); },
+    function () { renderLetter(check, settings.keepLetter === true); },
+  ];
+  let everyStepWorked = true;
+  for (const step of steps) {
+    try {
+      step();
+    } catch (problem) {
+      everyStepWorked = false;
+    }
+  }
+  byId("render-problem").hidden = everyStepWorked;
+  return everyStepWorked;
 }
 
 // Only the letter changes when the servicer name or loan number is typed.
-export function renderLetterOnly(check) {
-  renderLetter(check);
+export function renderLetterOnly(check, keepText) {
+  renderLetter(check, keepText === true);
 }
 
 // The one line screen readers hear while numbers are being edited (SPEC D4).

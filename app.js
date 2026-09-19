@@ -12,12 +12,14 @@ import { MONTH_NAMES } from "./engine/index.js";
 import {
   BILL_KINDS,
   MAX_BILL_ROWS,
+  MAX_BILL_NAME_LENGTH,
   MAX_FILE_CHARACTERS,
   emptyValues,
   emptyBill,
   exampleToValues,
   runCheck,
   billsTotal,
+  looksUnfinished,
   valuesToFileText,
   fileTextToValues,
 } from "./pipeline.js";
@@ -40,6 +42,22 @@ function byId(id) {
   return document.getElementById(id);
 }
 
+// ─────────────────────────── when something breaks ───────────────────────────
+// index.html carries a plain paragraph ("If the buttons on this page do
+// nothing…"). start() hides it as its very last line, so it stays visible if
+// start-up never finishes. These two listeners bring it back if anything
+// throws later on. They are registered first, before anything else can fail.
+
+function showPageProblem() {
+  const note = byId("page-problem");
+  if (!note) return;
+  note.hidden = false;
+  note.classList.add("is-shown");
+}
+
+window.addEventListener("error", showPageProblem);
+window.addEventListener("unhandledrejection", showPageProblem);
+
 const form = byId("escrow-form");
 const billRows = byId("bill-rows");
 
@@ -48,6 +66,9 @@ let hasCheckedOnce = false; // live what-if starts after the first good check
 let lastGoodCheck = null;
 let nextBillNumber = 1; // keeps ids unique even after rows are removed
 let liveEditTimer = null;
+let letterWasEdited = false; // once true, live what-if stops rewriting the letter
+let valuesBeforeClear = null; // what "Put my numbers back" restores
+let pageIsFramed = false;
 
 // ─────────────────────────── small helpers ───────────────────────────
 
@@ -97,7 +118,9 @@ function renumberBillRows() {
   rows.forEach(function (row, index) {
     row.querySelector(".bill-legend").textContent = "Bill " + (index + 1);
     const removeButton = row.querySelector(".bill-remove");
-    removeButton.setAttribute("aria-label", "Remove bill " + (index + 1));
+    // Starts with the words on the button, so "click Remove this bill" works
+    // for people who use their voice (WCAG 2.5.3, Label in Name).
+    removeButton.setAttribute("aria-label", "Remove this bill (bill " + (index + 1) + ")");
   });
   byId("add-bill").disabled = rows.length >= MAX_BILL_ROWS;
 }
@@ -128,7 +151,13 @@ function addBillRow(bill) {
 
   const nameInput = el("input", {
     className: "input bill-name",
-    attrs: { id: prefix + "-name", type: "text", autocomplete: "off", maxlength: "60" },
+    attrs: {
+      id: prefix + "-name",
+      type: "text",
+      autocomplete: "off",
+      maxlength: String(MAX_BILL_NAME_LENGTH),
+      "aria-describedby": prefix + "-name-error",
+    },
   });
   nameInput.value = data.name || "";
 
@@ -180,6 +209,7 @@ function addBillRow(bill) {
       el("div", { className: "field field-name" }, [
         el("label", { className: "field-label", text: "Name of this bill", attrs: { for: prefix + "-name" } }),
         nameInput,
+        el("p", { className: "field-error", attrs: { id: prefix + "-name-error" } }),
       ]),
       el("div", { className: "bill-remove-cell" }, [removeButton]),
     ]),
@@ -291,6 +321,13 @@ function writeFormValues(values) {
   if (values.cushionMonths !== "2" || values.behind === "yes") byId("less-common").open = true;
 }
 
+// The first month is pre-filled with a guess (next month). A wrong guess would
+// quietly change the answer, so the box says it was guessed until the visitor
+// picks a month, loads an example, or loads a file.
+function setMonthGuessNote(isGuess) {
+  byId("f-start-month-guess").hidden = !isGuess;
+}
+
 // "How much?", "spread over" and the pay-in-full question only make sense for
 // some answers, so they appear only then.
 function syncConditionalFields() {
@@ -341,7 +378,10 @@ function fieldToId(field) {
     const row = rows[Number(parts[1])];
     if (!row) return "add-bill";
     if (parts[2] === "month") return row.querySelector(".bill-month").id;
-    if (parts[2] === "label") return row.querySelector(".bill-kind").id;
+    if (parts[2] === "label") {
+      const usesOwnName = row.querySelector(".bill-kind").value === "other";
+      return usesOwnName ? row.querySelector(".bill-name").id : row.querySelector(".bill-kind").id;
+    }
     return row.querySelector(".bill-amount").id;
   }
   return "";
@@ -350,7 +390,10 @@ function fieldToId(field) {
 // Where the inline message for a control goes.
 function errorSlotFor(field, controlId) {
   if (String(field) === "disbursements") return byId("bills-error");
-  return controlId ? byId(controlId + "-error") : null;
+  if (controlId && byId(controlId + "-error")) return byId(controlId + "-error");
+  // No box to point at: the message goes just above "Check the math", so the
+  // page never says "fix the box marked above" with nothing marked.
+  return byId("general-error");
 }
 
 function clearErrors() {
@@ -403,7 +446,7 @@ function showErrors(errors, withSummary) {
 
     const item = el("li");
     if (controlId) item.append(el("a", { text: linkText, attrs: { href: "#" + controlId } }));
-    else item.append(linkText);
+    else item.append(el("a", { text: linkText, attrs: { href: "#check-button" } }));
     list.append(item);
   }
 
@@ -462,7 +505,7 @@ function showWarnings(warnings) {
 
 // A link in the error summary (or a nudge) moves focus INTO the box, not just near it.
 function handleJumpLinkClick(event) {
-  const link = event.target.closest('a[href^="#f-"], a[href^="#bill-"], a[href="#add-bill"]');
+  const link = event.target.closest('a[href^="#f-"], a[href^="#bill-"], a[href="#add-bill"], a[href="#check-button"]');
   if (!link) return;
   const target = byId(link.getAttribute("href").slice(1));
   if (!target) return;
@@ -480,8 +523,9 @@ function showResults(check, moveFocus) {
   hasCheckedOnce = true;
   byId("results").hidden = false;
   byId("print-date").textContent = "Made on " + todayInWords() + ". Math, not legal advice.";
-  setStale(false);
-  renderResults(check, { fieldToId: fieldToId });
+  const everyStepDrew = renderResults(check, { fieldToId: fieldToId, keepLetter: letterWasEdited });
+  // Only call the results fresh when ALL of them were redrawn.
+  setStale(!everyStepDrew);
   showWarnings(check.warnings);
 
   if (moveFocus) {
@@ -498,10 +542,11 @@ function checkNow() {
   if (!check.ok) {
     showErrors(check.errors, true);
     if (hasCheckedOnce) setStale(true);
-    return;
+    return false;
   }
   clearErrors();
   showResults(check, true);
+  return true;
 }
 
 // Live what-if (SPEC D4): after the first good check, any edit re-runs the math.
@@ -509,6 +554,10 @@ function liveEdit() {
   if (!hasCheckedOnce) return;
   const check = runCheck(readFormValues());
   if (!check.ok) {
+    // "1," on the way to "1,234" is not a mistake yet. Say nothing and wait for
+    // the next key. (A real press of "Check the math" still checks everything.)
+    const typingIn = document.activeElement;
+    if (typingIn && typingIn.classList.contains("input-money") && looksUnfinished(typingIn.value)) return;
     showErrors(check.errors, false);
     setStale(true);
     announceStale();
@@ -545,7 +594,9 @@ function buildExampleButtons() {
       button.setAttribute("aria-pressed", "true");
       byId("f-servicer-name").value = "";
       byId("f-loan-number").value = "";
+      forgetLetterEdits();
       writeFormValues(exampleToValues(example));
+      setMonthGuessNote(false);
       checkNow();
     });
     holder.append(button);
@@ -576,8 +627,33 @@ function refreshLetter() {
   const check = runCheck(readFormValues());
   if (check.ok) {
     lastGoodCheck = check;
-    renderLetterOnly(check);
+    renderLetterOnly(check, letterWasEdited);
   }
+}
+
+// The visitor typed in the letter: from now on it is theirs. Live what-if keeps
+// updating the results but no longer rewrites the letter, and says so.
+function rememberLetterEdit() {
+  if (letterWasEdited) return;
+  letterWasEdited = true;
+  byId("reset-letter").hidden = false;
+  setStatus(
+    "letter-status",
+    "You have edited the letter, so this page no longer rewrites it when the numbers change. “Start the letter over” writes a fresh one from the current numbers."
+  );
+}
+
+function forgetLetterEdits() {
+  letterWasEdited = false;
+  byId("reset-letter").hidden = true;
+  setStatus("letter-status", "");
+}
+
+function startLetterOver() {
+  forgetLetterEdits();
+  refreshLetter();
+  setStatus("letter-status", "The letter was written again from the current numbers.");
+  byId("letter-text").focus();
 }
 
 function setStatus(id, message) {
@@ -592,6 +668,8 @@ function copyLetter() {
   const fallback = function () {
     box.focus();
     box.select();
+    // iPhones and iPads ignore select() here; this does the same job there.
+    box.setSelectionRange(0, box.value.length);
     setStatus("copy-status", "The letter is selected. Press Ctrl+C (or ⌘C on a Mac) to copy it.");
   };
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
@@ -631,6 +709,9 @@ function printReport() {
 }
 
 function printLetter() {
+  // The printed letter is whatever is in the box right now, edits included.
+  // It is the visitor's own text, so it goes in as plain text only.
+  byId("letter-print").textContent = byId("letter-text").value;
   document.body.classList.add("print-letter-mode");
   window.print();
 }
@@ -672,9 +753,27 @@ function loadNumbers(event) {
       return;
     }
     unpressExamples();
+    forgetLetterEdits();
     writeFormValues(loaded.values);
-    setStatus("file-status", "Loaded your numbers from the file. Nothing was uploaded.");
-    checkNow();
+    setMonthGuessNote(false);
+
+    // A drop-down or a date box quietly refuses a value it does not know. Compare
+    // what was written with what each box kept, and name the ones that differ.
+    const lost = boxesThatLostTheirValue(loaded.values, readFormValues());
+    let message = "Loaded your numbers from the file. Nothing was uploaded.";
+    if (lost.length > 0) {
+      message = "Loaded the file, but these boxes could not be restored and need checking: " + lost.join(", ") + ". Nothing was uploaded.";
+    }
+    setStatus("file-status", message);
+
+    const worked = checkNow();
+    if (!worked) {
+      // The form now shows the file's numbers. Results from an earlier check
+      // would describe different numbers, so they are taken down.
+      byId("results").hidden = true;
+      hasCheckedOnce = false;
+      lastGoodCheck = null;
+    }
   });
   reader.addEventListener("error", function () {
     input.value = "";
@@ -683,11 +782,44 @@ function loadNumbers(event) {
   reader.readAsText(file);
 }
 
+// Which boxes did not keep the value a file tried to put in them?
+function boxesThatLostTheirValue(wanted, kept) {
+  const lost = [];
+  const named = [
+    ["startMonth", "First month"],
+    ["claimedKind", "What the statement says there is"],
+    ["cushionMonths", "Cushion months"],
+    ["analysisDate", "Date of the analysis"],
+  ];
+  for (const pair of named) {
+    if (String(wanted[pair[0]] || "") !== String(kept[pair[0]] || "")) lost.push(pair[1]);
+  }
+  wanted.bills.forEach(function (bill, index) {
+    const keptBill = kept.bills[index];
+    if (!keptBill) return;
+    if (String(bill.month || "") !== String(keptBill.month || "")) lost.push("Bill " + (index + 1) + " month");
+    if (String(bill.kind || "") !== String(keptBill.kind || "")) lost.push("Bill " + (index + 1) + " “What it is”");
+  });
+  return lost;
+}
+
+// Has the visitor typed anything that a reload would throw away?
+function formHasContent() {
+  const values = readFormValues();
+  const typed = [values.currentPayment, values.newPayment, values.startingBalance, values.requiredMinimum, values.claimedAmount];
+  for (const bill of values.bills) typed.push(bill.amount, bill.name);
+  return typed.some(function (text) {
+    return String(text).trim() !== "";
+  });
+}
+
 // ─────────────────────────── start ───────────────────────────
 
 function clearForm() {
   window.clearTimeout(liveEditTimer);
+  valuesBeforeClear = formHasContent() ? readFormValues() : null;
   unpressExamples();
+  forgetLetterEdits();
   byId("f-servicer-name").value = "";
   byId("f-loan-number").value = "";
   writeFormValues(blankFormValues());
@@ -698,7 +830,40 @@ function clearForm() {
   byId("results").hidden = true;
   byId("verdict-live").textContent = "";
   setStatus("file-status", "");
+  setMonthGuessNote(true);
+  setStatus("form-status", "Form cleared.");
+  byId("undo-clear").hidden = valuesBeforeClear === null;
   byId("form-heading").focus();
+}
+
+function undoClear() {
+  if (valuesBeforeClear === null) return;
+  writeFormValues(valuesBeforeClear);
+  setMonthGuessNote(false);
+  valuesBeforeClear = null;
+  byId("undo-clear").hidden = true;
+  setStatus("form-status", "Your numbers are back. Press “Check the math” to see the results again.");
+  byId("check-button").focus();
+}
+
+// Shown inside another website? Then someone else controls what sits around (or
+// on top of) this page. Switch the form off and say why.
+function guardAgainstFraming() {
+  try {
+    pageIsFramed = window.top !== window.self;
+  } catch (problem) {
+    // A parent page on another site refuses the question: that means framed.
+    pageIsFramed = true;
+  }
+  if (!pageIsFramed) return;
+  byId("framed-warning").hidden = false;
+  form.setAttribute("inert", "");
+  for (const control of form.querySelectorAll("input, select, textarea, button")) {
+    control.disabled = true;
+  }
+  for (const button of byId("example-buttons").querySelectorAll("button")) {
+    button.disabled = true;
+  }
 }
 
 function start() {
@@ -712,8 +877,16 @@ function start() {
     checkNow();
   });
   form.addEventListener("input", function () {
+    // The numbers are the visitor's own from the first keystroke: the example
+    // button is no longer "the one showing", and the undo offer has passed.
+    unpressExamples();
+    byId("undo-clear").hidden = true;
+    setStatus("form-status", "");
     updateBillsTotal();
     scheduleLiveEdit();
+  });
+  byId("f-start-month").addEventListener("change", function () {
+    setMonthGuessNote(false);
   });
   form.addEventListener("change", function () {
     syncConditionalFields();
@@ -727,6 +900,17 @@ function start() {
     scheduleLiveEdit();
   });
   byId("clear-button").addEventListener("click", clearForm);
+  byId("undo-clear").addEventListener("click", undoClear);
+  byId("letter-text").addEventListener("input", rememberLetterEdit);
+  byId("reset-letter").addEventListener("click", startLetterOver);
+
+  // Leaving or reloading throws the numbers away (nothing is stored), so the
+  // browser asks first, but only when there is something to lose.
+  window.addEventListener("beforeunload", function (event) {
+    if (!formHasContent()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
 
   byId("f-servicer-name").addEventListener("input", refreshLetter);
   byId("f-loan-number").addEventListener("input", refreshLetter);
@@ -751,7 +935,12 @@ function start() {
   initSelfCheck(byId("selfcheck"));
   registerServiceWorker();
 
-  runExampleFromAddress();
+  guardAgainstFraming();
+  if (!pageIsFramed) runExampleFromAddress();
+
+  // LAST line on purpose: if anything above threw, this never runs and the
+  // "If the buttons on this page do nothing…" paragraph stays on the page.
+  byId("page-problem").hidden = true;
 }
 
 start();

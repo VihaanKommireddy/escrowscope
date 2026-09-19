@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- The privacy promise, enforced by the browser: with connect-src 'none' this
-       page cannot open a connection to anywhere, even if its code tried to.
+  <!-- The privacy rule, enforced by the browser: with connect-src 'none' this page
+       cannot make background connections (fetch, XHR, web sockets, beacons) to
+       anywhere. That is how pages normally send data out without you noticing.
+       It does not stop a link you click from opening another site, and it cannot
+       stop this site's own files from being downloaded. The code never puts what
+       you type into either of those, and the code is open for anyone to read.
        No inline scripts or styles are allowed either, so this line is real. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -45,7 +49,7 @@
             <rect x="5" y="10.5" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
             <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <span>Nothing you type leaves this page</span>
+          <span>This page never sends what you type</span>
         </a>
       </div>
       <h1 class="masthead-title">See why your mortgage payment jumped.</h1>
@@ -55,6 +59,7 @@
   </header>
 
   <main id="main">
+    <p id="framed-warning" class="page-alert wrap" hidden>This page is being shown inside another website, so the form is switched off here. To use EscrowScope, open it directly in its own browser tab.</p>
 
     <!-- ───────────── Intro + examples + pre-check ───────────── -->
     <section class="intro" aria-labelledby="intro-heading">
@@ -69,7 +74,9 @@
         <div class="examples">
           <h3 id="examples-heading">No statement handy? Watch it work on an example.</h3>
           <p class="muted small">Each button fills in the form and checks the math. You can change any number afterwards to see what happens.</p>
-          <div id="example-buttons" class="example-grid" role="group" aria-labelledby="examples-heading"></div>
+          <div id="example-buttons" class="example-grid" role="group" aria-labelledby="examples-heading">
+            <p class="page-problem">The example buttons have not loaded. Your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser.</p>
+          </div>
         </div>
 
         <details class="disclosure precheck">
@@ -102,9 +109,9 @@
         <div class="form-col">
           <span class="eyebrow">Your statement</span>
           <h2 id="form-heading" tabindex="-1">Type the numbers from your statement</h2>
-          <p class="section-lede">The boxes follow the order most statements use, top to bottom. Two parts are required. Everything else is optional, and the more you fill in, the more this page can check. Type dollar amounts like <span class="num">1,234.56</span>. No dollar sign needed.</p>
+          <p class="section-lede">The boxes follow the order most statements use, top to bottom. Two parts are required. Everything else is optional, and the more you fill in, the more this page can check. Type dollar amounts like <span class="num">1,234.56</span> or <span class="num">1234.56</span>. Commas are fine, and no dollar sign is needed.</p>
 
-          <div id="error-summary" class="error-summary" role="alert" tabindex="-1" aria-labelledby="error-summary-title" hidden>
+          <div id="error-summary" class="error-summary" role="group" tabindex="-1" aria-labelledby="error-summary-title" hidden>
             <h3 id="error-summary-title" class="error-summary-title"></h3>
             <ul id="error-summary-list" class="error-summary-list"></ul>
           </div>
@@ -145,8 +152,9 @@
                 </div>
                 <div class="field" data-guide-region="start-month" data-guide-focus="f-start-month">
                   <label class="field-label" for="f-start-month"><span class="field-badge" aria-hidden="true">4</span> First month of those 12 months <span class="tag tag-required">required</span></label>
-                  <p class="hint" id="f-start-month-hint">The first month in the statement’s forecast table. It is usually the month the new payment starts (“Effective…”). Many escrow years do not start in January.</p>
-                  <select class="input input-select" id="f-start-month" name="startMonth" aria-required="true" aria-describedby="f-start-month-hint f-start-month-error"></select>
+                  <p class="hint" id="f-start-month-hint">The first month in the statement’s forecast table. It is usually the month the new payment starts (“Effective…”). Often the next 12 months do not start in January.</p>
+                  <select class="input input-select" id="f-start-month" name="startMonth" aria-required="true" aria-describedby="f-start-month-hint f-start-month-guess f-start-month-error"></select>
+                  <p class="field-note" id="f-start-month-guess">This page guessed this month. Check it against your statement.</p>
                   <p class="field-error" id="f-start-month-error"></p>
                   <div data-guide-slot></div>
                 </div>
@@ -211,7 +219,7 @@
               </div>
             </fieldset>
 
-            <fieldset class="part" id="bills-fieldset" data-guide-region="bills">
+            <fieldset class="part" id="bills-fieldset" data-guide-region="bills" aria-describedby="bills-hint bills-error">
               <legend class="part-legend"><span class="part-index">Part 4</span> <span class="part-title"><span class="field-badge" aria-hidden="true">9</span> Your bills for the next 12 months</span> <span class="tag tag-required">required</span></legend>
               <p class="part-hint" id="bills-hint">Every bill your servicer plans to pay out of escrow in the next 12 months, and the month it gets paid. Also called “Expected Escrow Payments”, “Anticipated Disbursements”, or “What We Expect to Pay Out”.</p>
               <ul class="tips">
@@ -222,7 +230,7 @@
               <p class="field-error" id="bills-error"></p>
               <div id="bill-rows" class="bill-rows"></div>
               <div class="bills-footer">
-                <button type="button" class="btn btn-secondary" id="add-bill">
+                <button type="button" class="btn btn-secondary" id="add-bill" aria-describedby="bills-hint bills-error">
                   <span aria-hidden="true">+</span> Add another bill
                 </button>
                 <p class="bills-total"><span class="bills-total-label">Total for the year</span> <span class="num bills-total-figure" id="bills-total">$0.00</span></p>
@@ -250,13 +258,20 @@
               </div>
             </details>
 
+            <p class="field-error" id="general-error"></p>
+            <p id="page-problem" class="page-problem">If the buttons on this page do nothing, your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser. What you typed was not sent anywhere.</p>
+
             <div class="form-actions">
               <button type="submit" class="btn btn-primary btn-large" id="check-button">Check the math</button>
               <button type="button" class="btn btn-quiet" id="clear-button">Clear the form</button>
             </div>
+            <p class="form-status">
+              <span id="form-status" role="status"></span>
+              <button type="button" class="btn btn-quiet" id="undo-clear" hidden>Put my numbers back</button>
+            </p>
 
             <div class="file-actions" id="file-actions" hidden>
-              <h3 class="file-actions-title">Keep your numbers, without us keeping them</h3>
+              <h3 class="file-actions-title">Keep your numbers. This page does not keep them.</h3>
               <p class="small muted">This page stores nothing. If you want to come back later, save your numbers as a small file on your own device and load it next time. The file never goes anywhere else.</p>
               <div class="file-actions-row">
                 <button type="button" class="btn btn-secondary" id="download-numbers">Download my numbers</button>
@@ -307,6 +322,11 @@
           <span><strong>These results are from your last valid numbers.</strong> Fix the box marked above and they will update.</span>
         </p>
 
+        <p id="render-problem" class="stale-note" hidden>
+          <span class="stale-mark" aria-hidden="true">!</span>
+          <span><strong>Part of the results could not be drawn.</strong> What is shown below may be out of date. Try reloading the page. What you typed was not sent anywhere.</span>
+        </p>
+
         <div id="verdict" class="verdict">
           <div class="verdict-mark" id="verdict-mark" aria-hidden="true"></div>
           <div class="verdict-text">
@@ -324,38 +344,38 @@
 
         <div id="three-numbers" class="three-numbers"></div>
 
-        <section class="result-block" id="sec-compare" aria-labelledby="sec-compare-h">
+        <section class="result-block" id="sec-compare">
           <h3 id="sec-compare-h">Your statement vs. the federal math</h3>
           <div id="compare-body"></div>
         </section>
 
-        <section class="result-block" id="sec-chart" aria-labelledby="sec-chart-h">
+        <section class="result-block" id="sec-chart">
           <h3 id="sec-chart-h">Your escrow balance, month by month</h3>
           <div id="chart-body" class="chart-body"></div>
         </section>
 
-        <section class="result-block" id="sec-jump" aria-labelledby="sec-jump-h">
+        <section class="result-block" id="sec-jump">
           <h3 id="sec-jump-h">Why did it jump?</h3>
           <div id="jump-body"></div>
         </section>
 
-        <section class="result-block" id="sec-payment" aria-labelledby="sec-payment-h">
-          <h3 id="sec-payment-h">Your lawful payment</h3>
+        <section class="result-block" id="sec-payment">
+          <h3 id="sec-payment-h">The payment the federal math gives</h3>
           <div id="payment-body"></div>
         </section>
 
-        <section class="result-block" id="sec-steps" aria-labelledby="sec-steps-h">
+        <section class="result-block" id="sec-steps">
           <h3 id="sec-steps-h">Show the math</h3>
           <p class="muted small block-lede">Each step opens to show the numbers and where the method comes from: the paragraph of the federal rule, or the official guidance.</p>
           <div id="steps-body"></div>
         </section>
 
-        <section class="result-block" id="sec-next" aria-labelledby="sec-next-h">
+        <section class="result-block" id="sec-next">
           <h3 id="sec-next-h">What you can do next</h3>
           <div id="next-body"></div>
         </section>
 
-        <section class="result-block" id="sec-letter" aria-labelledby="sec-letter-h">
+        <section class="result-block" id="sec-letter">
           <h3 id="sec-letter-h">A letter you can send</h3>
           <p class="block-lede" id="letter-lede">A calm, neutral letter asking your servicer to explain the calculation. It states arithmetic, not legal conclusions. Read it, change anything you like, and decide for yourself whether to send it.</p>
           <div class="letter-details">
@@ -370,11 +390,13 @@
               <input class="input num" id="f-loan-number" type="text" autocomplete="off" spellcheck="false" aria-describedby="f-loan-number-hint">
             </div>
           </div>
-          <label class="field-label" for="letter-text">The letter</label>
-          <textarea id="letter-text" class="letter-text" rows="18" readonly spellcheck="false"></textarea>
+          <label class="field-label" for="letter-text">The letter (you can edit it here)</label>
+          <textarea id="letter-text" class="letter-text" rows="18" spellcheck="true" aria-describedby="letter-lede letter-status"></textarea>
+          <p class="small muted" id="letter-status" role="status"></p>
           <div class="letter-actions">
             <button type="button" class="btn btn-secondary" id="copy-letter">Copy the letter</button>
             <button type="button" class="btn btn-secondary" id="print-letter">Print the letter</button>
+            <button type="button" class="btn btn-quiet" id="reset-letter" hidden>Start the letter over</button>
             <span class="action-status small" id="copy-status" role="status"></span>
           </div>
           <div id="letter-print" class="letter-print" aria-hidden="true"></div>
@@ -406,7 +428,7 @@
     <section class="selfcheck-section" id="selfcheck-section" aria-labelledby="selfcheck-heading">
       <div class="wrap">
         <span class="eyebrow">Check the checker</span>
-        <h2 id="selfcheck-heading">Don’t take our word for it.</h2>
+        <h2 id="selfcheck-heading">Don’t take this page’s word for it.</h2>
         <p class="section-lede">A tool that checks someone else’s math should let you check its own. This button runs this page’s calculator against a set of worked cases, right here on your device, and shows you every number. Some of the cases were worked out from the regulation by hand before this calculator existed. Others were added later by an independent checker who had not seen the calculator’s code. The exact count of each is listed below.</p>
         <div id="selfcheck"></div>
       </div>
@@ -417,7 +439,7 @@
     <div class="wrap">
       <section id="privacy-proof" class="privacy-proof" aria-labelledby="privacy-heading" tabindex="-1">
         <span class="eyebrow">Privacy you can check</span>
-        <h2 id="privacy-heading">Your numbers stay on this device.</h2>
+        <h2 id="privacy-heading">This page does not send your numbers anywhere. Check it yourself.</h2>
         <div id="proof-panel"></div>
       </section>
 
@@ -425,7 +447,7 @@
         <section aria-labelledby="how-heading">
           <h2 id="how-heading" class="footer-h">How this works</h2>
           <p>Federal rule 12 CFR 1024.17 tells every mortgage servicer how to run an escrow account: add up the year’s bills, divide by 12, walk the balance forward month by month, and keep a cushion no bigger than one sixth of the year’s bills. This page runs that same method on the numbers you type and compares the answer with your statement.</p>
-          <p>The whole thing is a handful of plain files that run in your browser. There is no account, no server, and no tracking. After your first visit it works with the internet turned off.</p>
+          <p>The whole thing is a handful of plain files that run in your browser. There is no account and no tracking. The files are hosted on GitHub Pages, which, like any web host, can see that your browser downloaded them. It never sees what you type. After your first visit the page works with the internet turned off in most browsers.</p>
         </section>
         <section aria-labelledby="sources-heading">
           <h2 id="sources-heading" class="footer-h">Read it yourself</h2>
@@ -439,7 +461,7 @@
         </section>
       </div>
 
-      <p class="footer-note small">EscrowScope is free and independent. It is not affiliated with any mortgage servicer or government agency. It shows math; what you do next is up to you.</p>
+      <p class="footer-note small">EscrowScope is free and independent. It is not affiliated with any mortgage servicer or government agency. It shows math. What you do next is up to you.</p>
     </div>
   </footer>
 </body>
