@@ -213,3 +213,50 @@ integration — anything beyond it is a new finding.
   figure also sits within $7 of the low point. That is the known limit written
   down in 4.4. The main check, "cushion over cap by > $7.00", still catches
   5,000 of 5,000.
+
+#### Fix Order 3 — the auditor's Stage 3 re-verification
+
+| # | What | Who |
+|---|---|---|
+| 4.11 | Stage 3 re-verification (`docs/verification/math-audit.md` §8, committed by the director as `6176424`, engine at `f686075`): **all 15 Stage 2 defects verified fixed** against the running code and its generated text, not against commit messages; 100,000 fuzz cases over five seeds with 0 throws, 0 disagreements, 0 invariant failures; the auditor updated its own `stage2-compare-checks.mjs` to the A1 / A3 / A12 / B2 rules and added `stage3-reverify.mjs` (35 checks). It also found **5 new things, two of them wrong answers**: N1 (an over-cushioned statement can come out green) and N2 (no payment ceiling for a not-current borrower with any deficiency), plus N3–N5 (wording). | Independent math auditor |
+| 4.12 | Fix Order 3 dispatched: N1–N5 to the fresh Engine Finisher, each with a named regression test built from the auditor's repro, after it finishes Fix Order 2 (c)–(d). The page-facing part (the new flag kind `CUSHION_MAYBE_OVER_CAP`; the UI's own TV01 mix-up pipeline test, which encodes the old rule and must split into two) to the UI Builder. Before relaying, the Build Chief checked the director's three-case rule for holes and pinned two things the ruling left open: the **order** (a) → (b) → (c), because for an excess of $7.01–$14.00 cases (a) and (b) are both true; and **signed** arithmetic for "disagrees by about (typed minimum − cap)", so a statement claiming a shortage where the math finds a surplus is read correctly (federal +$300, statement −$300, excess $600 → gap exactly $600 → case (b)). | Build Chief |
+
+**N1, told straight — whose mistake it was.** The *trigger* for the low-point
+mix-up rule came from the director (Fix Order 1, B2: when the typed required
+minimum equals the federal low point within $7 and is above the cap, do not
+accuse). The *design* of what happens next was the Build Chief's: a nudge
+instead of a flag, a "not-compared" cushion row, and `overall` computed from the
+other rows. The Build Chief **saw the collision case at the time** — a servicer
+genuinely holding a 3-month cushion with the balance sitting exactly on it
+makes the federal low point equal the typed minimum — and wrote it into this
+log (row 4.4) as a "known limit, stated on purpose", answered only with
+two-sided wording. That judgment was wrong in two ways. First, it treated the
+case as a corner. The independent auditor measured it: for a servicer that
+over-cushions as a habit, an account sitting on that servicer's own target is
+the *normal* state, and the rule fired in **19,996 of 20,000** such accounts.
+Second, the Build Chief's rule "a not-compared row never makes `overall`
+matches by itself" left the door open for any *other* matching row to do it:
+type the required minimum and the new payment, and a statement with a cushion
+$600 over the legal limit came out **green, "Your statement's math matches the
+federal method."** For a not-current borrower that happened 19,997 times in
+19,997. A tool whose one job is to catch an over-the-cap cushion was hiding
+exactly that, in the common case, behind a polite note. Nobody who wrote the
+rule caught it; the independent auditor did, by simulating the servicer instead
+of the user. That is what Phase 4 is for.
+
+The replacement (director's ruling): once the trigger is met, (a) a typed claim
+that **matches** the federal math proves the servicer's real cushion is within
+the cap → mix-up, nudge only; (b) a typed claim that disagrees by about (typed
+minimum − cap) proves the typed minimum is real → the ordinary
+`CUSHION_OVER_CAP`; (c) anything else cannot be told apart, so it is never
+green and never a hard accusation → a new two-sided amber flag
+`CUSHION_MAYBE_OVER_CAP`, `overall` "look-here", letter = a request for
+information asking the servicer to confirm the required minimum it used.
+
+**N2** was pre-existing and missed by everyone including the Stage 2 audit:
+when the borrower is not current, (f)(4)(iii) hands the *schedule* for a
+deficiency to the mortgage documents, and the engine read that as "no limit on
+the amount", so a $5,000 payment against a $10 deficiency was a green "match".
+New ceiling: base + shortage ÷ 12 + the **whole** deficiency (the fastest any
+document could collect it is all at once); above that, `PAYMENT_ABOVE_MAX`, and
+`explainJump` calls the excess unexplained.
