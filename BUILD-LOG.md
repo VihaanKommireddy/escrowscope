@@ -260,3 +260,38 @@ the amount", so a $5,000 payment against a $10 deficiency was a green "match".
 New ceiling: base + shortage ÷ 12 + the **whole** deficiency (the fastest any
 document could collect it is all at once); above that, `PAYMENT_ABOVE_MAX`, and
 `explainJump` calls the excess unexplained.
+
+| # | What | Who |
+|---|---|---|
+| 4.13 | UI Builder finished Fix Orders 1–3 (page side): `734d2d3`, `b33dc11`, `213b4db`, `3bffdfd`, `d69ab76`. **Claims checked against the tree by the Build Chief, not taken on trust:** nothing uncommitted; no file starting with `_` in the root; no listeners on ports 4188–4197; no headless browsers left running; 26 precache entries. Build Chief's own `npm test`: 606 tests, 603 pass, 3 fail — all three expected: the UI Builder's two N1 tests written ahead of the engine change ("B2 case (c)…", "B2 auditor's repro…"), and "sw.js CACHE_NAME is up to date", red because the Engine Finisher committed after the UI's last stamp. That third failure is the new B5 / QA #4 mechanism catching exactly what it exists to catch. | UI Builder + trust helper; verified by Build Chief |
+| 4.14 | Engine Finisher landed all four Fix Order 2 engine items: `5174332` (analysis date in the letter, #6), `f686075` (one `MAX_BILL_LABEL_LENGTH = 60`, #13), `a192d60` ("this page" voice, one term per thing, #14), `5989797` (privacy-claim and refund-promise sweeps, #1–#3, #7). Fix Order 3 (N1–N5) not landed at the time of this row. | Engine Finisher |
+| 4.15 | **First real-browser pass by the Build Chief** (port 4188, `?nosw`, the pane's Chromium), done before the engine's Fix Order 3 so page problems would surface while the UI Builder could still be resumed. Console: **no messages at all**, on load and after every action (no CSP violations). All 25 buttons have an accessible name (checked by computing names in the page, after a listing tool showed some as blank — it was the tool). **Example 1** → green "Matches", focus on the verdict heading with a visible ring, $300.00 shortage / $25.00 a month / $475.00 month, letter panel titled as a request to explain. **Example 2** → amber "Look here", all three rows "Matches", eyebrow exactly "If this surplus is right, the 30-day refund window ends" + October 1, 2026, letter = request for information under § 1024.36 and prints "dated September 1, 2026". **Example 3** → amber, three flags with the hand-worked dollars ($600.00 over the cushion limit; $600.00 different conclusion; $50.00 a month = $600.00 over 12 months), first month April, letter = notice of error with "I believe the statement contains the error(s) described below." **Live proof:** "30 of 30 checks passed on this device, just now", TV02 and TV01 called out first, provenance reads "22 of these cases came first … 8 more were added later by an independent checker who had not seen the calculator's code". **Privacy panel:** new label and counter line, counter at 0 after clicking all three examples and running the proof, the service-worker sentence directly under the number, the auditor's "stronger protection" paragraph, the GitHub Pages hosting sentence, "Offline copy: switched off for this visit, because the page address has ?nosw in it"; both old false sentences and "no server" are gone from the page text. **320px, dark:** document width 320 = viewport (no sideways page scroll), zero elements overflowing outside the scroll regions, both scrolling tables are named focusable regions, brand dark colors applied. One screenshot came back as a blank dark frame; checked rather than assumed: the verdict was on screen, visible, full opacity, real text under three sample points, and the next capture painted normally — a capture artifact after a scripted scroll, not a page bug. | Build Chief |
+
+**Not re-checked in 4.15 (so nobody reads more into it than is there):** the N1
+and N2 repros (the engine fix had not landed), offline behavior (the pass used
+`?nosw` on purpose), print, 200% zoom, forced colors, keyboard-only operation
+end to end, the framed-page guard, the error-boundary paragraph, the numbers
+file download/load, and any browser other than Chromium. The UI Builder reports
+checking most of those in headless Chrome; Safari, Firefox, a real phone and a
+screen reader have been checked by nobody.
+
+**UI Builder's own list of deviations and judgment calls (from its final
+report, recorded as reported):** four CSS files instead of the one in SPEC A2
+(`styles.css`, `chart.css`, `guide.css`, `selfcheck.css`); extra root modules
+beyond A2 (`dom.js`, `pipeline.js`, `guide.js`, `chart.js`, `proof.js`,
+`selfcheck-ui.js`, `sw-register.js`); the tab icon and manifest icons are
+`data:` URIs so the request counter can honestly read 0; a "balance is below
+zero" tick box because phone keypads have no minus key; a blank bill row is an
+error rather than skipped; the shortage-only boxes appear only when relevant;
+the big figure in the verdict banner is the UI's pick (largest flag gap, else
+the surplus / shortage / deficiency); its own SVG icons rather than the
+engine's glyphs; no manual theme toggle (it would need storage); the printed
+report omits the chart picture, the jump section, the payment receipts and the
+step prose to fit one page; the fallback "your browser may be too old"
+paragraph is folded by CSS for 6 seconds rather than hidden in markup; the
+View-Source comment says "web sockets" and "beacons" instead of the director's
+literal "WebSocket, beacon", because the literal API names are banned tokens in
+the shell scan; developer comments in `chart.js` still say "we" (comments are
+outside the voice scan). **SHOULD items:** D7 (download / load my numbers)
+shipped; D8 (refund clock) shipped and hidden inside the too-close band.
+Extras nobody asked for: `#example-N` links, dialable `tel:` links, a glossary.
