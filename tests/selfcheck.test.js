@@ -41,10 +41,10 @@ test("accountFromVector lifts startMonth next to the inputs", () => {
 
 test("report shape: totals, skippedKeys, and per-row account / expected / actual", () => {
   const report = runSelfCheck(VECTORS);
-  assert.equal(report.total, 22);
+  assert.equal(report.total, VECTORS.length);
   assert.equal(report.passed + report.failed, report.total);
   assert.deepStrictEqual(report.skippedKeys, ["exactArithmeticReference", "whatGoesWrong"]);
-  assert.equal(report.results.length, 22);
+  assert.equal(report.results.length, VECTORS.length);
 
   const first = report.results[0];
   assert.equal(first.id, "TV01");

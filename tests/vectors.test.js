@@ -1,5 +1,7 @@
-// tests/vectors.test.js — the engine must reproduce all 22 research vectors,
+// tests/vectors.test.js — the engine must reproduce EVERY research vector,
 // cent for cent, with the research JSON untouched (SPEC C5 + D1).
+// The count comes from the file (22 at first; the independent auditor may
+// append more). Nothing here hard-codes it.
 //
 // This file checks the vectors TWO ways on purpose:
 //   1. through runSelfCheck — the very same function the web page runs when a
@@ -27,10 +29,20 @@ const research = JSON.parse(readFileSync(jsonUrl, "utf8"));
 
 const report = runSelfCheck(VECTORS);
 
-test("runSelfCheck: 22 vectors, 22 pass, 0 fail", () => {
-  assert.equal(report.total, 22);
-  assert.equal(report.passed, 22, describeFailures(report));
+const HOW_MANY = research.vectors.length;
+
+test("runSelfCheck: every vector in the research file passes (" + HOW_MANY + " of " + HOW_MANY + ")", () => {
+  assert.ok(HOW_MANY >= 22, "the original 22 vectors must all still be there");
+  assert.equal(report.total, HOW_MANY);
+  assert.equal(report.passed, HOW_MANY, describeFailures(report));
   assert.equal(report.failed, 0);
+});
+
+test("the original 22 vectors are all still present, by id", () => {
+  const original = ["TV01", "TV02", "TV03", "TV04", "TV05", "TV06", "TV07", "TV08", "TV09", "TV10", "TV10b",
+    "TV11", "TV12", "TV13", "TV14", "TV15", "TV16", "TV17", "TV18", "TV19", "TV20", "TV21"];
+  const ids = research.vectors.map((vector) => vector.id);
+  for (const id of original) assert.ok(ids.includes(id), id + " is missing");
 });
 
 for (const row of report.results) {
@@ -42,8 +54,8 @@ for (const row of report.results) {
 
 test("runSelfCheck gives the same verdict on the research JSON read straight from disk", () => {
   const fromDisk = runSelfCheck(research.vectors);
-  assert.equal(fromDisk.total, 22);
-  assert.equal(fromDisk.passed, 22, describeFailures(fromDisk));
+  assert.equal(fromDisk.total, HOW_MANY);
+  assert.equal(fromDisk.passed, HOW_MANY, describeFailures(fromDisk));
 });
 
 // ---------- 2. directly, without runSelfCheck's comparing code ----------

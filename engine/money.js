@@ -32,9 +32,22 @@ export const MONTH_NAMES = [
 
 // The real minus sign (Unicode U+2212). It is wider than a hyphen and is what
 // typeset documents use, so some people will paste it in. We also print it.
-const MINUS_SIGN = "−";
+const MINUS_SIGN = "\u2212";
 
 const DIGITS = "0123456789";
+
+// ---------------------------------------------------------------------------
+// No negative zero. JavaScript has TWO zeros: 0 and -0. They are equal with
+// ===, but -0 shows up when you flip the sign of 0 (`-x` when x is 0), and it
+// can print as "-0" and fails strict test comparisons. Money has one zero.
+// Every place in the engine that flips a sign passes the answer through here.
+// (SPEC E5.)  How it works: -0 === 0 is true, so we hand back a plain 0.
+// ---------------------------------------------------------------------------
+
+export function noNegativeZero(number) {
+  if (number === 0) return 0;
+  return number;
+}
 
 // ---------------------------------------------------------------------------
 // Whole-number division. EVERY division of money in the engine goes through

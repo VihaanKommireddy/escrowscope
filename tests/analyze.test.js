@@ -213,19 +213,79 @@ test("small deficiency + small shortage (zero cushion keeps the target low)", ()
   assert.equal(both.cite, "12 CFR 1024.17(f)(4)(i) + 12 CFR 1024.17(f)(3)(i)");
 });
 
-test("borrower not current + deficiency: the (f)(4) repayment options do not bind the servicer", () => {
+// ---------- SPEC E2: a deficiency when the borrower is NOT current, (f)(4)(iii) ----------
+
+test("E2: borrower not current + deficiency + shortage → DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_*, no invented schedule", () => {
   const account = negativeBalanceAccount(-10000);
   account.borrowerCurrent = false;
   const result = analyze(account);
-  // The math and the classification stay the same …
-  assert.equal(result.classification, "DEFICIENCY_LT_ONE_MONTH_AND_SHORTAGE_GE_ONE_MONTH");
-  // … but the cite and the options say that (f)(4)(iii) applies to the deficiency part.
+  // The dollars do not change …
+  assert.equal(result.deficiencyCents, 10000);
+  assert.equal(result.shortageCents, 120000);
+  // … the label, the cite and the options do.
+  assert.equal(result.classification, "DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_GE_ONE_MONTH");
   assert.equal(result.cite, "12 CFR 1024.17(f)(4)(iii) + 12 CFR 1024.17(f)(3)(ii)");
   assert.deepStrictEqual(result.servicerOptions, [
-    "deficiency: borrower is not current, so the servicer may recover it pursuant to the loan documents",
+    "deficiency: servicer may recover the deficiency pursuant to the loan documents",
     "shortage: do nothing",
     "shortage: require repayment in equal monthly payments over at least 12 months",
   ]);
+  // The regulation sets no repayment schedule here, so the engine does not make one up.
+  assert.deepStrictEqual(result.newMonthlyEscrowPayment, {
+    baseMonthlyCents: 40000,
+    shortageSpreadOver12Cents: 10000,
+    deficiencySpreadCents: 0,
+    deficiencySpreadMonths: 0,
+    monthlyEscrowWhileRepayingDeficiencyCents: 50000,
+    monthlyEscrowAfterDeficiencyRepaidCents: 50000,
+  });
+});
+
+test("E2: the small-shortage combined form, and the deficiency-only form", () => {
+  const account = negativeBalanceAccount(-5000);
+  account.borrowerCurrent = false;
+  account.cushionMonths = 0;
+  account.disbursements = [
+    { label: "Tax", month: 5, amountCents: 59000 },
+    { label: "Insurance", month: 12, amountCents: 60000 },
+  ];
+  const both = analyze(account);
+  assert.equal(both.classification, "DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_LT_ONE_MONTH");
+  assert.equal(both.cite, "12 CFR 1024.17(f)(4)(iii) + 12 CFR 1024.17(f)(3)(i)");
+
+  account.disbursements = [{ label: "Annual property tax", month: 12, amountCents: 240000 }];
+  account.startingBalanceCents = -15000; // TV12's account, but not current
+  const only = analyze(account);
+  assert.equal(only.classification, "DEFICIENCY_BORROWER_NOT_CURRENT");
+  assert.equal(only.cite, "12 CFR 1024.17(f)(4)(iii)");
+  assert.deepStrictEqual(only.servicerOptions, ["deficiency: servicer may recover the deficiency pursuant to the loan documents"]);
+  assert.equal(only.newMonthlyEscrowPayment.deficiencySpreadCents, 0);
+  assert.equal(only.newMonthlyEscrowPayment.deficiencySpreadMonths, 0);
+  assert.equal(only.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents, 20000);
+});
+
+test("E2: there is no tier when not current — a huge and a tiny deficiency get the same label", () => {
+  for (const balance of [-1, -39999, -40000, -500000]) {
+    const account = negativeBalanceAccount(balance);
+    account.borrowerCurrent = false;
+    assert.equal(analyze(account).classification, "DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_GE_ONE_MONTH");
+  }
+});
+
+test("E2: shortage handling is IDENTICAL whether or not the borrower is current — (f)(3) has no such condition", () => {
+  for (const balance of [100000, 80000, 0, -10000]) {
+    const current = negativeBalanceAccount(balance);
+    const notCurrent = negativeBalanceAccount(balance);
+    notCurrent.borrowerCurrent = false;
+    const a = analyze(current);
+    const b = analyze(notCurrent);
+    assert.equal(a.shortageCents, b.shortageCents);
+    assert.equal(a.newMonthlyEscrowPayment.shortageSpreadOver12Cents, b.newMonthlyEscrowPayment.shortageSpreadOver12Cents);
+    const shortageOptions = (result) => result.servicerOptions.filter((option) => option.startsWith("shortage:"));
+    assert.deepStrictEqual(shortageOptions(a), shortageOptions(b));
+    const shortageTier = (result) => result.classification.slice(result.classification.indexOf("SHORTAGE_"));
+    assert.equal(shortageTier(a), shortageTier(b));
+  }
 });
 
 test("borrower not current does not change a plain shortage: (f)(3) has no 'current' condition", () => {
@@ -262,6 +322,27 @@ test("when rounding leaves step 1 a few cents ABOVE zero all year, the step-2 ad
     result.lowPoint.projectedBalanceCents - result.lowPoint.lowestTargetBalanceCents,
     result.differenceCents
   );
+});
+
+test("E1 (auditor's example): one bill of $1,200.06 in month 12, balance $300 → difference 9,999¢ but low point − cushion = 10,005¢", () => {
+  const account = {
+    startMonth: 1,
+    startingBalanceCents: 30000,
+    cushionMonths: 2,
+    borrowerCurrent: true,
+    disbursements: [{ label: "Property tax", month: 12, amountCents: 120006 }],
+  };
+  const result = analyze(account);
+  assert.equal(result.baseMonthlyPaymentCents, 10001); // 120006 ÷ 12 = 10000.5 → half up
+  assert.equal(result.cushionCapCents, 20001);
+  const lowestStepOne = Math.min(...result.table.map((row) => row.step1TrialBalanceCents));
+  assert.equal(lowestStepOne, 6); // 12 × 10001 − 120006: never below zero all year
+  assert.equal(result.stepTwoAddCents, 0); // the floor: never a negative add
+  assert.ok(Object.is(result.stepTwoAddCents, 0), "and never negative zero");
+  assert.equal(result.differenceCents, 9999);
+  assert.equal(result.lowPoint.projectedBalanceCents - result.cushionCapCents, 10005);
+  // The gap between the two is exactly the lowest Step 1 balance.
+  assert.equal(result.lowPoint.projectedBalanceCents - result.cushionCapCents - result.differenceCents, lowestStepOne);
 });
 
 test("a tie for the lowest month goes to the EARLIEST month", () => {
@@ -329,4 +410,228 @@ test("projectWithPayment accepts a $0 payment and refuses nonsense", () => {
     assert.throws(() => projectWithPayment(tv01Account(), bad), RangeError, String(bad));
   }
   assert.throws(() => projectWithPayment({}, 45000), Error);
+});
+
+// ---------- SPEC E3: nearLine — "too close to call" ----------
+
+function surplusOf(cents) {
+  const account = tv01Account(); // required start $1,200.00
+  account.startingBalanceCents = 120000 + cents;
+  return analyze(account);
+}
+
+function shortageOf(cents) {
+  const account = tv01Account(); // one month's payment $400.00
+  account.startingBalanceCents = 120000 - cents;
+  return analyze(account);
+}
+
+test("E3: nearLine is null when nothing is near a line", () => {
+  assert.equal(surplusOf(30000).nearLine, null); // TV01
+  assert.equal(surplusOf(0).nearLine, null); // on target
+  assert.equal(shortageOf(10000).nearLine, null);
+  assert.equal(shortageOf(110000).nearLine, null); // TV19
+});
+
+test("E3: a surplus within $7.00 of $50.00 sets nearLine, and classification stays cent-exact", () => {
+  const exactly50 = surplusOf(5000); // TV06
+  assert.equal(exactly50.classification, "SURPLUS_REFUND_REQUIRED");
+  assert.deepStrictEqual(exactly50.nearLine, {
+    line: "SURPLUS_50",
+    distanceCents: 0,
+    toleranceCents: 700,
+    appliesTo: "surplus",
+    side: "at-or-above",
+    amountCents: 5000,
+    lineCents: 5000,
+  });
+
+  const oneCentUnder = surplusOf(4999); // TV07
+  assert.equal(oneCentUnder.classification, "SURPLUS_UNDER_50");
+  assert.equal(oneCentUnder.nearLine.distanceCents, 1);
+  assert.equal(oneCentUnder.nearLine.side, "below");
+});
+
+test("E3: the band is $43.00 to $57.00 inclusive", () => {
+  assert.equal(surplusOf(4299).nearLine, null);
+  assert.equal(surplusOf(4300).nearLine.distanceCents, 700);
+  assert.equal(surplusOf(5700).nearLine.distanceCents, 700);
+  assert.equal(surplusOf(5701).nearLine, null);
+});
+
+test("E3: a shortage within $7.00 of one month's payment sets nearLine (TV10 / TV10b shape)", () => {
+  const exactlyOneMonth = shortageOf(40000);
+  assert.equal(exactlyOneMonth.classification, "SHORTAGE_GE_ONE_MONTH");
+  assert.deepStrictEqual(exactlyOneMonth.nearLine, {
+    line: "ONE_MONTH_PAYMENT",
+    distanceCents: 0,
+    toleranceCents: 700,
+    appliesTo: "shortage",
+    side: "at-or-above",
+    amountCents: 40000,
+    lineCents: 40000,
+  });
+  const oneCentLess = shortageOf(39999);
+  assert.equal(oneCentLess.classification, "SHORTAGE_LT_ONE_MONTH");
+  assert.equal(oneCentLess.nearLine.side, "below");
+  assert.equal(shortageOf(39299).nearLine, null);
+  assert.equal(shortageOf(40701).nearLine, null);
+});
+
+test("E3: a deficiency near one month's payment; when BOTH parts are near, the deficiency is reported", () => {
+  const deficiencyNear = analyze(negativeBalanceAccount(-40300)); // deficiency $403, shortage $1,200
+  assert.equal(deficiencyNear.nearLine.appliesTo, "deficiency");
+  assert.equal(deficiencyNear.nearLine.distanceCents, 300);
+
+  // Both near: zero cushion, required start $400 → shortage $400.00 and deficiency $399.00.
+  const account = negativeBalanceAccount(-39900);
+  account.cushionMonths = 0;
+  const both = analyze(account);
+  assert.equal(both.shortageCents, 40000);
+  assert.equal(both.deficiencyCents, 39900);
+  assert.equal(both.nearLine.appliesTo, "deficiency");
+  assert.equal(both.nearLine.side, "below");
+
+  // Only the shortage near.
+  const shortageOnly = negativeBalanceAccount(-10000);
+  shortageOnly.cushionMonths = 0;
+  assert.equal(analyze(shortageOnly).nearLine.appliesTo, "shortage");
+});
+
+test("E3: lines that do not apply to a borrower who is not current cannot be 'near'", () => {
+  const surplus = tv01Account();
+  surplus.startingBalanceCents = 125000; // surplus $50.00
+  surplus.borrowerCurrent = false;
+  assert.equal(analyze(surplus).nearLine, null); // (f)(2)(ii): no $50 line
+
+  const deficiency = negativeBalanceAccount(-40000);
+  deficiency.borrowerCurrent = false;
+  assert.equal(analyze(deficiency).nearLine, null); // (f)(4)(iii): no deficiency tier; shortage $1,200 is far
+
+  const shortage = tv01Account();
+  shortage.startingBalanceCents = 80000; // shortage $400.00
+  shortage.borrowerCurrent = false;
+  assert.equal(analyze(shortage).nearLine.appliesTo, "shortage"); // (f)(3) still applies
+});
+
+// ---------- SPEC E5: no negative zero ----------
+
+test("E5: a starting balance of -0 is treated as plain 0 everywhere", () => {
+  const account = tv01Account();
+  account.startingBalanceCents = -0;
+  account.cushionMonths = 0;
+  account.disbursements = [{ label: "Tax", month: 12, amountCents: 120000 }]; // required start $0
+  const result = analyze(account);
+  assert.ok(Object.is(result.differenceCents, 0));
+  assert.ok(Object.is(result.inputs.startingBalanceCents, 0));
+  assert.ok(Object.is(result.deficiencyCents, 0));
+  assert.ok(Object.is(result.stepTwoAddCents, 0));
+  assert.equal(result.classification, "ON_TARGET");
+  for (const balance of projectWithPayment(account, 0)) {
+    assert.equal(Object.is(balance, -0), false);
+  }
+});
+
+// ---------- the nine classic bugs, one named guard each ----------
+
+test("bug 1 guard: a surplus of exactly $50.00 IS refund-required (>=, not >)", () => {
+  assert.equal(surplusOf(5000).classification, "SURPLUS_REFUND_REQUIRED");
+  assert.equal(surplusOf(4999).classification, "SURPLUS_UNDER_50");
+});
+
+test("bug 2 guard: a shortage of exactly one month's payment is in the GE tier", () => {
+  assert.equal(shortageOf(40000).classification, "SHORTAGE_GE_ONE_MONTH");
+  assert.equal(shortageOf(39999).classification, "SHORTAGE_LT_ONE_MONTH");
+  assert.equal(shortageOf(40000).servicerOptions.includes("shortage: require repayment within 30 days"), false);
+});
+
+test("bug 3 guard: the cushion cap rounds DOWN ($5,000.00 × 2 ÷ 12 = $833.33, never $833.34)", () => {
+  const account = tv01Account();
+  account.disbursements = [{ label: "Tax", month: 10, amountCents: 500000 }];
+  assert.equal(analyze(account).cushionCapCents, 83333);
+  account.disbursements[0].amountCents = 500005; // × 2 ÷ 12 = 83334.17 → 83334
+  assert.equal(analyze(account).cushionCapCents, 83334);
+  account.disbursements[0].amountCents = 500003; // × 2 ÷ 12 = 83333.83 → still 83333
+  assert.equal(analyze(account).cushionCapCents, 83333);
+});
+
+test("bug 4 guard: the monthly payment rounds HALF UP, it is not chopped ($5,000.00 ÷ 12 = $416.67)", () => {
+  const account = tv01Account();
+  account.disbursements = [{ label: "Tax", month: 10, amountCents: 500000 }];
+  assert.equal(analyze(account).baseMonthlyPaymentCents, 41667);
+  account.disbursements[0].amountCents = 120006; // exactly half a cent → up
+  assert.equal(analyze(account).baseMonthlyPaymentCents, 10001);
+  account.disbursements[0].amountCents = 120005; // just under half → down
+  assert.equal(analyze(account).baseMonthlyPaymentCents, 10000);
+});
+
+test("bug 5 guard: on a low-point tie the EARLIEST month wins (TV21: month 6, not month 11)", () => {
+  const account = {
+    startMonth: 1,
+    startingBalanceCents: 130000,
+    cushionMonths: 2,
+    borrowerCurrent: true,
+    disbursements: [
+      { label: "Tax", month: 6, amountCents: 210000 },
+      { label: "Tax", month: 12, amountCents: 210000 },
+    ],
+  };
+  const result = analyze(account); // P = $350. Months 6 and 12 both end Step 1 at exactly $0: a tie.
+  assert.equal(result.table[5].step1TrialBalanceCents, result.table[11].step1TrialBalanceCents);
+  assert.equal(result.lowPoint.month, 6);
+});
+
+test("bug 6 guard: a PROJECTED dip below $0 is a shortage, never a deficiency (TV19)", () => {
+  const result = shortageOf(110000); // balance $100; the projection dips to −$300 in November
+  assert.ok(result.lowPoint.projectedBalanceCents < 0);
+  assert.equal(result.deficiencyCents, 0);
+  assert.equal(result.shortageCents, 110000);
+  assert.equal(result.classification, "SHORTAGE_GE_ONE_MONTH");
+});
+
+test("bug 7 guard: a second bill in the same month ADDS to the first, it does not replace it (TV14)", () => {
+  const account = tv01Account();
+  account.disbursements = [
+    { label: "County tax", month: 7, amountCents: 110000 },
+    { label: "City tax", month: 7, amountCents: 70000 },
+  ];
+  const result = analyze(account);
+  assert.equal(result.table[6].disbursementCents, 180000);
+  assert.equal(result.annualDisbursementsCents, 180000);
+});
+
+test("bug 8 guard: awkward totals never produce a fraction of a cent anywhere in the result", () => {
+  const account = tv01Account();
+  account.startingBalanceCents = 33333;
+  account.disbursements = [
+    { label: "Tax", month: 3, amountCents: 100001 },
+    { label: "Insurance", month: 8, amountCents: 77777 },
+  ];
+  const result = analyze(account);
+  const numbers = [];
+  JSON.stringify(result, (key, value) => {
+    if (typeof value === "number") numbers.push(value);
+    return value;
+  });
+  assert.ok(numbers.length > 100);
+  for (const number of numbers) assert.ok(Number.isInteger(number), String(number));
+});
+
+test("bug 9 guard: the shortage spread rounds HALF UP ($479.99 ÷ 12 = $40.00, $1,100 ÷ 12 = $91.67)", () => {
+  const tv10b = {
+    startMonth: 1,
+    startingBalanceCents: 192001,
+    cushionMonths: 2,
+    borrowerCurrent: true,
+    disbursements: [
+      { label: "Homeowners insurance", month: 3, amountCents: 144000 },
+      { label: "Property tax", month: 9, amountCents: 432000 },
+    ],
+  };
+  assert.equal(analyze(tv10b).newMonthlyEscrowPayment.shortageSpreadOver12Cents, 4000); // chopping would give 3999
+  assert.equal(shortageOf(110000).newMonthlyEscrowPayment.shortageSpreadOver12Cents, 9167); // chopping would give 9166
+  // … and the deficiency spread too: $150.01 ÷ 2 = $75.01 (chopping would give $75.00)
+  const account = tv01Account();
+  account.startingBalanceCents = -15001;
+  assert.equal(analyze(account).newMonthlyEscrowPayment.deficiencySpreadCents, 7501);
 });

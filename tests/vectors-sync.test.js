@@ -23,10 +23,11 @@ test("REFERENCE_ONLY is identical to the research JSON's referenceOnly block", (
   assert.deepStrictEqual(REFERENCE_ONLY, research.referenceOnly);
 });
 
-test("there are exactly 22 vectors, each with a unique id", () => {
-  assert.equal(VECTORS.length, 22);
+test("same number of vectors as the research file (at least the original 22), each with a unique id", () => {
+  assert.equal(VECTORS.length, research.vectors.length);
+  assert.ok(VECTORS.length >= 22);
   const ids = VECTORS.map((vector) => vector.id);
-  assert.equal(new Set(ids).size, 22);
+  assert.equal(new Set(ids).size, VECTORS.length);
 });
 
 test("the generated file says it is generated", () => {

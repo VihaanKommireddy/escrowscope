@@ -12,7 +12,7 @@ import {
 } from "../engine/index.js";
 import { divideRoundDown, divideRoundHalfUp, MAX_MONEY_CENTS } from "../engine/money.js";
 
-const MINUS = "−"; // the real minus sign, not a hyphen
+const MINUS = "\u2212"; // the real minus sign, not a hyphen
 
 // ---------- parseDollars: things it must accept ----------
 

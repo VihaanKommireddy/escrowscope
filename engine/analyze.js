@@ -36,7 +36,13 @@
 // The drift this can cause is a few cents. compare.js forgives $7.00.
 
 import { validateAccount } from "./validate.js";
-import { MAX_MONEY_CENTS, divideRoundDown, divideRoundHalfUp, escrowToCalendarMonth } from "./money.js";
+import {
+  MAX_MONEY_CENTS,
+  divideRoundDown,
+  divideRoundHalfUp,
+  escrowToCalendarMonth,
+  noNegativeZero,
+} from "./money.js";
 
 // How far apart two numbers may be before we say they differ.
 // A servicer that rounds every figure to whole dollars (allowed, per HUD 1995)
@@ -117,19 +123,23 @@ function findLowest(monthEndValues) {
 // predicts for later (HUD 1994: the rule "does not allow servicers to
 // anticipate deficiencies"; TV19).
 //
-// When the balance is negative it is below zero AND below target. To avoid
-// counting the same dollars twice: deficiency first (the part below $0), then
-// the REMAINING shortage, measured from $0 up to the target. That is HUD's
-// reading (60 FR 8812, clarification (l), and its Appendix M example; TV04) —
-// guidance, not the regulation's own words, but the only reading that does not
-// double-charge.
+// When the balance is negative it is below zero AND below target, so read
+// literally the (b) definitions overlap. To avoid counting the same dollars
+// twice: deficiency first (the part below $0), then the REMAINING shortage,
+// measured from $0 up to the target.
+//   *** THIS SPLIT IS HUD GUIDANCE, NOT REGULATION TEXT. ***
+// Source: HUD's 1995 Federal Register notice, 60 FR 8812, 8813–14
+// (clarification (l): "The servicer first computes the deficiency and then
+// computes the remaining shortage"), and HUD's worked example in its
+// Appendix M (TV04). It is the only reading that does not double-charge, but
+// it is guidance, and the page says so wherever it shows this step.
 export function splitDifference(startingBalanceCents, requiredStartingBalanceCents) {
   let surplusCents = 0;
   let shortageCents = 0;
   let deficiencyCents = 0;
 
   if (startingBalanceCents < 0) {
-    deficiencyCents = -startingBalanceCents;
+    deficiencyCents = noNegativeZero(-startingBalanceCents);
   }
 
   if (startingBalanceCents > requiredStartingBalanceCents) {
@@ -175,6 +185,23 @@ function shortageRules(shortageCents, oneMonthPaymentCents) {
 }
 
 function deficiencyRules(deficiencyCents, oneMonthPaymentCents, borrowerCurrent) {
+  // (f)(4)(iii): the repayment choices in (f)(4)(i)–(ii) "apply if the borrower
+  // is current". If a payment came in more than 30 days late, "the servicer
+  // may recover the deficiency pursuant to the terms of the federally related
+  // mortgage loan documents". So the regulation sets NO schedule here, and we
+  // do not invent one: there are no tiers, and the mortgage documents — not
+  // this rule — control how the amount is collected. (SPEC E2.)
+  // NOTE: this "is the borrower current?" condition exists only for surpluses
+  // ((f)(2)(ii)) and deficiencies ((f)(4)(iii)). Shortages ((f)(3)) have no
+  // such condition, so shortageRules never looks at it.
+  if (!borrowerCurrent) {
+    return {
+      name: "DEFICIENCY_BORROWER_NOT_CURRENT",
+      cite: CITE_PREFIX + "(f)(4)(iii)",
+      options: ["deficiency: servicer may recover the deficiency pursuant to the loan documents"],
+    };
+  }
+
   let name = "DEFICIENCY_GE_ONE_MONTH";
   let cite = CITE_PREFIX + "(f)(4)(ii)";
   let options = [
@@ -189,14 +216,6 @@ function deficiencyRules(deficiencyCents, oneMonthPaymentCents, borrowerCurrent)
       "deficiency: require repayment within 30 days",
       "deficiency: require repayment in 2 or more equal monthly payments",
     ];
-  }
-  // (f)(4)(iii): the repayment options above protect a borrower who is
-  // current. If a payment came in more than 30 days late, "the servicer may
-  // recover the deficiency pursuant to the terms of the federally related
-  // mortgage loan documents". The size of the deficiency does not change.
-  if (!borrowerCurrent) {
-    cite = CITE_PREFIX + "(f)(4)(iii)";
-    options = ["deficiency: borrower is not current, so the servicer may recover it pursuant to the loan documents"];
   }
   return { name: name, cite: cite, options: options };
 }
@@ -254,6 +273,60 @@ function classify(amounts, oneMonthPaymentCents, borrowerCurrent) {
   return { classification: "ON_TARGET", cite: CITE_PREFIX + "(d)(2)", servicerOptions: [] };
 }
 
+// "Too close to call" (SPEC E3).
+// Two lines in the rule turn on an exact dollar figure:
+//   • a surplus of $50.00 or more must be refunded            (f)(2)(i)
+//   • a shortage or deficiency of one month's payment or more
+//     loses the "repay within 30 days" option                 (f)(3), (f)(4)
+// Our cent rounding can move a figure by a few cents, and HUD lets a servicer
+// round any figure to whole dollars, so a lawful statement can sit up to about
+// $7 away from ours. If our figure is within $7.00 of one of those lines, a
+// servicer could lawfully land on EITHER side of it. `classification` stays
+// cent-exact, and this block tells the words (explain.js, letter.js) and the
+// page to soften: state the figure, say it is too close to call.
+//
+// Returns null, or:
+//   line           "SURPLUS_50" | "ONE_MONTH_PAYMENT"
+//   distanceCents  how far our figure is from the line (never negative)
+//   toleranceCents 700
+//   appliesTo      "surplus" | "deficiency" | "shortage"  — which figure is near
+//   side           "below" | "at-or-above"                — which side OUR figure is on
+//   amountCents    our cent-exact figure
+//   lineCents      where the line is ($50.00, or one month's payment)
+// If a deficiency and a shortage are BOTH near the line, the deficiency is
+// reported (it is the first part HUD's guidance works out). When the borrower
+// is not current the $50 line and the deficiency tiers do not apply at all
+// ((f)(2)(ii), (f)(4)(iii)), so they cannot be "near". The shortage line still
+// can: (f)(3) does not depend on being current.
+function nearLineOrNull(line, appliesTo, amountCents, lineCents) {
+  const distanceCents = Math.abs(amountCents - lineCents);
+  if (distanceCents > TOLERANCE_BALANCE_CENTS) return null;
+  return {
+    line: line,
+    distanceCents: distanceCents,
+    toleranceCents: TOLERANCE_BALANCE_CENTS,
+    appliesTo: appliesTo,
+    side: amountCents < lineCents ? "below" : "at-or-above",
+    amountCents: amountCents,
+    lineCents: lineCents,
+  };
+}
+
+function findNearLine(amounts, oneMonthPaymentCents, borrowerCurrent) {
+  if (amounts.surplusCents > 0) {
+    if (!borrowerCurrent) return null;
+    return nearLineOrNull("SURPLUS_50", "surplus", amounts.surplusCents, REFUND_THRESHOLD_CENTS);
+  }
+  if (amounts.deficiencyCents > 0 && borrowerCurrent) {
+    const near = nearLineOrNull("ONE_MONTH_PAYMENT", "deficiency", amounts.deficiencyCents, oneMonthPaymentCents);
+    if (near !== null) return near;
+  }
+  if (amounts.shortageCents > 0) {
+    return nearLineOrNull("ONE_MONTH_PAYMENT", "shortage", amounts.shortageCents, oneMonthPaymentCents);
+  }
+  return null;
+}
+
 // The MOST the monthly escrow line can lawfully be (reg notes §8):
 //     bills ÷ 12                                   (c)(1)(ii)
 //   + shortage ÷ 12     "at least a 12-month period" → 12 is the fastest   (f)(3)
@@ -262,12 +335,16 @@ function classify(amounts, oneMonthPaymentCents, borrowerCurrent) {
 // is being repaid, and after. The cushion is NOT in this formula on purpose:
 // Appendix E shows the same $130 payment in all three steps. The cushion lives
 // in the balance, so it gets funded through the shortage.
-function buildNewMonthlyPayment(baseMonthlyCents, amounts) {
+//
+// Borrower NOT current + a deficiency: (f)(4)(iii) hands the repayment terms
+// to the mortgage documents, so the regulation gives us no "÷ 2" to apply.
+// The deficiency fields stay 0 and the two totals are the same. (SPEC E2.)
+function buildNewMonthlyPayment(baseMonthlyCents, amounts, borrowerCurrent) {
   const shortageSpreadOver12Cents = divideRoundHalfUp(amounts.shortageCents, 12);
 
   let deficiencySpreadCents = 0;
   let deficiencySpreadMonths = 0;
-  if (amounts.deficiencyCents > 0) {
+  if (amounts.deficiencyCents > 0 && borrowerCurrent) {
     deficiencySpreadMonths = 2;
     deficiencySpreadCents = divideRoundHalfUp(amounts.deficiencyCents, deficiencySpreadMonths);
   }
@@ -310,7 +387,7 @@ function buildPaymentJumpDecomposition(priorYear, pieces) {
 
 // A tidy copy of what went in, with defaults filled and calendar months added.
 // A copy, so nothing downstream can change the caller's account.
-function copyInputs(account, cushionMonths, borrowerCurrent) {
+function copyInputs(account, cushionMonths, borrowerCurrent, startingBalanceCents) {
   const bills = [];
   for (const bill of account.disbursements) {
     bills.push({
@@ -322,7 +399,7 @@ function copyInputs(account, cushionMonths, borrowerCurrent) {
   }
   return {
     startMonth: account.startMonth,
-    startingBalanceCents: account.startingBalanceCents,
+    startingBalanceCents: startingBalanceCents,
     cushionMonths: cushionMonths,
     borrowerCurrent: borrowerCurrent,
     disbursements: bills,
@@ -349,7 +426,7 @@ export function analyze(account) {
   // state law can set it lower, never higher. (c)(8), (d)(2)(i)(C).
   const cushionMonths = account.cushionMonths === undefined ? 2 : account.cushionMonths;
   const borrowerCurrent = account.borrowerCurrent === undefined ? true : account.borrowerCurrent;
-  const startingBalanceCents = account.startingBalanceCents;
+  const startingBalanceCents = noNegativeZero(account.startingBalanceCents);
 
   // D — total bills for the coming 12 months.
   const annualDisbursementsCents = addUpBills(account.disbursements);
@@ -378,7 +455,7 @@ export function analyze(account) {
   // eliminate → add $0, never a negative amount.
   let stepTwoAddCents = 0;
   if (lowestStepOne.value < 0) {
-    stepTwoAddCents = -lowestStepOne.value;
+    stepTwoAddCents = noNegativeZero(-lowestStepOne.value);
   }
 
   // Step 3 — add the cushion. (d)(2)(i)(C). The first row of that column is
@@ -422,7 +499,8 @@ export function analyze(account) {
   };
 
   const verdict = classify(amounts, baseMonthlyPaymentCents, borrowerCurrent);
-  const newMonthlyEscrowPayment = buildNewMonthlyPayment(baseMonthlyPaymentCents, amounts);
+  const newMonthlyEscrowPayment = buildNewMonthlyPayment(baseMonthlyPaymentCents, amounts, borrowerCurrent);
+  const nearLine = findNearLine(amounts, baseMonthlyPaymentCents, borrowerCurrent);
 
   const result = {
     annualDisbursementsCents: annualDisbursementsCents,
@@ -440,7 +518,8 @@ export function analyze(account) {
     servicerOptions: verdict.servicerOptions,
     newMonthlyEscrowPayment: newMonthlyEscrowPayment,
     table: table,
-    inputs: copyInputs(account, cushionMonths, borrowerCurrent),
+    nearLine: nearLine,
+    inputs: copyInputs(account, cushionMonths, borrowerCurrent, startingBalanceCents),
   };
 
   if (account.priorYear !== undefined && account.priorYear !== null) {
@@ -475,9 +554,9 @@ export function projectWithPayment(account, monthlyCents) {
 
   const billsByMonth = billsForEachMonth(account.disbursements);
   const balances = [];
-  let balance = account.startingBalanceCents;
+  let balance = noNegativeZero(account.startingBalanceCents);
   for (let month = 1; month <= 12; month++) {
-    balance = balance + monthlyCents - billsByMonth[month];
+    balance = noNegativeZero(balance + monthlyCents - billsByMonth[month]);
     balances.push(balance);
   }
   return balances;
