@@ -26,16 +26,20 @@
 //             status: "match" | "differs" | "over-limit" | "not-compared".
 //             gap = statement − federal.  "not-compared" is only ever used
 //             for the cushion row, together with a nudge (see below).
+//             The shortage / surplus row also carries `claimedKind`, so the
+//             words in explain.js never have to guess it from a label.
 //   nudges    ALWAYS present (empty when none): { kind, field, message, letterLine }.
 //             A nudge is a "please double-check what you typed" note. It is
 //             never a flag: it cannot make `overall` "look-here", and a
 //             not-compared row cannot make it "matches" on its own.
-//   flags     { kind, rowKey?, amountCents, perYearCents?, cite, sentence, letterLine }
+//   flags     { kind, rowKey?, field?, amountCents, perYearCents?, cite, sentence, letterLine }
 //             `sentence` talks to the homeowner ("Your statement…").
 //             `letterLine` says the same thing in the homeowner's own voice
 //             ("The statement…, by my math…") for the letter in letter.js.
 //             `amountCents` is "the dollars this flag is about":
 //               CUSHION_OVER_CAP   how far the statement's cushion is over the cap
+//               CUSHION_MAYBE_OVER_CAP  the same dollars, when the page cannot
+//                                  tell a real cushion from a typing mix-up
 //               AMOUNT_DIFFERS     the gap between the two figures
 //               KIND_DIFFERS       the gap between the two figures
 //               PAYMENT_ABOVE_MAX  how far over, PER MONTH (perYearCents = × 12)
@@ -46,7 +50,7 @@
 // Every row that is not a "match" has a flag pointing at it (`rowKey`), so the
 // table and the verdict can never disagree.
 
-import { TOLERANCE_BALANCE_CENTS, paymentToleranceCents, countPaymentParts, splitDifference } from "./analyze.js";
+import { TOLERANCE_BALANCE_CENTS, paymentToleranceCents, countPaymentParts, paymentCeiling, splitDifference } from "./analyze.js";
 import { formatCents, divideRoundHalfUp, noNegativeZero, MAX_MONEY_CENTS } from "./money.js";
 
 const CITE_PREFIX = "12 CFR 1024.17";
@@ -91,19 +95,83 @@ function readClaimedKind(statement) {
 // balance comparison below uses "the federal math, run with the cushion the
 // statement uses — but never more than the cap".
 
+// ---------- the typed minimum that is also the low point ----------
 // A likely mix-up (math audit B2): someone types their LOWEST PROJECTED
 // BALANCE into "required minimum balance". On most statements those are two
-// different lines. If the typed number is over the cap AND is the same as the
-// federal low point (within $7.00), we cannot tell a mix-up from a real
-// oversized cushion, so we do not accuse: no CUSHION_OVER_CAP flag, the row is
-// "not-compared", and a two-sided nudge keeps the dollars visible.
-// Known limit, on purpose: a servicer really holding an oversized cushion,
-// with the balance sitting exactly on it, also lands here — which is why the
-// nudge spells out "if your statement really does list $X…".
+// different lines.
+//
+// THE TRIGGER: the typed number is over the cap by more than $7.00 AND is the
+// same as the federal low point (within $7.00).
+//
+// The catch (auditor's Stage 3 finding N1): a servicer that really does hold
+// an oversized cushion sets things up so the lowest month lands ON that
+// cushion. So for an over-cushioning servicer, the typed minimum equals the
+// low point almost every time (19,996 of 20,000 in the auditor's run), and
+// treating every such case as a typing mix-up let a cushion $600 over the
+// limit come out green. So once the trigger is met, the rest of what the
+// person typed decides, in this order (the director's ruling):
+//
+//   "MIX_UP"       (a) They typed the statement's shortage / surplus and it
+//                  MATCHES the federal math. A statement that agrees with the
+//                  federal math cannot be using a bigger cushion, so the typed
+//                  number is a mix-up: a nudge, no flag, row "not-compared".
+//   "OVER_CAP"     (b) They typed it and it DISAGREES by about (typed minimum
+//                  − cap). That is what a servicer really using that cushion
+//                  would print, so the typed minimum is real: the ordinary
+//                  CUSHION_OVER_CAP flag, no nudge.
+//   "CANNOT_TELL"  (c) Anything else (no claim typed, or a disagreement of
+//                  some other size). It cannot be told apart, so it is never
+//                  green and never a hard accusation: a two-sided
+//                  CUSHION_MAYBE_OVER_CAP flag, row "differs", no nudge.
+// The order matters: when the typed minimum is only $7.01 to $14.00 over the
+// cap, (a) and (b) can both be true, and (a) wins.
 function typedMinimumLooksLikeLowPoint(result, typedCents) {
   const isOverTheCap = typedCents - result.cushionCapCents > TOLERANCE_BALANCE_CENTS;
   const isTheLowPoint = Math.abs(typedCents - result.lowPoint.projectedBalanceCents) <= TOLERANCE_BALANCE_CENTS;
   return isOverTheCap && isTheLowPoint;
+}
+
+// Would a servicer that REALLY uses a cushion `extraCents` over the cap print
+// this claim? Its target is higher by `extraCents`, so:
+//   • its surplus (+) or shortage (−) is the federal one minus `extraCents`;
+//   • with a real deficiency, its "shortage part" (from $0 up to the target)
+//     is the federal shortage plus `extraCents`.
+// Signed numbers on purpose (above zero = surplus, below zero = shortage), so
+// a statement that says "shortage $300" where the federal math finds "surplus
+// $300" is read as $600 apart, not $0 apart.
+// Exported for tests only; engine/index.js does not re-export it.
+export function claimPointsToARealCushion(result, claimedKind, claimedCents, extraCents) {
+  const servicerDifferenceCents = result.differenceCents - extraCents;
+
+  let statementDifferenceCents = 0; // "none": no shortage and no surplus
+  if (claimedKind === "surplus") statementDifferenceCents = claimedCents;
+  if (claimedKind === "shortage" || claimedKind === "deficiency") statementDifferenceCents = noNegativeZero(-claimedCents);
+  if (Math.abs(servicerDifferenceCents - statementDifferenceCents) <= TOLERANCE_BALANCE_CENTS) return true;
+
+  // A real deficiency: the statement may name only the shortage part. (The
+  // deficiency part is the same whatever the cushion, so it proves nothing.)
+  const namesAnAmountBelowTarget = claimedKind === "shortage" || claimedKind === "deficiency";
+  if (result.deficiencyCents > 0 && namesAnAmountBelowTarget) {
+    const servicerShortagePartCents = result.shortageCents + extraCents;
+    if (Math.abs(claimedCents - servicerShortagePartCents) <= TOLERANCE_BALANCE_CENTS) return true;
+  }
+  return false;
+}
+
+// Which of the cushion outcomes applies? `claim` is what evaluateClaim found
+// (or null when no kind was picked).
+function decideCushionCase(result, statement, claim) {
+  if (!isGivenCents(statement.requiredMinimumBalanceCents)) return "NOT_GIVEN";
+
+  const typedCents = statement.requiredMinimumBalanceCents;
+  const extraCents = typedCents - result.cushionCapCents;
+  if (extraCents <= TOLERANCE_BALANCE_CENTS) return "WITHIN_CAP";
+  if (!typedMinimumLooksLikeLowPoint(result, typedCents)) return "OVER_CAP"; // trigger not met: the plain rule
+
+  const claimHasDollars = claim !== null && claim.hasAmount;
+  if (claimHasDollars && claim.isMatch) return "MIX_UP"; // (a)
+  if (claimHasDollars && claimPointsToARealCushion(result, claim.kind, claim.claimedCents, extraCents)) return "OVER_CAP"; // (b)
+  return "CANNOT_TELL"; // (c)
 }
 
 function buildServicerView(result, statement) {
@@ -114,9 +182,10 @@ function buildServicerView(result, statement) {
   if (isGivenCents(statement.requiredMinimumBalanceCents)) {
     const theirs = statement.requiredMinimumBalanceCents;
     if (theirs < capCents) cushionUsedCents = theirs;
+    // Other sentences may blame this "extra cushion" ONLY when the cushion
+    // case turns out to be "OVER_CAP". compareWithStatement sets it back to 0
+    // for a mix-up and for a cannot-tell.
     if (theirs - capCents > TOLERANCE_BALANCE_CENTS) extraCushionCents = theirs - capCents;
-    // If the number is probably the low point, do not blame an "extra cushion" anywhere.
-    if (typedMinimumLooksLikeLowPoint(result, theirs)) extraCushionCents = 0;
   }
 
   const startingBalanceCents = result.inputs.startingBalanceCents;
@@ -181,18 +250,59 @@ function closestTo(target, candidates) {
 // total annual disbursements". (c)(8): mortgage documents or state law may set
 // a lower limit, and then that lower limit applies.
 
-function compareCushion(result, statement, rows, flags, nudges) {
-  if (!isGivenCents(statement.requiredMinimumBalanceCents)) return;
+// The words for "the most the rule allows here", by how many cushion months apply.
+function cushionLimitWords(months) {
+  if (months === 1) return "1 month of escrow payments, the limit you chose as the one your mortgage documents set";
+  if (months === 0) return "no cushion at all, the limit you chose as the one your mortgage documents set";
+  return "2 months of escrow payments (one-sixth of your yearly bills)";
+}
+
+function compareCushion(result, statement, cushionCase, rows, flags, nudges) {
+  if (cushionCase === "NOT_GIVEN") return;
 
   const theirs = statement.requiredMinimumBalanceCents;
   const capCents = result.cushionCapCents;
   const gapCents = theirs - capCents;
   const months = result.inputs.cushionMonths;
   const cite = months === 2 ? CITE_PREFIX + "(c)(5)" : CITE_PREFIX + "(c)(8)";
+  const typed = formatCents(theirs);
 
-  // Audit B2: probably the low point typed into the wrong box. Ask, do not flag.
-  if (typedMinimumLooksLikeLowPoint(result, theirs)) {
-    const typed = formatCents(theirs);
+  // Both the mix-up nudge and the cannot-tell flag ask the servicer the same
+  // thing in the letter: please CONFIRM the number. Neither asserts anything.
+  const confirmLetterLine =
+    "The statement lists a required minimum balance of " + typed + ". By my math, the most cushion " + cite + " allows here is " +
+    formatCents(capCents) + ". Please confirm the required minimum balance (cushion) you used and how it was worked out.";
+
+  // Case (c): cannot tell a real oversized cushion from a typing mix-up.
+  // Never green, never a hard accusation: a two-sided flag (auditor's N1).
+  if (cushionCase === "CANNOT_TELL") {
+    rows.push({
+      key: "requiredMinimumBalance",
+      label: "Required minimum balance (the cushion)",
+      statementCents: theirs,
+      federalCents: capCents,
+      gapCents: gapCents,
+      status: "differs",
+      note: "This is above the most cushion the rule allows here, but it is also the same as your lowest projected balance. Please check which line of the statement it came from.",
+    });
+    flags.push({
+      kind: "CUSHION_MAYBE_OVER_CAP",
+      rowKey: "requiredMinimumBalance",
+      field: "statement.requiredMinimumBalanceCents",
+      amountCents: gapCents,
+      cite: cite,
+      sentence:
+        "The most cushion the federal rule allows here is " + formatCents(capCents) + ": " + cushionLimitWords(months) + ". The number you typed as the required minimum balance, " +
+        typed + ", is " + formatCents(gapCents) + " above that. It is also the same as your lowest projected balance, and on many statements those are two different lines. Please check which line you typed. If " +
+        typed + " really is the required minimum, it is " + formatCents(gapCents) + " over the limit, and it is worth asking your servicer about. (" + cite + ")",
+      letterLine: confirmLetterLine,
+    });
+    return;
+  }
+
+  // Case (a): the statement's own shortage / surplus agrees with the federal
+  // math, so the typed number is a mix-up. Ask, do not flag (audit B2).
+  if (cushionCase === "MIX_UP") {
     rows.push({
       key: "requiredMinimumBalance",
       label: "Required minimum balance (the cushion)",
@@ -208,13 +318,13 @@ function compareCushion(result, statement, rows, flags, nudges) {
       message:
         "The number you typed as the required minimum balance (" + typed + ") is the same as your lowest projected balance. On most statements those are two different lines, so please check which one you typed. If your statement really does list " +
         typed + " as the required minimum, that is " + formatCents(gapCents) + " above the most the rule allows here (" + formatCents(capCents) + "), and it is worth asking your servicer about (" + cite + ").",
-      letterLine:
-        "The statement lists a required minimum balance of " + typed + ". By my math, the most cushion " + cite + " allows here is " +
-        formatCents(capCents) + ". Please confirm the required minimum balance (cushion) you used and how it was worked out.",
+      letterLine: confirmLetterLine,
     });
     return;
   }
 
+  // What is left: "WITHIN_CAP" (a match, or a smaller cushion, which is
+  // allowed) and "OVER_CAP" (the plain rule, and case (b) above).
   let status = "match";
   let note = "This matches the most cushion the federal rule allows here.";
   if (gapCents > TOLERANCE_BALANCE_CENTS) {
@@ -236,9 +346,7 @@ function compareCushion(result, statement, rows, flags, nudges) {
 
   if (status !== "over-limit") return;
 
-  let limitWords = "2 months of escrow payments (one-sixth of your yearly bills)";
-  if (months === 1) limitWords = "1 month of escrow payments, the limit you chose as the one your mortgage documents set";
-  if (months === 0) limitWords = "no cushion at all, the limit you chose as the one your mortgage documents set";
+  const limitWords = cushionLimitWords(months);
 
   flags.push({
     kind: "CUSHION_OVER_CAP",
@@ -258,9 +366,15 @@ function compareCushion(result, statement, rows, flags, nudges) {
 // (b): surplus and shortage are "current balance vs. target balance"; a
 // deficiency is "the amount of a negative balance".
 
-function compareClaim(result, statement, view, rows, flags) {
+// evaluateClaim works out, ONCE, how the statement's shortage / surplus /
+// deficiency compares with the federal math. Two readers use the answer:
+// compareClaim (which writes the row and the flags) and decideCushionCase
+// (which needs to know "did the claim match?" before any row is written).
+// Returns null when no kind was picked: an amount with no kind cannot be
+// compared.
+function evaluateClaim(statement, view) {
   const kind = readClaimedKind(statement);
-  if (kind === null) return; // an amount with no kind cannot be compared
+  if (kind === null) return null;
 
   const amounts = view.amounts;
   const found = kindsFound(amounts);
@@ -269,21 +383,7 @@ function compareClaim(result, statement, view, rows, flags) {
 
   // A kind with no amount: all we can compare is the kind.
   if (!hasAmount) {
-    const clearlyDifferent = !kindsAgree && Math.abs(view.differenceCents) > TOLERANCE_BALANCE_CENTS;
-    if (clearlyDifferent) {
-      flags.push({
-        kind: "KIND_DIFFERS",
-        amountCents: Math.abs(view.differenceCents),
-        cite: CLAIM_CITE,
-        sentence:
-          "Your statement shows " + describeClaim(kind, null) + ". From the numbers you typed, the federal math finds " +
-          describeAmounts(amounts) + " instead. (" + CLAIM_CITE + ")",
-        letterLine:
-          "The statement shows " + describeClaim(kind, null) + ". By my math, using the method in " + CLAIM_CITE +
-          ", the account has " + describeAmounts(amounts) + ".",
-      });
-    }
-    return;
+    return { kind: kind, kindsAgree: kindsAgree, hasAmount: false, isMatch: false };
   }
 
   const claimedCents = kind === "none" ? 0 : statement.claimedAmountCents;
@@ -314,7 +414,48 @@ function compareClaim(result, statement, view, rows, flags) {
   }
 
   const gapCents = claimedCents - federalCents;
-  const isMatch = Math.abs(gapCents) <= TOLERANCE_BALANCE_CENTS;
+  return {
+    kind: kind,
+    kindsAgree: kindsAgree,
+    hasAmount: true,
+    claimedCents: claimedCents,
+    federalCents: federalCents,
+    gapCents: gapCents,
+    isMatch: Math.abs(gapCents) <= TOLERANCE_BALANCE_CENTS,
+    label: label,
+  };
+}
+
+function compareClaim(result, claim, view, rows, flags) {
+  if (claim === null) return;
+
+  const kind = claim.kind;
+  const kindsAgree = claim.kindsAgree;
+  const amounts = view.amounts;
+
+  // A kind with no amount: all we can compare is the kind.
+  if (!claim.hasAmount) {
+    const clearlyDifferent = !kindsAgree && Math.abs(view.differenceCents) > TOLERANCE_BALANCE_CENTS;
+    if (clearlyDifferent) {
+      flags.push({
+        kind: "KIND_DIFFERS",
+        amountCents: Math.abs(view.differenceCents),
+        cite: CLAIM_CITE,
+        sentence:
+          "Your statement shows " + describeClaim(kind, null) + ". From the numbers you typed, the federal math finds " +
+          describeAmounts(amounts) + " instead. (" + CLAIM_CITE + ")",
+        letterLine:
+          "The statement shows " + describeClaim(kind, null) + ". By my math, using the method in " + CLAIM_CITE +
+          ", the account has " + describeAmounts(amounts) + ".",
+      });
+    }
+    return;
+  }
+
+  const claimedCents = claim.claimedCents;
+  const federalCents = claim.federalCents;
+  const gapCents = claim.gapCents;
+  const isMatch = claim.isMatch;
 
   let note = "The federal math finds " + describeAmounts(amounts) + ". That matches your statement.";
   if (!isMatch) note = "The federal math finds " + describeAmounts(amounts) + ".";
@@ -322,7 +463,8 @@ function compareClaim(result, statement, view, rows, flags) {
 
   rows.push({
     key: "claimedAmount",
-    label: label,
+    label: claim.label,
+    claimedKind: kind, // "surplus" | "shortage" | "deficiency" | "none": what the person picked
     statementCents: claimedCents,
     federalCents: federalCents,
     gapCents: gapCents,
@@ -372,6 +514,11 @@ function compareClaim(result, statement, view, rows, flags) {
 // The MOST the monthly escrow line can lawfully be (reg notes §8):
 //     bills ÷ 12  +  shortage ÷ 12  +  deficiency ÷ 2 (first 2 months only)
 // analyze.js already worked that out: monthlyEscrowWhileRepayingDeficiencyCents.
+// One exception: a borrower who is NOT current, with a deficiency. There the
+// mortgage documents set the schedule, (f)(4)(iii), so "deficiency ÷ 2" does
+// not apply — but no month can collect more than the WHOLE deficiency, so the
+// ceiling is bills ÷ 12 + shortage ÷ 12 + the whole deficiency (finding N2).
+// paymentCeiling in analyze.js covers both cases.
 //
 // But the maximum is not the only lawful figure. The servicer may also:
 //   • collect a small shortage as one payment within 30 days, or do nothing
@@ -412,10 +559,12 @@ function lawfulPaymentFigures(result, view, spreadMonths) {
   return figures;
 }
 
-function describeMaximum(result) {
+function describeMaximum(result, ceiling) {
   const parts = ["bills ÷ 12"];
   if (result.newMonthlyEscrowPayment.shortageSpreadOver12Cents > 0) parts.push("shortage ÷ 12");
   if (result.newMonthlyEscrowPayment.deficiencySpreadCents > 0) parts.push("deficiency ÷ 2");
+  // Borrower not current: the ceiling allows the WHOLE deficiency in one month (N2).
+  if (ceiling.deficiencySetByMortgageDocuments) parts.push("the whole deficiency of " + formatCents(result.deficiencyCents));
   return parts.join(" + ");
 }
 
@@ -424,7 +573,11 @@ function comparePayment(result, statement, view, rows, flags) {
 
   const paymentCents = statement.newMonthlyEscrowCents;
   const baseCents = result.baseMonthlyPaymentCents;
-  const maximumCents = result.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents;
+  // The most the payment can be in any one month. For a borrower who is not
+  // current and has a deficiency, that is bills ÷ 12 + shortage ÷ 12 + the
+  // WHOLE deficiency (auditor's finding N2); see paymentCeiling in analyze.js.
+  const ceiling = paymentCeiling(result);
+  const maximumCents = ceiling.ceilingCents;
   const spreadMonths = readSpreadMonths(statement) === null ? 12 : readSpreadMonths(statement);
 
   const figures = lawfulPaymentFigures(result, view, spreadMonths);
@@ -433,14 +586,16 @@ function comparePayment(result, statement, view, rows, flags) {
   const toleranceCents = paymentToleranceCents(countPaymentParts(result.newMonthlyEscrowPayment));
   const matchesAFigure = Math.abs(paymentCents - closestFigure) <= toleranceCents;
 
-  // (f)(4)(iii): when the borrower is not current, the rule does not limit how
-  // a deficiency is collected — the mortgage documents do. So there is no
-  // federal maximum to be "above" (SPEC E2).
-  const deficiencyOutsideTheRule = result.deficiencyCents > 0 && !result.inputs.borrowerCurrent;
+  // (f)(4)(iii): when the borrower is not current, the rule does not set the
+  // SCHEDULE for collecting a deficiency — the mortgage documents do (SPEC E2).
+  // The AMOUNT still has a ceiling: no month can collect more than the whole
+  // deficiency. Before fix order 3 there was no ceiling at all here, so a
+  // $5,000 payment on a $10 deficiency came out green (auditor's finding N2).
+  const deficiencyOutsideTheRule = ceiling.deficiencySetByMortgageDocuments;
   const hasDeficiencyRange = result.deficiencyCents > 0 && result.inputs.borrowerCurrent;
   const atLeastBase = paymentCents >= baseCents - toleranceCents;
 
-  const isOverMaximum = paymentCents > maximumCents + toleranceCents && !deficiencyOutsideTheRule;
+  const isOverMaximum = paymentCents > maximumCents + ceiling.toleranceCents;
 
   // What we expected to see: bills ÷ 12, plus the shortage spread the way the
   // statement says it is spread.
@@ -470,7 +625,7 @@ function comparePayment(result, statement, view, rows, flags) {
   } else if (deficiencyOutsideTheRule && atLeastBase) {
     status = "match";
     federalCents = result.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents;
-    note = "You ticked that a payment was more than 30 days late. In that case the federal rule does not limit how the deficiency is collected. Your mortgage documents control that, so this page cannot check the part above " + formatCents(federalCents) + ".";
+    note = "You ticked that a payment was more than 30 days late. In that case the federal rule does not set the schedule for collecting the deficiency. Your mortgage documents do. So this page cannot check the part above " + formatCents(federalCents) + ", except that no month can collect more than the whole deficiency (" + formatCents(result.deficiencyCents) + ").";
   } else if (hasDeficiencyRange && atLeastBase) {
     status = "match";
     federalCents = maximumCents;
@@ -495,11 +650,34 @@ function comparePayment(result, statement, view, rows, flags) {
     note: note,
   });
 
-  if (status === "over-limit") {
+  if (status === "over-limit" && deficiencyOutsideTheRule) {
+    // The whole-deficiency allowance applies to ONE month at most, so the
+    // honest words are "at least $X a month more". No yearly figure is given
+    // (and the flag carries no perYearCents): multiplying a one-month
+    // allowance by 12 would be a claim this page cannot support.
+    const mortgageDocumentsCite = CITE_PREFIX + "(f)(4)(iii)";
+    flags.push({
+      kind: "PAYMENT_ABOVE_MAX",
+      rowKey: "newMonthlyEscrow",
+      amountCents: gapCents,
+      cite: PAYMENT_CITE,
+      sentence:
+        "Your statement's new escrow payment is " + formatCents(paymentCents) + " a month. From the numbers you typed, the most the federal math supports in any one month is " +
+        formatCents(maximumCents) + " (" + describeMaximum(result, ceiling) + "). That is at least " + formatCents(gapCents) +
+        " a month more. With a payment more than 30 days late, your mortgage documents set the schedule for collecting a deficiency, but no month can collect more than the whole deficiency (" +
+        mortgageDocumentsCite + "). (" + PAYMENT_CITE + ")",
+      letterLine:
+        "The statement sets the new monthly escrow payment at " + formatCents(paymentCents) + ". By my math, the most " + PAYMENT_CITE +
+        " supports from these numbers in any one month is " + formatCents(maximumCents) + " (" + describeMaximum(result, ceiling) + "). That is at least " +
+        formatCents(gapCents) + " a month more.",
+    });
+  }
+
+  if (status === "over-limit" && !deficiencyOutsideTheRule) {
     const perYearCents = gapCents * 12;
     let sentence =
       "Your statement's new escrow payment is " + formatCents(paymentCents) + " a month. From the numbers you typed, the most the federal math supports is " +
-      formatCents(maximumCents) + " a month (" + describeMaximum(result) + "). That is " + formatCents(gapCents) +
+      formatCents(maximumCents) + " a month (" + describeMaximum(result, ceiling) + "). That is " + formatCents(gapCents) +
       " a month more, or " + formatCents(perYearCents) + " over 12 months. (" + PAYMENT_CITE + ")";
     if (view.extraCushionCents > 0 && Math.abs(perYearCents - view.extraCushionCents) <= 12 * toleranceCents) {
       sentence = sentence + " Over 12 months that adds up to the extra cushion.";
@@ -513,7 +691,7 @@ function comparePayment(result, statement, view, rows, flags) {
       sentence: sentence,
       letterLine:
         "The statement sets the new monthly escrow payment at " + formatCents(paymentCents) + ". By my math, the most " + PAYMENT_CITE +
-        " supports from these numbers is " + formatCents(maximumCents) + " a month (" + describeMaximum(result) + "). That is " +
+        " supports from these numbers is " + formatCents(maximumCents) + " a month (" + describeMaximum(result, ceiling) + "). That is " +
         formatCents(gapCents) + " a month more, or " + formatCents(perYearCents) + " over 12 months.",
     });
   }
@@ -627,9 +805,15 @@ export function compareWithStatement(result, statement) {
 
   if (isPlainObject(statement)) {
     const view = buildServicerView(result, statement);
+    const claim = evaluateClaim(statement, view);
+    const cushionCase = decideCushionCase(result, statement, claim);
+    // Only a cushion the page is SURE about may be blamed in other sentences
+    // ("the cushion is the likely reason"). Not a mix-up, and not a cannot-tell.
+    if (cushionCase === "MIX_UP" || cushionCase === "CANNOT_TELL") view.extraCushionCents = 0;
+
     // Cause → effect order: the cushion drives the shortage, which drives the payment.
-    compareCushion(result, statement, rows, flags, nudges);
-    compareClaim(result, statement, view, rows, flags);
+    compareCushion(result, statement, cushionCase, rows, flags, nudges);
+    compareClaim(result, claim, view, rows, flags);
     comparePayment(result, statement, view, rows, flags);
     checkSpread(result, statement, view, flags);
     checkLumpSum(result, statement, view, flags);

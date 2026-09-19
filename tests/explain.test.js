@@ -82,7 +82,10 @@ function statementsFor(result) {
   // Each one fills in ONE thing, so the branch for that thing is what speaks.
   const base = result.baseMonthlyPaymentCents;
   const most = pay.monthlyEscrowWhileRepayingDeficiencyCents;
-  const lowPointTypedAsMinimum = { requiredMinimumBalanceCents: result.lowPoint.projectedBalanceCents > 0 ? result.lowPoint.projectedBalanceCents : 0 };
+  const lowPointCents = result.lowPoint.projectedBalanceCents > 0 ? result.lowPoint.projectedBalanceCents : 0;
+  const lowPointTypedAsMinimum = { requiredMinimumBalanceCents: lowPointCents }; // no claim → CUSHION_MAYBE_OVER_CAP
+  const lowPointWithAMatchingClaim = { requiredMinimumBalanceCents: lowPointCents, claimedKind: kind, claimedAmountCents: amount }; // → the mix-up nudge
+  const lowPointWithNoneClaimed = { requiredMinimumBalanceCents: lowPointCents, claimedKind: "none" }; // → often the real CUSHION_OVER_CAP
   const basePaymentOnly = { newMonthlyEscrowCents: base };
   const halfwayToTheMost = { currentMonthlyEscrowCents: base, newMonthlyEscrowCents: base + Math.floor((most - base) / 2) };
   const aHairOverTheMost = { currentMonthlyEscrowCents: base, newMonthlyEscrowCents: most + 50 };
@@ -92,7 +95,8 @@ function statementsFor(result) {
   const lumpSumOnly = { lumpSumOfferedOnStatement: true };
 
   return [undefined, {}, agrees, tooMuch, tooLittle, oddOnes]
-    .concat([lowPointTypedAsMinimum, basePaymentOnly, halfwayToTheMost, aHairOverTheMost, amountWithNoKind, lumpSumOnly])
+    .concat([lowPointTypedAsMinimum, lowPointWithAMatchingClaim, lowPointWithNoneClaimed])
+    .concat([basePaymentOnly, halfwayToTheMost, aHairOverTheMost, amountWithNoKind, lumpSumOnly])
     .concat(kindsWithNoAmount)
     .concat(spreadOnly);
 }
@@ -257,7 +261,7 @@ test("the scan reaches both kinds of letter, every flag kind, the mix-up nudge, 
     for (const row of comparison.rows) rowStatuses.add(row.status);
   }
   assert.deepStrictEqual([...letterKinds].sort(), ["NOTICE_OF_ERROR", "REQUEST_FOR_INFORMATION"]);
-  assert.deepStrictEqual([...flagKinds].sort(), ["AMOUNT_DIFFERS", "CUSHION_OVER_CAP", "KIND_DIFFERS", "LUMP_SUM_OFFERED", "PAYMENT_ABOVE_MAX", "SPREAD_TOO_SHORT"]);
+  assert.deepStrictEqual([...flagKinds].sort(), ["AMOUNT_DIFFERS", "CUSHION_MAYBE_OVER_CAP", "CUSHION_OVER_CAP", "KIND_DIFFERS", "LUMP_SUM_OFFERED", "PAYMENT_ABOVE_MAX", "SPREAD_TOO_SHORT"]);
   assert.deepStrictEqual([...nudgeKinds], ["MINIMUM_LOOKS_LIKE_LOW_POINT"]);
   assert.deepStrictEqual([...tones].sort(), ["clear", "flag", "info"]);
   assert.deepStrictEqual([...rowStatuses].sort(), ["differs", "match", "not-compared", "over-limit"]);
@@ -475,7 +479,7 @@ test("QA #14: the new wording, sentence by sentence", () => {
     "but you chose no cushion as the limit in your mortgage documents, and the lower limit wins.",
     "1 month of escrow payments, the limit you chose as the one your mortgage documents set.",
     "no cushion at all, the limit you chose as the one your mortgage documents set.",
-    "so this page cannot check the part above",
+    "So this page cannot check the part above",
     "Choose yes or no: are you more than 30 days behind on a payment?",
     "Choose yes or no: does the statement offer a pay-it-all-at-once option?",
     "That comparison was skipped.",
@@ -900,9 +904,16 @@ test("PROPERTY: the four parts add up to exactly new − old, for every vector a
         assert.ok(jump.parts[1].cents >= 0 && jump.parts[1].cents <= result.newMonthlyEscrowPayment.shortageSpreadOver12Cents);
         assert.ok(jump.parts[2].cents >= 0);
         // The "deficiency ÷ 2" ceiling only exists for a borrower who is current, (f)(4)(iii) (audit A3).
+        // Not current: the mortgage documents set the schedule, but the deficiency part can never be
+        // more than the WHOLE deficiency, and only what is above THAT is unexplained (auditor's N2).
         const notCurrentDeficiency = result.deficiencyCents > 0 && !result.inputs.borrowerCurrent;
         if (!notCurrentDeficiency) assert.ok(jump.parts[2].cents <= result.newMonthlyEscrowPayment.deficiencySpreadCents);
-        if (notCurrentDeficiency) assert.ok(jump.parts[3].cents <= 0, "nothing above the base is 'unexplained' when the mortgage documents set the deficiency repayment");
+        if (notCurrentDeficiency) {
+          assert.ok(jump.parts[2].cents <= result.deficiencyCents, "the deficiency part is capped at the whole deficiency");
+          const ceilingCents = result.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents + result.deficiencyCents;
+          if (newCents <= ceilingCents) assert.ok(jump.parts[3].cents <= 0, "nothing up to the ceiling is 'unexplained' when the mortgage documents set the schedule");
+          if (newCents > ceilingCents) assert.equal(jump.parts[3].cents, newCents - ceilingCents, "only the part above the whole deficiency is unexplained");
+        }
         checked = checked + 1;
       }
     }
@@ -1026,6 +1037,47 @@ test("A3: not current + deficiency — the dollars above base + shortage are 'de
 function rowStatus(comparison, key) {
   return comparison.rows.find((row) => row.key === key).status;
 }
+
+// FIX ORDER 3, N2: (f)(4)(iii) hands the SCHEDULE to the mortgage documents,
+// not an unlimited amount. The most that can be deficiency repayment in any
+// one month is the WHOLE deficiency; anything above that is unexplained.
+test("N2 in explainJump: on a $10.00 deficiency the deficiency part is capped at $10.00 and the rest is 'not explained' ($300 → $1,000)", () => {
+  const account = {
+    startMonth: 1, startingBalanceCents: -1000, cushionMonths: 2, borrowerCurrent: false,
+    disbursements: [{ label: "Property tax", month: 6, amountCents: 360000 }],
+  };
+  const result = analyze(account);
+  for (const newCents of [100000, 500000]) {
+    const jump = explainJump(result, { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: newCents });
+    assert.deepStrictEqual(jump.parts.map((part) => part.cents), [0, 20000, 1000, newCents - 51000]);
+    assert.equal(jump.parts.reduce((sum, part) => sum + part.cents, 0), newCents - 30000, "the parts still add up exactly");
+    assert.match(jump.parts[2].sentence, /\$10\.00 a month is above the bills and the shortage repayment/);
+    assert.match(jump.parts[2].sentence, /set by your mortgage documents, not by this rule/);
+    assert.match(jump.parts[3].sentence, /more than the federal math supports/);
+  }
+  // At the ceiling, and inside its $3.00 tolerance, nothing is "more than the federal math supports".
+  const atCeiling = explainJump(result, { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: 51000 });
+  assert.deepStrictEqual(atCeiling.parts.map((part) => part.cents), [0, 20000, 1000, 0]);
+  const insideTolerance = explainJump(result, { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: 51300 });
+  assert.equal(insideTolerance.parts[3].cents, 300);
+  assert.match(insideTolerance.parts[3].sentence, /small enough to be whole-dollar rounding/);
+  const past = explainJump(result, { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: 51301 });
+  assert.match(past.parts[3].sentence, /more than the federal math supports/);
+});
+
+test("N2: compare.js and explainJump agree on every payment around the not-current ceiling (flagged exactly when 'more than the federal math supports')", () => {
+  const account = {
+    startMonth: 1, startingBalanceCents: -1000, cushionMonths: 2, borrowerCurrent: false,
+    disbursements: [{ label: "Property tax", month: 6, amountCents: 360000 }],
+  };
+  const result = analyze(account);
+  for (let newCents = 50000; newCents <= 52000; newCents = newCents + 7) {
+    const statement = { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: newCents };
+    const flagged = compareWithStatement(result, statement).flags.some((flag) => flag.kind === "PAYMENT_ABOVE_MAX");
+    const saysMore = explainJump(result, statement).parts[3].sentence.includes("more than the federal math supports");
+    assert.equal(flagged, saysMore, String(newCents));
+  }
+});
 
 test("A1 in explainJump: a leftover inside the scaled payment tolerance reads as rounding; one cent more does not", () => {
   const example = exampleById("jumped-ok"); // two rounded parts → $2.00

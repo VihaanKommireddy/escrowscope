@@ -70,6 +70,43 @@ export function countPaymentParts(newMonthlyEscrowPayment) {
   return parts;
 }
 
+// The most a statement's monthly escrow payment can be in ANY one month, for
+// the comparison and for "why did my payment jump?". (Auditor's finding N2.)
+//
+//   Borrower current:      bills ÷ 12 + shortage ÷ 12 + deficiency ÷ 2.
+//                          analyze already worked that out.
+//   Borrower NOT current,  12 CFR 1024.17(f)(4)(iii) hands the SCHEDULE for
+//   with a deficiency:     collecting the deficiency to the mortgage documents.
+//                          That does not make the AMOUNT unlimited: whatever
+//                          the schedule, no single month can collect more
+//                          than the WHOLE deficiency. So the ceiling is
+//                          bills ÷ 12 + shortage ÷ 12 + the whole deficiency.
+//                          It is a ONE-MONTH allowance, so nobody may multiply
+//                          it into a yearly figure.
+// The tolerance is the usual $1.00 for each separately rounded part (A1).
+// `result.newMonthlyEscrowPayment` itself is pinned by the research vectors
+// and is not changed by any of this.
+export function paymentCeiling(result) {
+  const payment = result.newMonthlyEscrowPayment;
+  const deficiencySetByMortgageDocuments = result.deficiencyCents > 0 && !result.inputs.borrowerCurrent;
+
+  let ceilingCents = payment.monthlyEscrowWhileRepayingDeficiencyCents;
+  let mostDeficiencyInOneMonthCents = payment.deficiencySpreadCents; // deficiency ÷ 2
+  let parts = countPaymentParts(payment);
+  if (deficiencySetByMortgageDocuments) {
+    mostDeficiencyInOneMonthCents = result.deficiencyCents; // the whole deficiency
+    ceilingCents = ceilingCents + mostDeficiencyInOneMonthCents;
+    parts = parts + 1;
+  }
+
+  return {
+    ceilingCents: ceilingCents,
+    mostDeficiencyInOneMonthCents: mostDeficiencyInOneMonthCents,
+    toleranceCents: paymentToleranceCents(parts),
+    deficiencySetByMortgageDocuments: deficiencySetByMortgageDocuments,
+  };
+}
+
 // A surplus of $50.00 or more must be refunded. 12 CFR 1024.17(f)(2)(i):
 // "greater than or equal to 50 dollars".
 const REFUND_THRESHOLD_CENTS = 5000;

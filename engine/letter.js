@@ -103,12 +103,22 @@ function billLines(result) {
 //     to ask at all.
 // ---------------------------------------------------------------------------
 
-const FLAGS_THAT_ASSERT_A_DISCREPANCY = ["CUSHION_OVER_CAP", "PAYMENT_ABOVE_MAX", "KIND_DIFFERS", "SPREAD_TOO_SHORT"];
+// An explicit list, on purpose: a new flag kind is a QUESTION until someone
+// adds it here. CUSHION_MAYBE_OVER_CAP is NOT on it: the page cannot tell that
+// one from a typing mix-up, so the letter only asks the servicer to confirm
+// the number. (Exported so a test can pin the list.)
+export const FLAGS_THAT_ASSERT_A_DISCREPANCY = ["CUSHION_OVER_CAP", "PAYMENT_ABOVE_MAX", "KIND_DIFFERS", "SPREAD_TOO_SHORT"];
+
+// Does this one flag say "I believe the statement has an error here"?
+function flagAssertsADiscrepancy(flag) {
+  if (FLAGS_THAT_ASSERT_A_DISCREPANCY.includes(flag.kind)) return true;
+  if (flag.kind === "AMOUNT_DIFFERS" && flag.rowKey === "claimedAmount") return true;
+  return false;
+}
 
 export function letterKind(result, comparison) {
   for (const flag of comparison.flags) {
-    if (FLAGS_THAT_ASSERT_A_DISCREPANCY.includes(flag.kind)) return "NOTICE_OF_ERROR";
-    if (flag.kind === "AMOUNT_DIFFERS" && flag.rowKey === "claimedAmount") return "NOTICE_OF_ERROR";
+    if (flagAssertsADiscrepancy(flag)) return "NOTICE_OF_ERROR";
   }
   return "REQUEST_FOR_INFORMATION";
 }

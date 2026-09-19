@@ -25,7 +25,7 @@
 // Every function here is pure: numbers in, words out.
 
 import { formatCents, MONTH_NAMES, MAX_MONEY_CENTS } from "./money.js";
-import { projectWithPayment, TOLERANCE_PAYMENT_CENTS, paymentToleranceCents, countPaymentParts } from "./analyze.js";
+import { projectWithPayment, TOLERANCE_PAYMENT_CENTS, paymentCeiling } from "./analyze.js";
 import { letterKind } from "./letter.js";
 
 // Official pages only. Every URL below appears in the research docs' source lists.
@@ -171,6 +171,14 @@ function outcomeHeadline(result) {
 function shortFlagPhrase(flag) {
   const amount = formatCents(flag.amountCents);
   if (flag.kind === "CUSHION_OVER_CAP") return "the cushion is " + amount + " over the most the rule allows";
+  if (flag.kind === "CUSHION_MAYBE_OVER_CAP") {
+    return "the number typed as the required minimum is " + amount + " above the most the rule allows, but it is also your lowest projected balance, so check which line it came from";
+  }
+  if (flag.kind === "PAYMENT_ABOVE_MAX" && flag.perYearCents === undefined) {
+    // Borrower not current, with a deficiency: the ceiling is a one-month
+    // allowance, so compare.js gives no yearly figure (auditor's finding N2).
+    return "the new payment is at least " + amount + " a month above the most the federal math supports in any one month";
+  }
   if (flag.kind === "PAYMENT_ABOVE_MAX") {
     return "the new payment is " + amount + " a month above the most the federal math supports (" + formatCents(flag.perYearCents) + " over 12 months)";
   }
@@ -394,16 +402,20 @@ export function explainJump(result, statement) {
   let deficiencyPartCents = 0;
   const aboveBase = newCents - base;
   // Borrower not current + a deficiency: (f)(4)(iii) lets the mortgage
-  // documents, not this rule, set how the deficiency is collected. So there is
-  // no federal "deficiency ÷ 2" ceiling to measure against, and whatever sits
-  // above base + shortage repayment is deficiency repayment — NOT "more than
-  // the federal math supports". This keeps explainJump in step with
-  // compare.js, which calls the same payment a match (math audit A3).
-  const deficiencySetByMortgageDocuments = result.deficiencyCents > 0 && !result.inputs.borrowerCurrent;
+  // documents, not this rule, set the SCHEDULE for collecting the deficiency.
+  // So there is no federal "deficiency ÷ 2" to measure against, and what sits
+  // above base + shortage repayment is deficiency repayment, NOT "more than
+  // the federal math supports" (math audit A3) — but only up to the WHOLE
+  // deficiency, because no month can collect more than all of it. Anything
+  // past that is unexplained (auditor's finding N2). paymentCeiling in
+  // analyze.js is the one place that works this out, and compare.js uses the
+  // same function, so the two can never disagree.
+  const ceiling = paymentCeiling(result);
+  const deficiencySetByMortgageDocuments = ceiling.deficiencySetByMortgageDocuments;
   if (aboveBase > 0) {
     shortagePartCents = smallerOf(aboveBase, payment.shortageSpreadOver12Cents);
     const stillLeft = aboveBase - shortagePartCents;
-    deficiencyPartCents = deficiencySetByMortgageDocuments ? stillLeft : smallerOf(stillLeft, payment.deficiencySpreadCents);
+    deficiencyPartCents = smallerOf(stillLeft, ceiling.mostDeficiencyInOneMonthCents);
   }
   const unexplainedCents = changeCents - billsChangedCents - shortagePartCents - deficiencyPartCents;
 
@@ -422,7 +434,7 @@ export function explainJump(result, statement) {
 
   // "Small enough to be rounding" uses the same scaled tolerance compare.js
   // uses for the same purpose: $1.00 per separately rounded part (audit A1).
-  const roundingCents = paymentToleranceCents(countPaymentParts(payment));
+  const roundingCents = ceiling.toleranceCents;
   let unexplainedSentence = "Nothing is left over. The federal math explains the whole change.";
   if (unexplainedCents > roundingCents) unexplainedSentence = formatCents(unexplainedCents) + " a month is more than the federal math supports from the numbers typed here. It is worth asking your servicer what it covers.";
   if (unexplainedCents > 0 && unexplainedCents <= roundingCents) unexplainedSentence = formatCents(unexplainedCents) + " a month is left over. That is small enough to be whole-dollar rounding, which HUD's 1995 guidance describes (60 FR 8812).";
@@ -533,6 +545,16 @@ export function nextSteps(result, comparison) {
       // as a promise that money is coming (SPEC A7; QA audit #7).
       title: "The 30-day refund rule",
       body: "The rule says a surplus of $50 or more is refunded within 30 days of the date of the escrow analysis. That date is usually printed on your statement. If it has passed and nothing has arrived, you can call your servicer and ask when the refund was sent.",
+      url: URL_CFPB_RULE,
+    });
+  }
+
+  // The page cannot tell a real oversized cushion from a number typed into
+  // the wrong box, so the first thing to do is look at the statement again.
+  if (flagKinds.includes("CUSHION_MAYBE_OVER_CAP")) {
+    steps.push({
+      title: "Check which line you typed",
+      body: "Look at your statement again. The required minimum balance (the cushion) and the lowest projected balance are often two different lines. If the number you typed really is the required minimum, you can ask your servicer to point to the line where the cushion is worked out. The cap is one-sixth of the year's bills, unless your mortgage documents or state law set it lower (12 CFR 1024.17(c)(5)).",
       url: URL_CFPB_RULE,
     });
   }

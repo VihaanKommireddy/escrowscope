@@ -440,6 +440,79 @@ test("E5 + C5: every numeric output is a whole number and none is negative zero 
   assert.ok(numbersSeen > 300000, "only " + numbersSeen + " numbers were checked");
 });
 
+// FIX ORDER 3, N1 (the auditor's Stage 3 finding): an over-the-cap "required
+// minimum" must never come out green by accident. For every random account we
+// type a minimum that is OVER the cap, half the time exactly the federal low
+// point (the case the old mix-up rule hid), and we let the other statement
+// boxes vary: a claim that matches, "none", a claim of another size, no claim.
+test("N1 property: typed minimum over the cap → exactly ONE of {nudge, CUSHION_OVER_CAP, CUSHION_MAYBE_OVER_CAP}, and never 'matches' unless the claim itself matches (case a)", () => {
+  const randomNumber = makeRandom(SEED + 11);
+  const { whole, pick } = makeHelpers(randomNumber);
+  const seen = { nudge: 0, overCap: 0, maybe: 0, greenOnlyInCaseA: 0, triggerMet: 0 };
+
+  for (const account of ACCOUNTS) {
+    const result = analyze(account);
+    const capCents = result.cushionCapCents;
+    const lowPointCents = result.lowPoint.projectedBalanceCents;
+
+    // A typed minimum that is over the cap by more than the $7.00 tolerance.
+    let typedCents = capCents + 701 + whole(0, 300000);
+    if (lowPointCents - capCents > 700 && randomNumber() < 0.5) typedCents = lowPointCents + whole(-700, 700);
+    if (typedCents - capCents <= 700) typedCents = capCents + 701;
+    if (typedCents > 1000000000) continue; // past the tool's $10,000,000 limit: treated as not given
+
+    let kind = "none";
+    let amount = 0;
+    if (result.surplusCents > 0) { kind = "surplus"; amount = result.surplusCents; }
+    if (result.shortageCents > 0) { kind = "shortage"; amount = result.shortageCents; }
+    const claim = pick([
+      {}, // no claim typed
+      { claimedKind: kind, claimedAmountCents: amount }, // matches the federal math
+      { claimedKind: "none" },
+      { claimedKind: pick(["surplus", "shortage"]), claimedAmountCents: whole(0, 400000) },
+      { claimedKind: pick(["surplus", "shortage", "deficiency"]) }, // a kind with no amount
+    ]);
+    const payment = pick([{}, { newMonthlyEscrowCents: result.baseMonthlyPaymentCents }, { newMonthlyEscrowCents: result.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents }]);
+    const statement = { requiredMinimumBalanceCents: typedCents, ...claim, ...payment };
+    const context = describe(account) + "\nstatement=" + JSON.stringify(statement);
+
+    const comparison = compareWithStatement(result, statement);
+    const nudges = comparison.nudges.length;
+    const overCap = comparison.flags.filter((flag) => flag.kind === "CUSHION_OVER_CAP").length;
+    const maybe = comparison.flags.filter((flag) => flag.kind === "CUSHION_MAYBE_OVER_CAP").length;
+    assert.equal(nudges + overCap + maybe, 1, "exactly one cushion outcome" + context);
+    seen.nudge += nudges;
+    seen.overCap += overCap;
+    seen.maybe += maybe;
+
+    const triggerMet = Math.abs(typedCents - lowPointCents) <= 700;
+    if (triggerMet) seen.triggerMet += 1;
+    if (!triggerMet) assert.equal(overCap, 1, "trigger not met → the plain rule" + context);
+
+    const claimRow = comparison.rows.find((row) => row.key === "claimedAmount");
+    const claimMatches = claimRow !== undefined && claimRow.status === "match";
+    assert.equal(nudges === 1, triggerMet && claimMatches, "a nudge exactly in case (a)" + context);
+
+    const cushionRow = comparison.rows.find((row) => row.key === "requiredMinimumBalance");
+    const expectedStatus = nudges === 1 ? "not-compared" : overCap === 1 ? "over-limit" : "differs";
+    assert.equal(cushionRow.status, expectedStatus, context);
+
+    if (comparison.overall === "matches") {
+      assert.ok(triggerMet && claimMatches, "green with an over-the-cap minimum, outside case (a)" + context);
+      seen.greenOnlyInCaseA += 1;
+    }
+    if (nudges === 0) {
+      assert.equal(comparison.overall, "look-here", context);
+      assert.equal(explainVerdict(result, comparison).tone, "flag", context);
+    }
+  }
+
+  // The generator really reached all three outcomes, and the green case.
+  assert.ok(seen.triggerMet > 500, JSON.stringify(seen));
+  assert.ok(seen.nudge > 50 && seen.overCap > 500 && seen.maybe > 100, JSON.stringify(seen));
+  assert.ok(seen.greenOnlyInCaseA > 20, JSON.stringify(seen));
+});
+
 test("E5 + C5: whole numbers and no negative zero across every research vector and every example", () => {
   const cases = VECTORS.map((vector) => ({ account: accountFromVector(vector), statement: undefined }));
   for (const example of EXAMPLES) cases.push({ account: example.account, statement: example.statement });
