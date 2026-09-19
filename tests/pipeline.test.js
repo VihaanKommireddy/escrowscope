@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { EXAMPLES } from "../examples.js";
+import { VECTORS, accountFromVector } from "../engine/index.js";
 import {
   BILL_KINDS,
   emptyValues,
@@ -116,8 +117,13 @@ test("example 1: the servicer's line is drawn from the typed new payment (SPEC D
 });
 
 test("no new payment typed → no servicer line, no jump, and nothing breaks", () => {
-  const check = runCheck(goodValues());
+  // $1,200.00 is exactly what TV01's bills need, so the account is on target.
+  // (With a required refund the banner is amber even with nothing to compare: SPEC C4.)
+  const values = goodValues();
+  values.startingBalance = "1,200.00";
+  const check = runCheck(values);
   assert.equal(check.ok, true);
+  assert.equal(check.result.classification, "ON_TARGET");
   assert.equal(check.servicerLine, null);
   assert.equal(check.jump, null);
   assert.equal(check.comparison.overall, "not-provided");
@@ -372,6 +378,65 @@ test("a $300.00 surplus is nowhere near the line: refund required, in amber, wit
   assert.equal(check.verdict.tone, "flag");
   assert.ok(check.refund);
   assert.equal(check.refund.isoDate, "2026-10-01");
+});
+
+// The same band, straight from the auditor's vectors (found by id, never by
+// position). Each vector's account is typed into the form the way an example
+// button would type it, with an analysis date, and run through the page's path.
+function checkVector(id) {
+  const vector = VECTORS.find((entry) => entry.id === id);
+  assert.ok(vector, "engine/vectors.js should have " + id);
+  const asExample = { account: accountFromVector(vector), statement: {}, details: { analysisDate: "2026-09-01" } };
+  const check = runCheck(exampleToValues(asExample));
+  assert.equal(check.ok, true, id + ": " + JSON.stringify(check.errors));
+  return check;
+}
+
+test("TV26 (surplus $52.00): refund-required by the cents, but inside the band → calm, no refund date", () => {
+  const check = checkVector("TV26");
+  assert.equal(check.result.classification, "SURPLUS_REFUND_REQUIRED", "classification stays cent-exact");
+  assert.notEqual(check.result.nearLine, null);
+  assert.equal(check.result.nearLine.line, "SURPLUS_50");
+  assert.equal(check.result.nearLine.distanceCents, 200);
+  assert.equal(check.result.nearLine.toleranceCents, 700);
+  assert.notEqual(check.verdict.tone, "flag");
+  assert.equal(check.refund, null);
+});
+
+test("TV28 (surplus $57.00, exactly $7.00 from the line): still inside the band", () => {
+  const check = checkVector("TV28");
+  assert.notEqual(check.result.nearLine, null);
+  assert.equal(check.result.nearLine.distanceCents, 700);
+  assert.notEqual(check.verdict.tone, "flag");
+  assert.equal(check.refund, null);
+});
+
+test("TV29 (surplus $57.01): outside the band → the normal refund-required treatment and date", () => {
+  const check = checkVector("TV29");
+  assert.equal(check.result.nearLine, null);
+  assert.equal(check.result.classification, "SURPLUS_REFUND_REQUIRED");
+  assert.equal(check.verdict.tone, "flag");
+  assert.ok(check.refund);
+  assert.equal(check.refund.isoDate, "2026-10-01");
+});
+
+test("TV27 (shortage $346.00 against a $350.00 month): inside the one-month band", () => {
+  const check = checkVector("TV27");
+  assert.notEqual(check.result.nearLine, null);
+  assert.equal(check.result.nearLine.line, "ONE_MONTH_PAYMENT");
+  assert.equal(check.result.nearLine.distanceCents, 400);
+  assert.equal(check.refund, null);
+  assert.ok(check.verdict.headline.length > 0 && check.verdict.body.length > 0);
+});
+
+test("every research vector runs through the page's path without an error", () => {
+  for (const vector of VECTORS) {
+    const check = checkVector(vector.id);
+    assert.equal(check.result.classification, vector.expected.classification, vector.id);
+    assert.equal(check.result.lowPoint.projectedBalanceCents, vector.expected.lowPoint.projectedBalanceCents, vector.id);
+    assert.ok(check.verdict.headline.length > 0, vector.id + " has a verdict headline");
+    assert.ok(check.letter.length > 0, vector.id + " has a letter");
+  }
 });
 
 // ─────────────────────────── running total ───────────────────────────

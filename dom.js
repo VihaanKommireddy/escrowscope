@@ -1,4 +1,4 @@
-// dom.js — tiny helpers for building the page without ever using innerHTML.
+// dom.js — tiny helpers for building the page without ever parsing a string as HTML.
 //
 // Why this file exists: the page's Content-Security-Policy forbids inline
 // scripts and inline styles, and SPEC A1.6 says user-typed text may only reach
@@ -61,7 +61,7 @@ export function svgEl(tag, options = {}, children = []) {
   return node;
 }
 
-// Empty a node (the safe replacement for `node.innerHTML = ""`).
+// Empty a node the safe way (no HTML strings involved).
 export function clear(node) {
   node.replaceChildren();
 }

@@ -12,7 +12,11 @@
   <meta name="theme-color" content="#0C5460">
   <title>EscrowScope: see why your mortgage payment jumped</title>
   <meta name="description" content="Type the numbers from your yearly mortgage escrow statement and see whether the math follows the federal escrow rule. Free. Nothing you type leaves the page.">
-  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <!-- The tab icon is written inline (a data: address) on purpose. Browsers fetch a
+       file-based icon by themselves just AFTER the page loads, which would make the
+       "requests since load" counter in the privacy panel read 1 instead of 0.
+       It is the same drawing as assets/favicon.svg. -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%230C5460' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./guide.css">
@@ -341,7 +345,7 @@
 
         <section class="result-block" id="sec-steps" aria-labelledby="sec-steps-h">
           <h3 id="sec-steps-h">Show the math</h3>
-          <p class="muted small block-lede">Each step opens to show the numbers and the exact paragraph of the federal rule it comes from.</p>
+          <p class="muted small block-lede">Each step opens to show the numbers and where the method comes from: the paragraph of the federal rule, or the official guidance.</p>
           <div id="steps-body"></div>
         </section>
 

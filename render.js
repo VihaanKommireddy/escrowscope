@@ -59,11 +59,12 @@ function icon(name) {
 // SPEC E3: when a result sits within $7 of a legal line (the $50 refund line, or
 // one month's payment), the engine sets result.nearLine and softens its words.
 // The page must then stay calm too: teal "info" styling, never the amber
-// "refund required" look, and no refund date.
+// "refund required" look, and no refund date. The ONLY test is whether the
+// engine set nearLine. "Near" is never worked out again here.
 export function isTooCloseToCall(check) {
-  const nearLine = check.result ? check.result.nearLine : null;
-  const flagged = check.verdict ? check.verdict.tooCloseToCall === true : false;
-  return Boolean(nearLine) || flagged;
+  if (!check.result) return false;
+  const nearLine = check.result.nearLine;
+  return nearLine !== null && nearLine !== undefined;
 }
 
 // The banner's look comes from the verdict the engine wrote (its tone), never
@@ -144,7 +145,10 @@ function renderVerdict(check) {
   mark.append(icon(verdictIconName(check)));
 
   byId("verdict-label").textContent = verdict.label;
-  byId("verdict-heading").textContent = verdict.headline;
+  const heading = byId("verdict-heading");
+  heading.textContent = verdict.headline;
+  // A long headline gets a slightly smaller size so the banner stays compact.
+  heading.classList.toggle("is-long", String(verdict.headline).length > 70);
   byId("verdict-body").textContent = verdict.body;
 
   const figure = verdictFigure(check);
@@ -286,9 +290,11 @@ function renderCompare(check) {
   ]);
   const body = el("tbody");
   for (const row of comparison.rows) {
+    const rowHead = el("th", { attrs: { scope: "row" } }, [el("span", { className: "row-label", text: row.label })]);
+    if (row.note) rowHead.append(el("span", { className: "row-note", text: row.note }));
     body.append(
       el("tr", {}, [
-        el("th", { text: row.label, attrs: { scope: "row" } }),
+        rowHead,
         moneyCell(row.statementCents),
         moneyCell(row.federalCents),
         moneyCell(row.gapCents),
@@ -321,13 +327,12 @@ function renderCompare(check) {
       if (typeof flag.amountCents === "number" && flag.amountCents !== 0) {
         head.append(el("span", { className: "flag-card-amount", text: formatCents(flag.amountCents) }));
       }
-      list.append(
-        el("li", { className: "flag-card" }, [
-          head,
-          el("p", { text: flag.sentence }),
-          el("p", { className: "cite", text: flag.cite ? "Source: " + flag.cite : "" }),
-        ])
-      );
+      const card = el("li", { className: "flag-card" }, [head, el("p", { text: flag.sentence })]);
+      // Most flag sentences already end with their cite; only add it when missing.
+      if (flag.cite && !String(flag.sentence).includes(flag.cite)) {
+        card.append(el("p", { className: "cite", text: "Source: " + flag.cite }));
+      }
+      list.append(card);
     }
     box.append(list);
     box.append(
@@ -473,9 +478,19 @@ function renderSteps(check) {
   clear(box);
 
   check.steps.forEach(function (step, index) {
+    // The engine titles its steps "Step 1. Add up next year's bills". The
+    // "Step 1" part is shown as a small label and the rest as the title. The
+    // words themselves are not changed.
+    let numberText = "";
+    let titleText = String(step.title);
+    const dotAt = titleText.indexOf(". ");
+    if (titleText.startsWith("Step ") && dotAt > 0 && dotAt < 10) {
+      numberText = titleText.slice(0, dotAt);
+      titleText = titleText.slice(dotAt + 2);
+    }
     const summary = el("summary", {}, [
-      el("span", { className: "step-number", text: "Step " + (index + 1) }),
-      el("span", { className: "step-title", text: step.title }),
+      el("span", { className: "step-number", text: numberText }),
+      el("span", { className: "step-title", text: titleText }),
       el("span", { className: "step-toggle", attrs: { "aria-hidden": "true" } }, [
         el("span", { className: "step-toggle-open", text: "Show" }),
         el("span", { className: "step-toggle-close", text: "Hide" }),
