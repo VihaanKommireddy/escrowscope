@@ -27,9 +27,16 @@ function isPlainObject(value) {
 }
 
 // Walk through `expected` and write down every place `actual` differs.
-// Strict: 30000 and "30000" are different. A list must have the same length.
-// Only keys that appear in `expected` are checked, so the engine may return
-// extra helpful fields without failing.
+// The rule is "every EXPECTED key, at every depth":
+//   • an object: every key in `expected` must be on `actual` with an equal
+//     value. EXTRA keys on `actual` are ignored, at every depth, so the engine
+//     may return extra helpful fields (SPEC E3a.6: nearLine's describing keys,
+//     result.inputs). A MISSING key is a mismatch.
+//   • a list: must have exactly the expected length, in the same order
+//     (12 table rows means 12, not 11 or 13).
+//   • a number, string, true/false or null: compared with Object.is, which is
+//     === except that it also tells 0 from -0 (SPEC E5) — and 30000 is never
+//     equal to "30000", and null is never equal to an object.
 function collectMismatches(expected, actual, path, mismatches) {
   if (Array.isArray(expected)) {
     if (!Array.isArray(actual) || actual.length !== expected.length) {
@@ -56,9 +63,16 @@ function collectMismatches(expected, actual, path, mismatches) {
   }
 
   // Numbers, strings, true/false, null.
-  if (expected !== actual) {
+  if (!Object.is(expected, actual)) {
     mismatches.push({ path: path, expected: expected, actual: actual });
   }
+}
+
+// The comparing rule on its own, so tests can try to fool it with fake results.
+export function findMismatches(expected, actual) {
+  const mismatches = [];
+  collectMismatches(expected, actual, "", mismatches);
+  return mismatches;
 }
 
 // TV02 carries the three tables PRINTED in Appendix E of the regulation.

@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { VECTORS } from "../engine/vectors.js";
+import { findMismatches } from "../engine/selfcheck.js";
 import {
   runSelfCheck,
   accountFromVector,
@@ -183,4 +184,114 @@ test("TV15 exactArithmeticReference: whole-cent rounding drifts by under 7 cents
   const driftSurplus = Math.abs(result.surplusCents - exact.surplusExactCents);
   assert.ok(driftRequired < 7, "required start drifted " + driftRequired + " cents");
   assert.ok(driftSurplus < 7, "surplus drifted " + driftSurplus + " cents");
+});
+
+// ---------- can the checker be fooled? (SPEC E3a.6) ----------
+// findMismatches is the comparing rule runSelfCheck uses. These tests hand it
+// deliberately broken FAKE results. The browser proof is only worth something
+// if the checker itself cannot be tricked.
+
+function pathsOf(mismatches) {
+  return mismatches.map((mismatch) => mismatch.path);
+}
+
+const EXPECTED_SAMPLE = {
+  surplusCents: 5000,
+  nearLine: { line: "SURPLUS_50", distanceCents: 0, toleranceCents: 700 },
+  lowPoint: { projectedBalanceCents: 85000, month: 11 },
+  servicerOptions: ["refund the surplus"],
+  table: [{ month: 1, depositCents: 40000 }, { month: 2, depositCents: 40000 }],
+};
+
+function fakeResult() {
+  return copy(EXPECTED_SAMPLE);
+}
+
+test("checker: an identical result has no mismatches", () => {
+  assert.deepStrictEqual(findMismatches(EXPECTED_SAMPLE, fakeResult()), []);
+});
+
+test("checker: EXTRA keys on the actual side are ignored at every depth", () => {
+  const actual = fakeResult();
+  actual.inputs = { startMonth: 1 };
+  actual.nearLine.side = "at-or-above";
+  actual.nearLine.amountCents = 5000;
+  actual.lowPoint.extra = true;
+  actual.table[0].note = "hello";
+  assert.deepStrictEqual(findMismatches(EXPECTED_SAMPLE, actual), []);
+});
+
+test("checker: a MISSING nested key fails", () => {
+  const actual = fakeResult();
+  delete actual.nearLine.toleranceCents;
+  delete actual.lowPoint.month;
+  assert.deepStrictEqual(pathsOf(findMismatches(EXPECTED_SAMPLE, actual)), ["nearLine.toleranceCents", "lowPoint.month"]);
+});
+
+test("checker: null where an object is expected fails, and an object where null is expected fails", () => {
+  const gotNull = fakeResult();
+  gotNull.nearLine = null;
+  assert.deepStrictEqual(pathsOf(findMismatches(EXPECTED_SAMPLE, gotNull)), ["nearLine"]);
+
+  const expectsNull = copy(EXPECTED_SAMPLE);
+  expectsNull.nearLine = null;
+  assert.deepStrictEqual(pathsOf(findMismatches(expectsNull, fakeResult())), ["nearLine"]);
+  assert.deepStrictEqual(findMismatches(expectsNull, gotNull), []);
+
+  const gotUndefined = fakeResult();
+  delete gotUndefined.nearLine;
+  assert.deepStrictEqual(pathsOf(findMismatches(expectsNull, gotUndefined)), ["nearLine"]);
+});
+
+test("checker: a table with one row too few or one too many fails", () => {
+  const short = fakeResult();
+  short.table.pop();
+  assert.deepStrictEqual(pathsOf(findMismatches(EXPECTED_SAMPLE, short)), ["table.length"]);
+  const long = fakeResult();
+  long.table.push({ month: 3, depositCents: 40000 });
+  assert.deepStrictEqual(pathsOf(findMismatches(EXPECTED_SAMPLE, long)), ["table.length"]);
+});
+
+test("checker: the real 12-row table — 11 or 13 rows fail against a real vector", () => {
+  const vector = VECTORS[0];
+  const real = analyze(accountFromVector(vector));
+  const eleven = copy(real);
+  eleven.table.pop();
+  const thirteen = copy(real);
+  thirteen.table.push(copy(real.table[0]));
+  assert.deepStrictEqual(findMismatches(vector.expected.table, real.table), []);
+  assert.deepStrictEqual(pathsOf(findMismatches(vector.expected.table, eleven.table)), [".length"]);
+  assert.deepStrictEqual(pathsOf(findMismatches(vector.expected.table, thirteen.table)), [".length"]);
+});
+
+test("checker: servicerOptions must match exactly — same length, same order", () => {
+  const expected = { servicerOptions: ["a", "b"] };
+  assert.deepStrictEqual(findMismatches(expected, { servicerOptions: ["a", "b"] }), []);
+  assert.deepStrictEqual(pathsOf(findMismatches(expected, { servicerOptions: ["b", "a"] })), ["servicerOptions[0]", "servicerOptions[1]"]);
+  assert.deepStrictEqual(pathsOf(findMismatches(expected, { servicerOptions: ["a", "b", "c"] })), ["servicerOptions.length"]);
+  assert.deepStrictEqual(pathsOf(findMismatches(expected, { servicerOptions: "a,b" })), ["servicerOptions.length"]);
+});
+
+test("checker: -0 where 0 is expected fails (and the other way round)", () => {
+  assert.deepStrictEqual(pathsOf(findMismatches({ stepTwoAddCents: 0 }, { stepTwoAddCents: -0 })), ["stepTwoAddCents"]);
+  assert.deepStrictEqual(pathsOf(findMismatches({ stepTwoAddCents: -0 }, { stepTwoAddCents: 0 })), ["stepTwoAddCents"]);
+  assert.deepStrictEqual(findMismatches({ stepTwoAddCents: 0 }, { stepTwoAddCents: 0 }), []);
+});
+
+test("checker: a differing type fails (number vs text, true vs 1, list vs object)", () => {
+  assert.equal(findMismatches({ a: 1 }, { a: "1" }).length, 1);
+  assert.equal(findMismatches({ a: true }, { a: 1 }).length, 1);
+  assert.equal(findMismatches({ a: [1] }, { a: { 0: 1, length: 1 } }).length, 1);
+  assert.equal(findMismatches({ a: { b: 1 } }, { a: [1] }).length, 1);
+});
+
+test("every vector's expected nearLine is matched by the engine (three pinned keys; extra describing keys allowed)", () => {
+  for (const vector of VECTORS) {
+    assert.ok("nearLine" in vector.expected, vector.id + " has no expected.nearLine");
+    const result = analyze(accountFromVector(vector));
+    assert.deepStrictEqual(findMismatches(vector.expected.nearLine, result.nearLine), [], vector.id);
+    if (result.nearLine !== null) {
+      assert.deepStrictEqual(Object.keys(result.nearLine), ["line", "distanceCents", "toleranceCents", "appliesTo", "side", "amountCents", "lineCents"]);
+    }
+  }
 });

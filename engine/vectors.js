@@ -50,6 +50,9 @@ export const VECTORS_META = {
     "CFPB interactive Regulation X: consumerfinance.gov/rules-policy/regulations/1024/17/ and /1024/e/ - pulled 2026-09-19",
     "Cornell LII: law.cornell.edu/cfr/text/12/1024.17 and /appendix-E_to_part_1024 - pulled 2026-09-19",
     "HUD, Escrow Accounting Procedures final rule, 60 FR 8812 (Feb. 15, 1995), govinfo.gov FR-1995-02-15 doc 95-3683, and the CFPB-hosted copy files.consumerfinance.gov/f/documents/HUD_95-3683.pdf - pulled 2026-09-19"
+  ],
+  "amendments": [
+    "2026-09-19 (Phase 4, independent math audit): appended TV22, TV23, TV24, TV25, TV26, TV27, TV28, TV29 and added the additive key expected.nearLine to every earlier vector (SPEC Part E). No pre-existing value was changed; verified by script."
   ]
 };
 
@@ -220,7 +223,8 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 150000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -386,7 +390,8 @@ export const VECTORS = [
           "targetBalanceCents": 104000,
           "projectedBalanceCents": 104000
         }
-      ]
+      ],
+      "nearLine": null
     },
     "publishedTables": {
       "note": "13 entries: starting row then months 1-12, exactly as printed in the source",
@@ -602,7 +607,8 @@ export const VECTORS = [
           "targetBalanceCents": 109000,
           "projectedBalanceCents": 132000
         }
-      ]
+      ],
+      "nearLine": null
     },
     "publishedTables": {
       "note": "13 entries: starting row then months 1-12, exactly as printed in the source",
@@ -793,7 +799,8 @@ export const VECTORS = [
           "targetBalanceCents": 330000,
           "projectedBalanceCents": -240000
         }
-      ]
+      ],
+      "nearLine": null
     },
     "publishedTables": {
       "note": "13 entries: starting row then months 1-12, exactly as printed in the source",
@@ -979,7 +986,8 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 120000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -1147,7 +1155,12 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 125000
         }
-      ]
+      ],
+      "nearLine": {
+        "line": "SURPLUS_50",
+        "distanceCents": 0,
+        "toleranceCents": 700
+      }
     }
   },
   {
@@ -1316,7 +1329,12 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 124999
         }
-      ]
+      ],
+      "nearLine": {
+        "line": "SURPLUS_50",
+        "distanceCents": 1,
+        "toleranceCents": 700
+      }
     }
   },
   {
@@ -1485,7 +1503,8 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 123000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -1655,7 +1674,8 @@ export const VECTORS = [
           "targetBalanceCents": 240000,
           "projectedBalanceCents": 216000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -1824,7 +1844,12 @@ export const VECTORS = [
           "targetBalanceCents": 240000,
           "projectedBalanceCents": 192000
         }
-      ]
+      ],
+      "nearLine": {
+        "line": "ONE_MONTH_PAYMENT",
+        "distanceCents": 0,
+        "toleranceCents": 700
+      }
     }
   },
   {
@@ -1994,7 +2019,12 @@ export const VECTORS = [
           "targetBalanceCents": 240000,
           "projectedBalanceCents": 192001
         }
-      ]
+      ],
+      "nearLine": {
+        "line": "ONE_MONTH_PAYMENT",
+        "distanceCents": 1,
+        "toleranceCents": 700
+      }
     }
   },
   {
@@ -2163,7 +2193,8 @@ export const VECTORS = [
           "targetBalanceCents": 240000,
           "projectedBalanceCents": 120000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -2323,7 +2354,8 @@ export const VECTORS = [
           "targetBalanceCents": 0,
           "projectedBalanceCents": -15000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -2491,7 +2523,8 @@ export const VECTORS = [
           "targetBalanceCents": 90000,
           "projectedBalanceCents": 100000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -2666,7 +2699,8 @@ export const VECTORS = [
           "targetBalanceCents": 185000,
           "projectedBalanceCents": 170000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -2840,7 +2874,8 @@ export const VECTORS = [
         "note": "What you get with NO rounding until the end. Not the expected value - shown so the rounding drift is visible.",
         "requiredStartingBalanceExactCents": 166666.66666666666,
         "surplusExactCents": 3333.333333333343
-      }
+      },
+      "nearLine": null
     }
   },
   {
@@ -3008,7 +3043,8 @@ export const VECTORS = [
           "targetBalanceCents": 80000,
           "projectedBalanceCents": 150000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -3176,7 +3212,8 @@ export const VECTORS = [
           "targetBalanceCents": 40000,
           "projectedBalanceCents": 150000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -3374,7 +3411,8 @@ export const VECTORS = [
           "timingNeedRoseCents": 7500,
           "lastYearCameInUnderProjectionCents": 7500
         }
-      }
+      },
+      "nearLine": null
     }
   },
   {
@@ -3543,7 +3581,8 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 10000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -3711,7 +3750,8 @@ export const VECTORS = [
           "targetBalanceCents": 120000,
           "projectedBalanceCents": 150000
         }
-      ]
+      ],
+      "nearLine": null
     }
   },
   {
@@ -3946,6 +3986,1347 @@ export const VECTORS = [
           "step1TrialBalanceCents": 0,
           "targetBalanceCents": 130000,
           "projectedBalanceCents": 130000
+        }
+      ],
+      "nearLine": null
+    }
+  },
+  {
+    "id": "TV22",
+    "title": "Pure deficiency, borrower NOT current - (f)(4)(iii): no tier, no repayment schedule (audit, SPEC E2)",
+    "source": "DERIVED",
+    "startMonth": 3,
+    "inputs": {
+      "startingBalanceCents": -45000,
+      "cushionMonths": 0,
+      "borrowerCurrent": false,
+      "disbursements": [
+        {
+          "label": "Property tax (annual)",
+          "month": 12,
+          "amountCents": 360000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 360000,
+      "baseMonthlyPaymentCents": 30000,
+      "cushionCapCents": 0,
+      "stepTwoAddCents": 0,
+      "requiredStartingBalanceCents": 0,
+      "differenceCents": -45000,
+      "surplusCents": 0,
+      "shortageCents": 0,
+      "deficiencyCents": 45000,
+      "lowPoint": {
+        "projectedBalanceCents": -45000,
+        "month": 12,
+        "calendarMonth": 2,
+        "lowestTargetBalanceCents": 0
+      },
+      "classification": "DEFICIENCY_BORROWER_NOT_CURRENT",
+      "cite": "12 CFR 1024.17(f)(4)(iii)",
+      "servicerOptions": [
+        "deficiency: servicer may recover the deficiency pursuant to the loan documents"
+      ],
+      "nearLine": null,
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 30000,
+        "shortageSpreadOver12Cents": 0,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 30000,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 30000
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 3,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 30000,
+          "targetBalanceCents": 30000,
+          "projectedBalanceCents": -15000
+        },
+        {
+          "month": 2,
+          "calendarMonth": 4,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 60000,
+          "targetBalanceCents": 60000,
+          "projectedBalanceCents": 15000
+        },
+        {
+          "month": 3,
+          "calendarMonth": 5,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 90000,
+          "targetBalanceCents": 90000,
+          "projectedBalanceCents": 45000
+        },
+        {
+          "month": 4,
+          "calendarMonth": 6,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 120000,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": 75000
+        },
+        {
+          "month": 5,
+          "calendarMonth": 7,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 150000,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": 105000
+        },
+        {
+          "month": 6,
+          "calendarMonth": 8,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 180000,
+          "targetBalanceCents": 180000,
+          "projectedBalanceCents": 135000
+        },
+        {
+          "month": 7,
+          "calendarMonth": 9,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 210000,
+          "targetBalanceCents": 210000,
+          "projectedBalanceCents": 165000
+        },
+        {
+          "month": 8,
+          "calendarMonth": 10,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 240000,
+          "targetBalanceCents": 240000,
+          "projectedBalanceCents": 195000
+        },
+        {
+          "month": 9,
+          "calendarMonth": 11,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 270000,
+          "targetBalanceCents": 270000,
+          "projectedBalanceCents": 225000
+        },
+        {
+          "month": 10,
+          "calendarMonth": 12,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 300000,
+          "targetBalanceCents": 300000,
+          "projectedBalanceCents": 255000
+        },
+        {
+          "month": 11,
+          "calendarMonth": 1,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 330000,
+          "targetBalanceCents": 330000,
+          "projectedBalanceCents": 285000
+        },
+        {
+          "month": 12,
+          "calendarMonth": 2,
+          "depositCents": 30000,
+          "disbursementCents": 360000,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 0,
+          "projectedBalanceCents": -45000
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV23",
+    "title": "Deficiency + shortage, borrower NOT current - deficiency has no tier, shortage tier unchanged (audit, SPEC E2)",
+    "source": "DERIVED",
+    "startMonth": 1,
+    "inputs": {
+      "startingBalanceCents": -20000,
+      "cushionMonths": 2,
+      "borrowerCurrent": false,
+      "disbursements": [
+        {
+          "label": "Property tax",
+          "month": 4,
+          "amountCents": 240000
+        },
+        {
+          "label": "Homeowners insurance",
+          "month": 9,
+          "amountCents": 120000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 360000,
+      "baseMonthlyPaymentCents": 30000,
+      "cushionCapCents": 60000,
+      "stepTwoAddCents": 120000,
+      "requiredStartingBalanceCents": 180000,
+      "differenceCents": -200000,
+      "surplusCents": 0,
+      "shortageCents": 180000,
+      "deficiencyCents": 20000,
+      "lowPoint": {
+        "projectedBalanceCents": -140000,
+        "month": 4,
+        "calendarMonth": 4,
+        "lowestTargetBalanceCents": 60000
+      },
+      "classification": "DEFICIENCY_BORROWER_NOT_CURRENT_AND_SHORTAGE_GE_ONE_MONTH",
+      "cite": "12 CFR 1024.17(f)(4)(iii) + 12 CFR 1024.17(f)(3)(ii)",
+      "servicerOptions": [
+        "deficiency: servicer may recover the deficiency pursuant to the loan documents",
+        "shortage: do nothing",
+        "shortage: require repayment in equal monthly payments over at least 12 months"
+      ],
+      "nearLine": null,
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 30000,
+        "shortageSpreadOver12Cents": 15000,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 45000,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 45000
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 1,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 30000,
+          "targetBalanceCents": 210000,
+          "projectedBalanceCents": 10000
+        },
+        {
+          "month": 2,
+          "calendarMonth": 2,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 60000,
+          "targetBalanceCents": 240000,
+          "projectedBalanceCents": 40000
+        },
+        {
+          "month": 3,
+          "calendarMonth": 3,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 90000,
+          "targetBalanceCents": 270000,
+          "projectedBalanceCents": 70000
+        },
+        {
+          "month": 4,
+          "calendarMonth": 4,
+          "depositCents": 30000,
+          "disbursementCents": 240000,
+          "step1TrialBalanceCents": -120000,
+          "targetBalanceCents": 60000,
+          "projectedBalanceCents": -140000
+        },
+        {
+          "month": 5,
+          "calendarMonth": 5,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -90000,
+          "targetBalanceCents": 90000,
+          "projectedBalanceCents": -110000
+        },
+        {
+          "month": 6,
+          "calendarMonth": 6,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -60000,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": -80000
+        },
+        {
+          "month": 7,
+          "calendarMonth": 7,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -30000,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": -50000
+        },
+        {
+          "month": 8,
+          "calendarMonth": 8,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 180000,
+          "projectedBalanceCents": -20000
+        },
+        {
+          "month": 9,
+          "calendarMonth": 9,
+          "depositCents": 30000,
+          "disbursementCents": 120000,
+          "step1TrialBalanceCents": -90000,
+          "targetBalanceCents": 90000,
+          "projectedBalanceCents": -110000
+        },
+        {
+          "month": 10,
+          "calendarMonth": 10,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -60000,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": -80000
+        },
+        {
+          "month": 11,
+          "calendarMonth": 11,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -30000,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": -50000
+        },
+        {
+          "month": 12,
+          "calendarMonth": 12,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 180000,
+          "projectedBalanceCents": -20000
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV24",
+    "title": "SHORTAGE with borrower NOT current - shortage tiers and options do not change, (f)(3) has no current test (audit, SPEC E2)",
+    "source": "DERIVED",
+    "startMonth": 10,
+    "inputs": {
+      "startingBalanceCents": 180000,
+      "cushionMonths": 2,
+      "borrowerCurrent": false,
+      "disbursements": [
+        {
+          "label": "Property tax 1st half",
+          "month": 2,
+          "amountCents": 150000
+        },
+        {
+          "label": "Homeowners insurance",
+          "month": 6,
+          "amountCents": 90000
+        },
+        {
+          "label": "Property tax 2nd half",
+          "month": 8,
+          "amountCents": 150000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 390000,
+      "baseMonthlyPaymentCents": 32500,
+      "cushionCapCents": 65000,
+      "stepTwoAddCents": 130000,
+      "requiredStartingBalanceCents": 195000,
+      "differenceCents": -15000,
+      "surplusCents": 0,
+      "shortageCents": 15000,
+      "deficiencyCents": 0,
+      "lowPoint": {
+        "projectedBalanceCents": 50000,
+        "month": 8,
+        "calendarMonth": 5,
+        "lowestTargetBalanceCents": 65000
+      },
+      "classification": "SHORTAGE_LT_ONE_MONTH",
+      "cite": "12 CFR 1024.17(f)(3)(i)",
+      "servicerOptions": [
+        "shortage: do nothing",
+        "shortage: require repayment within 30 days",
+        "shortage: require repayment in equal monthly payments over at least 12 months"
+      ],
+      "nearLine": null,
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 32500,
+        "shortageSpreadOver12Cents": 1250,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 33750,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 33750
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 10,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 32500,
+          "targetBalanceCents": 227500,
+          "projectedBalanceCents": 212500
+        },
+        {
+          "month": 2,
+          "calendarMonth": 11,
+          "depositCents": 32500,
+          "disbursementCents": 150000,
+          "step1TrialBalanceCents": -85000,
+          "targetBalanceCents": 110000,
+          "projectedBalanceCents": 95000
+        },
+        {
+          "month": 3,
+          "calendarMonth": 12,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -52500,
+          "targetBalanceCents": 142500,
+          "projectedBalanceCents": 127500
+        },
+        {
+          "month": 4,
+          "calendarMonth": 1,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -20000,
+          "targetBalanceCents": 175000,
+          "projectedBalanceCents": 160000
+        },
+        {
+          "month": 5,
+          "calendarMonth": 2,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 12500,
+          "targetBalanceCents": 207500,
+          "projectedBalanceCents": 192500
+        },
+        {
+          "month": 6,
+          "calendarMonth": 3,
+          "depositCents": 32500,
+          "disbursementCents": 90000,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": 135000
+        },
+        {
+          "month": 7,
+          "calendarMonth": 4,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -12500,
+          "targetBalanceCents": 182500,
+          "projectedBalanceCents": 167500
+        },
+        {
+          "month": 8,
+          "calendarMonth": 5,
+          "depositCents": 32500,
+          "disbursementCents": 150000,
+          "step1TrialBalanceCents": -130000,
+          "targetBalanceCents": 65000,
+          "projectedBalanceCents": 50000
+        },
+        {
+          "month": 9,
+          "calendarMonth": 6,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -97500,
+          "targetBalanceCents": 97500,
+          "projectedBalanceCents": 82500
+        },
+        {
+          "month": 10,
+          "calendarMonth": 7,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -65000,
+          "targetBalanceCents": 130000,
+          "projectedBalanceCents": 115000
+        },
+        {
+          "month": 11,
+          "calendarMonth": 8,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -32500,
+          "targetBalanceCents": 162500,
+          "projectedBalanceCents": 147500
+        },
+        {
+          "month": 12,
+          "calendarMonth": 9,
+          "depositCents": 32500,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 195000,
+          "projectedBalanceCents": 180000
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV25",
+    "title": "All-positive Step 1 (rounding artifact): one bill of $1,200.06 in month 12 - pins the floor on the Step 2 add (audit, SPEC E1)",
+    "source": "DERIVED",
+    "startMonth": 1,
+    "inputs": {
+      "startingBalanceCents": 30000,
+      "cushionMonths": 2,
+      "borrowerCurrent": true,
+      "disbursements": [
+        {
+          "label": "Property tax (annual)",
+          "month": 12,
+          "amountCents": 120006
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 120006,
+      "baseMonthlyPaymentCents": 10001,
+      "cushionCapCents": 20001,
+      "stepTwoAddCents": 0,
+      "requiredStartingBalanceCents": 20001,
+      "differenceCents": 9999,
+      "surplusCents": 9999,
+      "shortageCents": 0,
+      "deficiencyCents": 0,
+      "lowPoint": {
+        "projectedBalanceCents": 30006,
+        "month": 12,
+        "calendarMonth": 12,
+        "lowestTargetBalanceCents": 20007
+      },
+      "classification": "SURPLUS_REFUND_REQUIRED",
+      "cite": "12 CFR 1024.17(f)(2)(i)",
+      "servicerOptions": [
+        "refund the surplus to the borrower within 30 days from the date of the analysis"
+      ],
+      "nearLine": null,
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 10001,
+        "shortageSpreadOver12Cents": 0,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 10001,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 10001
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 1,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 10001,
+          "targetBalanceCents": 30002,
+          "projectedBalanceCents": 40001
+        },
+        {
+          "month": 2,
+          "calendarMonth": 2,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 20002,
+          "targetBalanceCents": 40003,
+          "projectedBalanceCents": 50002
+        },
+        {
+          "month": 3,
+          "calendarMonth": 3,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 30003,
+          "targetBalanceCents": 50004,
+          "projectedBalanceCents": 60003
+        },
+        {
+          "month": 4,
+          "calendarMonth": 4,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 40004,
+          "targetBalanceCents": 60005,
+          "projectedBalanceCents": 70004
+        },
+        {
+          "month": 5,
+          "calendarMonth": 5,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 50005,
+          "targetBalanceCents": 70006,
+          "projectedBalanceCents": 80005
+        },
+        {
+          "month": 6,
+          "calendarMonth": 6,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 60006,
+          "targetBalanceCents": 80007,
+          "projectedBalanceCents": 90006
+        },
+        {
+          "month": 7,
+          "calendarMonth": 7,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 70007,
+          "targetBalanceCents": 90008,
+          "projectedBalanceCents": 100007
+        },
+        {
+          "month": 8,
+          "calendarMonth": 8,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 80008,
+          "targetBalanceCents": 100009,
+          "projectedBalanceCents": 110008
+        },
+        {
+          "month": 9,
+          "calendarMonth": 9,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 90009,
+          "targetBalanceCents": 110010,
+          "projectedBalanceCents": 120009
+        },
+        {
+          "month": 10,
+          "calendarMonth": 10,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 100010,
+          "targetBalanceCents": 120011,
+          "projectedBalanceCents": 130010
+        },
+        {
+          "month": 11,
+          "calendarMonth": 11,
+          "depositCents": 10001,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 110011,
+          "targetBalanceCents": 130012,
+          "projectedBalanceCents": 140011
+        },
+        {
+          "month": 12,
+          "calendarMonth": 12,
+          "depositCents": 10001,
+          "disbursementCents": 120006,
+          "step1TrialBalanceCents": 6,
+          "targetBalanceCents": 20007,
+          "projectedBalanceCents": 30006
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV26",
+    "title": "Surplus $52.00 - refund required by the cents, but inside the $7 too-close-to-call band (audit, SPEC E3)",
+    "source": "DERIVED",
+    "startMonth": 6,
+    "inputs": {
+      "startingBalanceCents": 155200,
+      "cushionMonths": 2,
+      "borrowerCurrent": true,
+      "disbursements": [
+        {
+          "label": "Property tax 1st half",
+          "month": 3,
+          "amountCents": 135000
+        },
+        {
+          "label": "Homeowners insurance",
+          "month": 5,
+          "amountCents": 90000
+        },
+        {
+          "label": "Property tax 2nd half",
+          "month": 9,
+          "amountCents": 135000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 360000,
+      "baseMonthlyPaymentCents": 30000,
+      "cushionCapCents": 60000,
+      "stepTwoAddCents": 90000,
+      "requiredStartingBalanceCents": 150000,
+      "differenceCents": 5200,
+      "surplusCents": 5200,
+      "shortageCents": 0,
+      "deficiencyCents": 0,
+      "lowPoint": {
+        "projectedBalanceCents": 65200,
+        "month": 9,
+        "calendarMonth": 2,
+        "lowestTargetBalanceCents": 60000
+      },
+      "classification": "SURPLUS_REFUND_REQUIRED",
+      "cite": "12 CFR 1024.17(f)(2)(i)",
+      "servicerOptions": [
+        "refund the surplus to the borrower within 30 days from the date of the analysis"
+      ],
+      "nearLine": {
+        "line": "SURPLUS_50",
+        "distanceCents": 200,
+        "toleranceCents": 700
+      },
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 30000,
+        "shortageSpreadOver12Cents": 0,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 30000,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 30000
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 6,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 30000,
+          "targetBalanceCents": 180000,
+          "projectedBalanceCents": 185200
+        },
+        {
+          "month": 2,
+          "calendarMonth": 7,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 60000,
+          "targetBalanceCents": 210000,
+          "projectedBalanceCents": 215200
+        },
+        {
+          "month": 3,
+          "calendarMonth": 8,
+          "depositCents": 30000,
+          "disbursementCents": 135000,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 110200
+        },
+        {
+          "month": 4,
+          "calendarMonth": 9,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 135000,
+          "projectedBalanceCents": 140200
+        },
+        {
+          "month": 5,
+          "calendarMonth": 10,
+          "depositCents": 30000,
+          "disbursementCents": 90000,
+          "step1TrialBalanceCents": -75000,
+          "targetBalanceCents": 75000,
+          "projectedBalanceCents": 80200
+        },
+        {
+          "month": 6,
+          "calendarMonth": 11,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 110200
+        },
+        {
+          "month": 7,
+          "calendarMonth": 12,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 135000,
+          "projectedBalanceCents": 140200
+        },
+        {
+          "month": 8,
+          "calendarMonth": 1,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 15000,
+          "targetBalanceCents": 165000,
+          "projectedBalanceCents": 170200
+        },
+        {
+          "month": 9,
+          "calendarMonth": 2,
+          "depositCents": 30000,
+          "disbursementCents": 135000,
+          "step1TrialBalanceCents": -90000,
+          "targetBalanceCents": 60000,
+          "projectedBalanceCents": 65200
+        },
+        {
+          "month": 10,
+          "calendarMonth": 3,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -60000,
+          "targetBalanceCents": 90000,
+          "projectedBalanceCents": 95200
+        },
+        {
+          "month": 11,
+          "calendarMonth": 4,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -30000,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": 125200
+        },
+        {
+          "month": 12,
+          "calendarMonth": 5,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": 155200
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV27",
+    "title": "Shortage $346.00, $4.00 under one month's payment ($350.00) - small tier by the cents, but too close to call (audit, SPEC E3)",
+    "source": "DERIVED",
+    "startMonth": 1,
+    "inputs": {
+      "startingBalanceCents": 85400,
+      "cushionMonths": 2,
+      "borrowerCurrent": true,
+      "disbursements": [
+        {
+          "label": "Homeowners insurance",
+          "month": 2,
+          "amountCents": 120000
+        },
+        {
+          "label": "Property tax (annual)",
+          "month": 11,
+          "amountCents": 300000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 420000,
+      "baseMonthlyPaymentCents": 35000,
+      "cushionCapCents": 70000,
+      "stepTwoAddCents": 50000,
+      "requiredStartingBalanceCents": 120000,
+      "differenceCents": -34600,
+      "surplusCents": 0,
+      "shortageCents": 34600,
+      "deficiencyCents": 0,
+      "lowPoint": {
+        "projectedBalanceCents": 35400,
+        "month": 2,
+        "calendarMonth": 2,
+        "lowestTargetBalanceCents": 70000
+      },
+      "classification": "SHORTAGE_LT_ONE_MONTH",
+      "cite": "12 CFR 1024.17(f)(3)(i)",
+      "servicerOptions": [
+        "shortage: do nothing",
+        "shortage: require repayment within 30 days",
+        "shortage: require repayment in equal monthly payments over at least 12 months"
+      ],
+      "nearLine": {
+        "line": "ONE_MONTH_PAYMENT",
+        "distanceCents": 400,
+        "toleranceCents": 700
+      },
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 35000,
+        "shortageSpreadOver12Cents": 2883,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 37883,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 37883
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 1,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 35000,
+          "targetBalanceCents": 155000,
+          "projectedBalanceCents": 120400
+        },
+        {
+          "month": 2,
+          "calendarMonth": 2,
+          "depositCents": 35000,
+          "disbursementCents": 120000,
+          "step1TrialBalanceCents": -50000,
+          "targetBalanceCents": 70000,
+          "projectedBalanceCents": 35400
+        },
+        {
+          "month": 3,
+          "calendarMonth": 3,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 70400
+        },
+        {
+          "month": 4,
+          "calendarMonth": 4,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 20000,
+          "targetBalanceCents": 140000,
+          "projectedBalanceCents": 105400
+        },
+        {
+          "month": 5,
+          "calendarMonth": 5,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 55000,
+          "targetBalanceCents": 175000,
+          "projectedBalanceCents": 140400
+        },
+        {
+          "month": 6,
+          "calendarMonth": 6,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 90000,
+          "targetBalanceCents": 210000,
+          "projectedBalanceCents": 175400
+        },
+        {
+          "month": 7,
+          "calendarMonth": 7,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 125000,
+          "targetBalanceCents": 245000,
+          "projectedBalanceCents": 210400
+        },
+        {
+          "month": 8,
+          "calendarMonth": 8,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 160000,
+          "targetBalanceCents": 280000,
+          "projectedBalanceCents": 245400
+        },
+        {
+          "month": 9,
+          "calendarMonth": 9,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 195000,
+          "targetBalanceCents": 315000,
+          "projectedBalanceCents": 280400
+        },
+        {
+          "month": 10,
+          "calendarMonth": 10,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 230000,
+          "targetBalanceCents": 350000,
+          "projectedBalanceCents": 315400
+        },
+        {
+          "month": 11,
+          "calendarMonth": 11,
+          "depositCents": 35000,
+          "disbursementCents": 300000,
+          "step1TrialBalanceCents": -35000,
+          "targetBalanceCents": 85000,
+          "projectedBalanceCents": 50400
+        },
+        {
+          "month": 12,
+          "calendarMonth": 12,
+          "depositCents": 35000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": 85400
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV28",
+    "title": "Surplus $57.00 - exactly $7.00 above the $50 line: still inside the band, the band is inclusive (audit, SPEC E3, optional)",
+    "source": "DERIVED",
+    "startMonth": 6,
+    "inputs": {
+      "startingBalanceCents": 155700,
+      "cushionMonths": 2,
+      "borrowerCurrent": true,
+      "disbursements": [
+        {
+          "label": "Property tax 1st half",
+          "month": 3,
+          "amountCents": 135000
+        },
+        {
+          "label": "Homeowners insurance",
+          "month": 5,
+          "amountCents": 90000
+        },
+        {
+          "label": "Property tax 2nd half",
+          "month": 9,
+          "amountCents": 135000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 360000,
+      "baseMonthlyPaymentCents": 30000,
+      "cushionCapCents": 60000,
+      "stepTwoAddCents": 90000,
+      "requiredStartingBalanceCents": 150000,
+      "differenceCents": 5700,
+      "surplusCents": 5700,
+      "shortageCents": 0,
+      "deficiencyCents": 0,
+      "lowPoint": {
+        "projectedBalanceCents": 65700,
+        "month": 9,
+        "calendarMonth": 2,
+        "lowestTargetBalanceCents": 60000
+      },
+      "classification": "SURPLUS_REFUND_REQUIRED",
+      "cite": "12 CFR 1024.17(f)(2)(i)",
+      "servicerOptions": [
+        "refund the surplus to the borrower within 30 days from the date of the analysis"
+      ],
+      "nearLine": {
+        "line": "SURPLUS_50",
+        "distanceCents": 700,
+        "toleranceCents": 700
+      },
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 30000,
+        "shortageSpreadOver12Cents": 0,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 30000,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 30000
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 6,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 30000,
+          "targetBalanceCents": 180000,
+          "projectedBalanceCents": 185700
+        },
+        {
+          "month": 2,
+          "calendarMonth": 7,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 60000,
+          "targetBalanceCents": 210000,
+          "projectedBalanceCents": 215700
+        },
+        {
+          "month": 3,
+          "calendarMonth": 8,
+          "depositCents": 30000,
+          "disbursementCents": 135000,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 110700
+        },
+        {
+          "month": 4,
+          "calendarMonth": 9,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 135000,
+          "projectedBalanceCents": 140700
+        },
+        {
+          "month": 5,
+          "calendarMonth": 10,
+          "depositCents": 30000,
+          "disbursementCents": 90000,
+          "step1TrialBalanceCents": -75000,
+          "targetBalanceCents": 75000,
+          "projectedBalanceCents": 80700
+        },
+        {
+          "month": 6,
+          "calendarMonth": 11,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 110700
+        },
+        {
+          "month": 7,
+          "calendarMonth": 12,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 135000,
+          "projectedBalanceCents": 140700
+        },
+        {
+          "month": 8,
+          "calendarMonth": 1,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 15000,
+          "targetBalanceCents": 165000,
+          "projectedBalanceCents": 170700
+        },
+        {
+          "month": 9,
+          "calendarMonth": 2,
+          "depositCents": 30000,
+          "disbursementCents": 135000,
+          "step1TrialBalanceCents": -90000,
+          "targetBalanceCents": 60000,
+          "projectedBalanceCents": 65700
+        },
+        {
+          "month": 10,
+          "calendarMonth": 3,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -60000,
+          "targetBalanceCents": 90000,
+          "projectedBalanceCents": 95700
+        },
+        {
+          "month": 11,
+          "calendarMonth": 4,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -30000,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": 125700
+        },
+        {
+          "month": 12,
+          "calendarMonth": 5,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": 155700
+        }
+      ]
+    }
+  },
+  {
+    "id": "TV29",
+    "title": "Surplus $57.01 - one cent outside the band: nearLine is null (audit, SPEC E3, optional)",
+    "source": "DERIVED",
+    "startMonth": 6,
+    "inputs": {
+      "startingBalanceCents": 155701,
+      "cushionMonths": 2,
+      "borrowerCurrent": true,
+      "disbursements": [
+        {
+          "label": "Property tax 1st half",
+          "month": 3,
+          "amountCents": 135000
+        },
+        {
+          "label": "Homeowners insurance",
+          "month": 5,
+          "amountCents": 90000
+        },
+        {
+          "label": "Property tax 2nd half",
+          "month": 9,
+          "amountCents": 135000
+        }
+      ]
+    },
+    "expected": {
+      "annualDisbursementsCents": 360000,
+      "baseMonthlyPaymentCents": 30000,
+      "cushionCapCents": 60000,
+      "stepTwoAddCents": 90000,
+      "requiredStartingBalanceCents": 150000,
+      "differenceCents": 5701,
+      "surplusCents": 5701,
+      "shortageCents": 0,
+      "deficiencyCents": 0,
+      "lowPoint": {
+        "projectedBalanceCents": 65701,
+        "month": 9,
+        "calendarMonth": 2,
+        "lowestTargetBalanceCents": 60000
+      },
+      "classification": "SURPLUS_REFUND_REQUIRED",
+      "cite": "12 CFR 1024.17(f)(2)(i)",
+      "servicerOptions": [
+        "refund the surplus to the borrower within 30 days from the date of the analysis"
+      ],
+      "nearLine": null,
+      "newMonthlyEscrowPayment": {
+        "baseMonthlyCents": 30000,
+        "shortageSpreadOver12Cents": 0,
+        "deficiencySpreadCents": 0,
+        "deficiencySpreadMonths": 0,
+        "monthlyEscrowWhileRepayingDeficiencyCents": 30000,
+        "monthlyEscrowAfterDeficiencyRepaidCents": 30000
+      },
+      "table": [
+        {
+          "month": 1,
+          "calendarMonth": 6,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 30000,
+          "targetBalanceCents": 180000,
+          "projectedBalanceCents": 185701
+        },
+        {
+          "month": 2,
+          "calendarMonth": 7,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 60000,
+          "targetBalanceCents": 210000,
+          "projectedBalanceCents": 215701
+        },
+        {
+          "month": 3,
+          "calendarMonth": 8,
+          "depositCents": 30000,
+          "disbursementCents": 135000,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 110701
+        },
+        {
+          "month": 4,
+          "calendarMonth": 9,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 135000,
+          "projectedBalanceCents": 140701
+        },
+        {
+          "month": 5,
+          "calendarMonth": 10,
+          "depositCents": 30000,
+          "disbursementCents": 90000,
+          "step1TrialBalanceCents": -75000,
+          "targetBalanceCents": 75000,
+          "projectedBalanceCents": 80701
+        },
+        {
+          "month": 6,
+          "calendarMonth": 11,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -45000,
+          "targetBalanceCents": 105000,
+          "projectedBalanceCents": 110701
+        },
+        {
+          "month": 7,
+          "calendarMonth": 12,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -15000,
+          "targetBalanceCents": 135000,
+          "projectedBalanceCents": 140701
+        },
+        {
+          "month": 8,
+          "calendarMonth": 1,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 15000,
+          "targetBalanceCents": 165000,
+          "projectedBalanceCents": 170701
+        },
+        {
+          "month": 9,
+          "calendarMonth": 2,
+          "depositCents": 30000,
+          "disbursementCents": 135000,
+          "step1TrialBalanceCents": -90000,
+          "targetBalanceCents": 60000,
+          "projectedBalanceCents": 65701
+        },
+        {
+          "month": 10,
+          "calendarMonth": 3,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -60000,
+          "targetBalanceCents": 90000,
+          "projectedBalanceCents": 95701
+        },
+        {
+          "month": 11,
+          "calendarMonth": 4,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": -30000,
+          "targetBalanceCents": 120000,
+          "projectedBalanceCents": 125701
+        },
+        {
+          "month": 12,
+          "calendarMonth": 5,
+          "depositCents": 30000,
+          "disbursementCents": 0,
+          "step1TrialBalanceCents": 0,
+          "targetBalanceCents": 150000,
+          "projectedBalanceCents": 155701
         }
       ]
     }

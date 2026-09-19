@@ -66,6 +66,16 @@ for (const vector of research.vectors) {
     for (const key of Object.keys(vector.expected)) {
       if (DOC_ONLY_EXPECTED_KEYS.includes(key)) continue;
       assert.ok(key in result, vector.id + ": the engine's result has no `" + key + "`");
+      if (key === "nearLine" && vector.expected.nearLine !== null) {
+        // The vectors pin three keys of nearLine. The engine also carries
+        // describing keys for the plain-English text (SPEC E3a.6), so compare
+        // the pinned three one by one instead of the whole object.
+        assert.notEqual(result.nearLine, null, vector.id + " → nearLine should be set");
+        for (const pinned of ["line", "distanceCents", "toleranceCents"]) {
+          assert.ok(Object.is(result.nearLine[pinned], vector.expected.nearLine[pinned]), vector.id + " → nearLine." + pinned);
+        }
+        continue;
+      }
       assert.deepStrictEqual(result[key], vector.expected[key], vector.id + " → " + key);
     }
     assert.equal(result.table.length, 12);

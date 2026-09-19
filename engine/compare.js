@@ -20,7 +20,10 @@
 //   rows      one per statement number the person filled in:
 //             { key, label, statementCents, federalCents, gapCents, status, note }
 //             status: "match" | "differs" | "over-limit".  gap = statement − federal.
-//   flags     { kind, rowKey?, amountCents, perYearCents?, cite, sentence }
+//   flags     { kind, rowKey?, amountCents, perYearCents?, cite, sentence, letterLine }
+//             `sentence` talks to the homeowner ("Your statement…").
+//             `letterLine` says the same thing in the homeowner's own voice
+//             ("The statement…, by my math…") for the letter in letter.js.
 //             `amountCents` is "the dollars this flag is about":
 //               CUSHION_OVER_CAP   how far the statement's cushion is over the cap
 //               AMOUNT_DIFFERS     the gap between the two figures
@@ -186,6 +189,9 @@ function compareCushion(result, statement, rows, flags) {
     sentence:
       "Your statement keeps a cushion of " + formatCents(theirs) + ". The most the federal rule allows here is " +
       formatCents(capCents) + ": " + limitWords + ". That is " + formatCents(gapCents) + " over the limit. (" + cite + ")",
+    letterLine:
+      "The statement uses a required minimum balance (cushion) of " + formatCents(theirs) + ". By my math, the most " + cite +
+      " allows here is " + formatCents(capCents) + ". That is " + formatCents(gapCents) + " more.",
   });
 }
 
@@ -213,6 +219,9 @@ function compareClaim(result, statement, view, rows, flags) {
         sentence:
           "Your statement shows " + describeClaim(kind, null) + ". From the numbers you typed, the federal math finds " +
           describeAmounts(amounts) + " instead. (" + CLAIM_CITE + ")",
+        letterLine:
+          "The statement shows " + describeClaim(kind, null) + ". By my math, using the method in " + CLAIM_CITE +
+          ", the account has " + describeAmounts(amounts) + ".",
       });
     }
     return;
@@ -286,6 +295,9 @@ function compareClaim(result, statement, view, rows, flags) {
     amountCents: sizeOfGap,
     cite: CLAIM_CITE,
     sentence: sentence,
+    letterLine:
+      "The statement shows " + describeClaim(kind, claimedCents) + ". By my math, using the method in " + CLAIM_CITE +
+      ", the account has " + describeAmounts(amounts) + ". That is a gap of " + formatCents(sizeOfGap) + ".",
   });
 }
 
@@ -425,6 +437,10 @@ function comparePayment(result, statement, view, rows, flags) {
       perYearCents: perYearCents,
       cite: PAYMENT_CITE,
       sentence: sentence,
+      letterLine:
+        "The statement sets the new monthly escrow payment at " + formatCents(paymentCents) + ". By my math, the most " + PAYMENT_CITE +
+        " supports from these numbers is " + formatCents(maximumCents) + " a month (" + describeMaximum(result) + "). That is " +
+        formatCents(gapCents) + " a month more, or " + formatCents(perYearCents) + " over 12 months.",
     });
   }
 
@@ -439,6 +455,9 @@ function comparePayment(result, statement, view, rows, flags) {
         "Your statement's new escrow payment (" + formatCents(paymentCents) + " a month) is " + formatCents(sizeOfGap) +
         " a month lower than the federal math expects from the bills you typed (" + formatCents(federalCents) +
         "). Collecting less is allowed. It can mean the servicer is planning on different bill amounts than the ones typed here, so double-check each bill. (" + PAYMENT_CITE + ")",
+      letterLine:
+        "The statement sets the new monthly escrow payment at " + formatCents(paymentCents) + ". From the bills listed above I expected " +
+        formatCents(federalCents) + " a month. Please tell me which bill amounts and dates you used.",
     });
   }
 }
@@ -491,6 +510,9 @@ function checkSpread(result, statement, view, flags) {
     sentence:
       "Your statement repays the shortage (" + formatCents(shortageCents) + " by the federal math) over " + monthWord + ". " +
       listWords + " It is worth asking your servicer about. (" + cite + ")",
+    letterLine:
+      "The statement repays the shortage over " + monthWord + ". " + cite +
+      " lists repayment in equal monthly payments over at least 12 months. Please explain how this repayment period was chosen.",
   });
 }
 
@@ -516,6 +538,9 @@ function checkLumpSum(result, statement, view, flags) {
     sentence:
       "You told us the statement offers a pay-it-all-at-once option. By the federal math the shortage is " + formatCents(shortageCents) +
       ", which is more than one month's escrow payment. For a shortage that size, the rule lists two choices for the servicer: leave it alone, or spread it over at least 12 months. The CFPB's mortgage servicing FAQ says the annual statement itself should stick to those choices. You are always free to pay a shortage off early if you want to. A fair question to ask your servicer: \"Why does my annual escrow statement offer a lump-sum option for this shortage?\" (" + cite + ")",
+    letterLine:
+      "The statement offers a lump-sum option for the shortage. By my math the shortage is " + formatCents(shortageCents) +
+      ", which is more than one month's escrow payment. Please explain how that option fits the choices listed in " + cite + ".",
   });
 }
 
