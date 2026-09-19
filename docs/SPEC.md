@@ -574,3 +574,22 @@ that cite. C3's cite "HUD 60 FR 8814" becomes "60 FR 8812, 8813–14".
 `assert.deepStrictEqual` and can print as "−$0.00". Normalize at the source, and
 add a test that no numeric output is `Object.is(x, -0)` across all vectors and
 the randomized runs. `formatCents(-0)` must print "$0.00".
+
+### E3a. `nearLine` conventions (director's rulings on the auditor's open points)
+
+1. **Only when the line actually decides something.** For a surplus or a
+   deficiency, `nearLine` is set only when `borrowerCurrent` is true (the $50
+   line and the deficiency one-month line decide nothing for a borrower who is
+   not current — (f)(2)(ii), (f)(4)(iii)). For a shortage it is set regardless.
+2. `distanceCents` is absolute (never negative); direction comes from the
+   classification.
+3. The band is inclusive: distance ≤ 700 cents (TV28 in, TV29 out).
+4. Checked in the classification's own order: surplus, then deficiency, then
+   shortage. If both a deficiency and a shortage sit in the band, report the
+   deficiency. The shape stays `{ line, distanceCents, toleranceCents }`.
+5. The $0 line between a small shortage and a small surplus is not a `nearLine`
+   (nothing is mandatory on either side of it).
+
+Vectors TV22–TV29 (appended 2026-09-19 by the director from the independent
+auditor's hand derivations) pin E1–E3. The additive key `expected.nearLine` was
+added to TV01–TV21; a script proved no pre-existing value changed.
