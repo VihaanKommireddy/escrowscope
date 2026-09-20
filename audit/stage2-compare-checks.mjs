@@ -6,7 +6,13 @@
 //   A1  payment tolerance is $1.00 per separately rounded part of the maximum ($1 / $2 / $3)
 //   A3  explainJump never blames deficiency collection when the borrower is not current
 //   A12 paymentJumpDecomposition has FOUR parts that must add up to exactly (new - old)
-//   B2  an over-the-cap minimum that equals the federal low point draws a nudge + a 'not-compared' row instead of CUSHION_OVER_CAP
+//   B2  (superseded in Stage 4 by N1, below)
+// Updated again in Stage 4 to fix order 3 (commits fa578c0, 3f67d12):
+//   N1  an over-the-cap minimum that equals the federal low point (within $7) is decided by the rest of what was typed:
+//       (a) a claim that MATCHES the federal math -> mix-up: nudge only, row 'not-compared', no flag
+//       (b) a claim that is off by about (typed minimum - cap), signed -> the real CUSHION_OVER_CAP
+//       (c) anything else -> amber CUSHION_MAYBE_OVER_CAP, row 'differs', overall 'look-here', letter stays a request for information
+//   N2  borrower not current + deficiency: ceiling = base + shortage/12 + the WHOLE deficiency, tolerance $1 per rounded part
 // Usage: node stage2-compare-checks.mjs [path-to-engine/index.js] [--n 20000]
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolve, dirname, join } from 'node:path';
@@ -186,20 +192,31 @@ section('compareWithStatement vs UNLAWFUL statements (no flag = a miss) and the 
 {
   const miss = {}; const hit = {}; const edge = {};
   const has = (c, kind) => c.flags.some((f) => f.kind === kind);
+  // N1 case (c), exactly as the contract words it: the amber flag, row "differs", no nudge, no hard cushion flag, overall "look-here"
+  const isMaybe = (c) => has(c, 'CUSHION_MAYBE_OVER_CAP') && !has(c, 'CUSHION_OVER_CAP') && (c.nudges ?? []).length === 0 && c.rows[0].key === 'requiredMinimumBalance' && c.rows[0].status === 'differs' && c.overall === 'look-here';
   const score = (name, ok) => tally(ok ? hit : miss, name);
   for (let i = 0; i < Math.floor(N / 4); i++) {
     // 1. cushion over the cap
     { const a = withOutcome(randomAccount({ cushionMonths: pick([2, 1, 0]) }), 'bigShortage'); const r = E.analyze(a);
-      { const typed = r.cushionCapCents + int(701, 90000); const c = E.compareWithStatement(r, { requiredMinimumBalanceCents: typed }); const isLowPoint = Math.abs(typed - r.lowPoint.projectedBalanceCents) <= 700; const nudged = (c.nudges ?? []).length === 1 && c.rows[0].status === 'not-compared' && c.overall !== 'look-here';
-        score('cushion over cap by > $7.00 -> CUSHION_OVER_CAP, or (B2) the nudge when the typed number is the federal low point', isLowPoint ? nudged && !has(c, 'CUSHION_OVER_CAP') : has(c, 'CUSHION_OVER_CAP') && (c.nudges ?? []).length === 0); }
+      { const typed = r.cushionCapCents + int(701, 90000); const c = E.compareWithStatement(r, { requiredMinimumBalanceCents: typed }); const isLowPoint = Math.abs(typed - r.lowPoint.projectedBalanceCents) <= 700; const maybe = isMaybe(c);
+        score('cushion over cap by > $7.00 -> CUSHION_OVER_CAP, or (N1 case c) the amber CUSHION_MAYBE_OVER_CAP when the typed number is also the federal low point', isLowPoint ? maybe && !has(c, 'CUSHION_OVER_CAP') : has(c, 'CUSHION_OVER_CAP') && (c.nudges ?? []).length === 0); }
       tally(edge, 'cushion over by exactly $7.00 flagged: ' + has(E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + 700 }), 'CUSHION_OVER_CAP'));
-      { const c = E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + 701 }); tally(edge, 'cushion over by $7.01 flagged (or, B2, nudged because it equals the low point): ' + (has(c, 'CUSHION_OVER_CAP') || ((c.nudges ?? []).length === 1 && Math.abs(r.cushionCapCents + 701 - r.lowPoint.projectedBalanceCents) <= 700))); } }
-    // 1b. B2: a servicer that really holds an oversized cushion X, with the balance sitting on the servicer's own target (so the federal low point equals X)
+      { const c = E.compareWithStatement(r, { requiredMinimumBalanceCents: r.cushionCapCents + 701 }); tally(edge, 'cushion over by $7.01 flagged (CUSHION_OVER_CAP, or the amber CUSHION_MAYBE_OVER_CAP when it equals the low point): ' + (has(c, 'CUSHION_OVER_CAP') || isMaybe(c))); } }
+    // 1b. N1: a servicer that REALLY holds an oversized cushion X, with the balance sitting on the servicer's own target (so the federal low point equals X)
     { const a = randomAccount({ current: pick([true, false]) }); const ref = oracle(a); const X = ref.cushionCapCents + int(701, 90000); const noise = int(-700, 700); a.startingBalanceCents = ref.stepTwoAddCents + X + noise; const r = E.analyze(a);
       const claim = noise < 0 ? { claimedKind: 'shortage', claimedAmountCents: -noise } : noise > 0 ? { claimedKind: 'surplus', claimedAmountCents: noise } : { claimedKind: 'none' };
-      const alone = E.compareWithStatement(r, { requiredMinimumBalanceCents: X }); const withClaim = E.compareWithStatement(r, { requiredMinimumBalanceCents: X, ...claim });
-      score('B2: over-the-cap minimum that equals the federal low point -> one nudge, row "not-compared", no CUSHION_OVER_CAP, and the nudge alone never makes overall "matches" or "look-here"', (alone.nudges ?? []).length === 1 && alone.rows[0].status === 'not-compared' && !has(alone, 'CUSHION_OVER_CAP') && alone.overall === 'not-provided');
-      score('B2: ...and when the servicer\'s claimed shortage/surplus/none is typed too, KIND_DIFFERS or AMOUNT_DIFFERS still fires', has(withClaim, 'KIND_DIFFERS') || has(withClaim, 'AMOUNT_DIFFERS')); }
+      const pay = r.baseMonthlyPaymentCents + (noise < 0 ? halfUp(-noise, 12) : 0);
+      const alone = E.compareWithStatement(r, { requiredMinimumBalanceCents: X }); const withPay = E.compareWithStatement(r, { requiredMinimumBalanceCents: X, newMonthlyEscrowCents: pay }); const withClaim = E.compareWithStatement(r, { requiredMinimumBalanceCents: X, ...claim }); const all3 = E.compareWithStatement(r, { requiredMinimumBalanceCents: X, newMonthlyEscrowCents: pay, ...claim });
+      score('N1 (c): real over-the-cap minimum that equals the federal low point, nothing else typed -> amber CUSHION_MAYBE_OVER_CAP, row "differs", no nudge, no CUSHION_OVER_CAP, overall "look-here", letter stays a request for information', isMaybe(alone) && E.letterKind(r, alone) === 'REQUEST_FOR_INFORMATION');
+      score('N1 (c): ...same with a matching new payment typed: still amber, NEVER overall "matches"', isMaybe(withPay) && withPay.overall === 'look-here' && E.letterKind(r, withPay) === 'REQUEST_FOR_INFORMATION');
+      score('N1 (b): ...and when the servicer\'s own shortage / surplus / "none" is typed too -> the real CUSHION_OVER_CAP, no nudge, notice of error', [withClaim, all3].every((c) => has(c, 'CUSHION_OVER_CAP') && !has(c, 'CUSHION_MAYBE_OVER_CAP') && (c.nudges ?? []).length === 0 && c.overall === 'look-here' && E.letterKind(r, c) === 'NOTICE_OF_ERROR'));
+      score('N1: a real oversized cushion is never green, whatever was typed with it', [alone, withPay, withClaim, all3].every((c) => c.overall !== 'matches' && c.flags.length > 0)); }
+    // 1c. N1 (a): a LAWFUL servicer (cushion exactly at the cap); the homeowner types the LOWEST PROJECTED BALANCE into "required minimum"
+    { const a = randomAccount({ current: pick([true, false]) }); const ref = oracle(a); const over = int(701, 90000); a.startingBalanceCents = ref.requiredStartingBalanceCents + over; const r = E.analyze(a); const L = r.lowPoint.projectedBalanceCents;
+      const claim = { claimedKind: 'surplus', claimedAmountCents: over }; const pay = r.baseMonthlyPaymentCents;
+      const withClaim = E.compareWithStatement(r, { requiredMinimumBalanceCents: L, ...claim }); const all3 = E.compareWithStatement(r, { requiredMinimumBalanceCents: L, newMonthlyEscrowCents: pay, ...claim }); const alone = E.compareWithStatement(r, { requiredMinimumBalanceCents: L });
+      score('N1 (a): lawful servicer, low point mistyped as the minimum, the statement\'s surplus typed and matching -> ONE nudge (MINIMUM_LOOKS_LIKE_LOW_POINT), row "not-compared", no flag at all, letter is a request for information', [withClaim, all3].every((c) => (c.nudges ?? []).length === 1 && c.nudges[0].kind === 'MINIMUM_LOOKS_LIKE_LOW_POINT' && c.rows[0].status === 'not-compared' && c.flags.length === 0 && c.overall === 'matches' && E.letterKind(r, c) === 'REQUEST_FOR_INFORMATION'));
+      score('N1 (c): same mistype with no claim typed -> amber CUSHION_MAYBE_OVER_CAP only: never the hard CUSHION_OVER_CAP, never a notice of error', isMaybe(alone) && E.letterKind(r, alone) === 'REQUEST_FOR_INFORMATION'); }
     // 2. payment above the lawful maximum (current borrower, and NOT-current borrower with a shortage only)
     for (const current of [true, false]) { const a = withOutcome(randomAccount({ current }), pick(['bigShortage', 'smallShortage', 'surplus', 'none'])); const r = E.analyze(a); const max = r.newMonthlyEscrowPayment.monthlyEscrowWhileRepayingDeficiencyCents;
       const tol = paymentTolerance(r);
@@ -225,9 +242,15 @@ section('compareWithStatement vs UNLAWFUL statements (no flag = a miss) and the 
     { const a = withOutcome(randomAccount(), 'surplus'); const r = E.analyze(a);
       score('statement says shortage, math says surplus (> $80) -> KIND_DIFFERS', has(E.compareWithStatement(r, { claimedKind: 'shortage', claimedAmountCents: int(1000, 50000) }), 'KIND_DIFFERS'));
       score('statement says "none", math says surplus (> $80) -> KIND_DIFFERS', has(E.compareWithStatement(r, { claimedKind: 'none' }), 'KIND_DIFFERS')); }
-    // 5. not current + deficiency: no federal cap on the deficiency part -> must NOT be accused of PAYMENT_ABOVE_MAX
-    { const a = withOutcome(randomAccount({ current: false }), 'deficiency'); const r = E.analyze(a);
-      tally(edge, 'NOT current + deficiency, payment far above base flagged PAYMENT_ABOVE_MAX: ' + has(E.compareWithStatement(r, { newMonthlyEscrowCents: r.baseMonthlyPaymentCents + r.deficiencyCents }), 'PAYMENT_ABOVE_MAX')); }
+    // 5. N2: not current + deficiency. (f)(4)(iii) hands the SCHEDULE to the mortgage documents, not an unlimited amount.
+    //    Ceiling, worked out here from the oracle and not from the engine: bills/12 + shortage/12 + the WHOLE deficiency, tolerance $1 per rounded part.
+    { const a = withOutcome(randomAccount({ current: false }), 'deficiency'); const ref = oracle(a); const r = E.analyze(a);
+      const sh12 = halfUp(ref.shortageCents, 12); const ceiling = ref.baseMonthlyPaymentCents + sh12 + ref.deficiencyCents; const tol = 100 * (1 + (sh12 > 0 ? 1 : 0) + 1);
+      const at = E.compareWithStatement(r, { newMonthlyEscrowCents: ceiling + tol }); const past = E.compareWithStatement(r, { newMonthlyEscrowCents: ceiling + tol + 1 }); const far = E.compareWithStatement(r, { newMonthlyEscrowCents: ceiling + tol + int(2, 500000) });
+      const inside = E.compareWithStatement(r, { newMonthlyEscrowCents: ref.baseMonthlyPaymentCents + sh12 + int(0, ref.deficiencyCents) });
+      score('N2: NOT current + deficiency, payment anywhere from base + shortage/12 up to the ceiling (+ the whole deficiency) -> never PAYMENT_ABOVE_MAX, row "match"', !has(inside, 'PAYMENT_ABOVE_MAX') && inside.rows[0].status === 'match' && inside.overall === 'matches');
+      score('N2 edge: exactly ceiling + tolerance passes; one cent more -> PAYMENT_ABOVE_MAX', !has(at, 'PAYMENT_ABOVE_MAX') && has(past, 'PAYMENT_ABOVE_MAX') && past.overall === 'look-here');
+      score('N2: payment far above the ceiling -> PAYMENT_ABOVE_MAX, never green', has(far, 'PAYMENT_ABOVE_MAX') && far.overall === 'look-here' && E.letterKind(r, far) === 'NOTICE_OF_ERROR'); }
   }
   for (const [k, v] of Object.entries(hit)) check(!(k in miss), `${k}: caught ${v}${miss[k] ? ', MISSED ' + miss[k] : ''}`);
   for (const [k, v] of Object.entries(miss)) if (!(k in hit)) check(false, `${k}: MISSED all ${v}`);

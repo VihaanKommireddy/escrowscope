@@ -132,6 +132,30 @@ function typedMinimumLooksLikeLowPoint(result, typedCents) {
   return isOverTheCap && isTheLowPoint;
 }
 
+// The same typing mix-up on the OTHER side of the cap (auditor's Stage 4
+// finding N7). In an account with a shortage, the lowest projected balance is
+// UNDER the cap. Typed into "required minimum balance", it used to be read as
+// "this servicer keeps a smaller cushion", which made the federal shortage
+// vanish and drew KIND_DIFFERS and a notice of error against a lawful
+// statement. A shortage is the usual reason someone opens this page.
+//
+// THE TRIGGER: the typed number is under the cap by more than $7.00 AND is the
+// same as the federal low point (within $7.00). Then the claim decides:
+//   • the claim fits ONLY the smaller cushion → the smaller cushion is real,
+//     and the page keeps reading the statement that way (no nudge);
+//   • anything else → a mix-up: everything is compared at the full cap, the
+//     cushion row is "not-compared", and a nudge asks which line was typed.
+// Comparing at the full cap can never accuse a servicer that truly keeps a
+// smaller cushion: a smaller cushion is always allowed, and the full cap is
+// the higher ceiling.
+function typedMinimumIsTheLowPointUnderTheCap(result, statement) {
+  if (!isGivenCents(statement.requiredMinimumBalanceCents)) return false;
+  const typedCents = statement.requiredMinimumBalanceCents;
+  const isUnderTheCap = result.cushionCapCents - typedCents > TOLERANCE_BALANCE_CENTS;
+  const isTheLowPoint = Math.abs(typedCents - result.lowPoint.projectedBalanceCents) <= TOLERANCE_BALANCE_CENTS;
+  return isUnderTheCap && isTheLowPoint;
+}
+
 // Would a servicer that REALLY uses a cushion `extraCents` over the cap print
 // this claim? Its target is higher by `extraCents`, so:
 //   • its surplus (+) or shortage (−) is the federal one minus `extraCents`;
@@ -169,20 +193,28 @@ function decideCushionCase(result, statement, claim) {
   if (extraCents <= TOLERANCE_BALANCE_CENTS) return "WITHIN_CAP";
   if (!typedMinimumLooksLikeLowPoint(result, typedCents)) return "OVER_CAP"; // trigger not met: the plain rule
 
-  const claimHasDollars = claim !== null && claim.hasAmount;
+  // Only a claim ABOUT THE TARGET (surplus, shortage, or "none") can say
+  // anything about the cushion. A deficiency is just the part of the balance
+  // below $0. It is the same whatever cushion is used, so "deficiency $0.00"
+  // agreeing with the federal math proves nothing here (auditor's Stage 4
+  // finding N6: it used to unlock the green mix-up path for a cushion of any
+  // size). Such a claim falls through to (c).
+  const claimHasDollars = claim !== null && claim.hasAmount && claim.isAboutTheTarget;
   if (claimHasDollars && claim.isMatch) return "MIX_UP"; // (a)
   if (claimHasDollars && claimPointsToARealCushion(result, claim.kind, claim.claimedCents, extraCents)) return "OVER_CAP"; // (b)
   return "CANNOT_TELL"; // (c)
 }
 
-function buildServicerView(result, statement) {
+// `atTheFullCap` true: ignore a smaller typed minimum and work everything out
+// with the most cushion the rule allows (used for the under-the-cap mix-up, N7).
+function buildServicerView(result, statement, atTheFullCap) {
   const capCents = result.cushionCapCents;
   let cushionUsedCents = capCents;
   let extraCushionCents = 0;
 
   if (isGivenCents(statement.requiredMinimumBalanceCents)) {
     const theirs = statement.requiredMinimumBalanceCents;
-    if (theirs < capCents) cushionUsedCents = theirs;
+    if (theirs < capCents && atTheFullCap !== true) cushionUsedCents = theirs;
     // Other sentences may blame this "extra cushion" ONLY when the cushion
     // case turns out to be "OVER_CAP". compareWithStatement sets it back to 0
     // for a mix-up and for a cannot-tell.
@@ -273,6 +305,30 @@ function compareCushion(result, statement, cushionCase, rows, flags, nudges) {
   const confirmLetterLine =
     "The statement lists a required minimum balance of " + typed + ". By my math, the most cushion " + cite + " allows here is " +
     formatCents(capCents) + ". Please confirm the required minimum balance (cushion) you used and how it was worked out.";
+
+  // The mix-up UNDER the cap (auditor's N7): not compared, and a nudge. No
+  // flag: a smaller cushion is always allowed, so there is nothing to question.
+  if (cushionCase === "MIX_UP_UNDER_CAP") {
+    rows.push({
+      key: "requiredMinimumBalance",
+      label: "Required minimum balance (the cushion)",
+      statementCents: theirs,
+      federalCents: capCents,
+      gapCents: gapCents,
+      status: "not-compared",
+      note: "This was not compared, because the number typed is the same as your lowest projected balance. Please check which line of the statement it came from. The rest was worked out with the most cushion the rule allows.",
+    });
+    nudges.push({
+      kind: "MINIMUM_LOOKS_LIKE_LOW_POINT",
+      field: "statement.requiredMinimumBalanceCents",
+      message:
+        "The number you typed as the required minimum balance (" + typed + ") is the same as your lowest projected balance. On most statements those are two different lines, so please check which one you typed. If your statement really does list " +
+        typed + " as the required minimum, your servicer keeps a smaller cushion than the rule's limit of " + formatCents(capCents) + ", and that is allowed (" + cite + ").",
+      letterLine:
+        "The statement lists a required minimum balance of " + typed + ". Please confirm the required minimum balance (cushion) you used and how it was worked out.",
+    });
+    return;
+  }
 
   // Case (c): cannot tell a real oversized cushion from a typing mix-up.
   // Never green, never a hard accusation: a two-sided flag (auditor's N1).
@@ -384,7 +440,7 @@ function evaluateClaim(statement, view) {
 
   // A kind with no amount: all we can compare is the kind.
   if (!hasAmount) {
-    return { kind: kind, kindsAgree: kindsAgree, hasAmount: false, isMatch: false };
+    return { kind: kind, kindsAgree: kindsAgree, hasAmount: false, isMatch: false, isAboutTheTarget: kind !== "deficiency", isAnEmptyDeficiencyLine: false };
   }
 
   const claimedCents = kind === "none" ? 0 : statement.claimedAmountCents;
@@ -415,6 +471,7 @@ function evaluateClaim(statement, view) {
   }
 
   const gapCents = claimedCents - federalCents;
+  const isMatch = Math.abs(gapCents) <= TOLERANCE_BALANCE_CENTS;
   return {
     kind: kind,
     kindsAgree: kindsAgree,
@@ -422,7 +479,14 @@ function evaluateClaim(statement, view) {
     claimedCents: claimedCents,
     federalCents: federalCents,
     gapCents: gapCents,
-    isMatch: Math.abs(gapCents) <= TOLERANCE_BALANCE_CENTS,
+    isMatch: isMatch,
+    // Surplus, shortage and "none" are statements about the TARGET balance,
+    // which depends on the cushion. A deficiency is not (finding N6).
+    isAboutTheTarget: kind !== "deficiency",
+    // "Deficiency: $0.00" when the balance is not below $0: both sides agree
+    // there is no deficiency, and that says nothing about the shortage or
+    // surplus. It is not a comparison, so it must never turn the page green.
+    isAnEmptyDeficiencyLine: kind === "deficiency" && amounts.deficiencyCents === 0 && isMatch,
     label: label,
   };
 }
@@ -461,6 +525,23 @@ function compareClaim(result, claim, view, rows, flags) {
   let note = "The federal math finds " + describeAmounts(amounts) + ". That matches your statement.";
   if (!isMatch) note = "The federal math finds " + describeAmounts(amounts) + ".";
   if (view.usesSmallerCushion) note = note + " (Worked out with the smaller cushion your statement uses.)";
+
+  // Finding N6: a deficiency line of about $0 when the balance is not below $0.
+  if (claim.isAnEmptyDeficiencyLine) {
+    rows.push({
+      key: "claimedAmount",
+      label: claim.label,
+      claimedKind: kind,
+      statementCents: claimedCents,
+      federalCents: federalCents,
+      gapCents: gapCents,
+      status: "not-compared",
+      note:
+        "The federal math finds no deficiency either: the starting balance typed here is not below $0. It does find " + describeAmounts(amounts) +
+        ". A deficiency line of about $0 says nothing about that, so this line was not used to judge the statement. If your statement also shows a shortage or a surplus, pick that instead.",
+    });
+    return;
+  }
 
   rows.push({
     key: "claimedAmount",
@@ -805,9 +886,22 @@ export function compareWithStatement(result, statement) {
   const nudges = [];
 
   if (isPlainObject(statement)) {
-    const view = buildServicerView(result, statement);
-    const claim = evaluateClaim(statement, view);
-    const cushionCase = decideCushionCase(result, statement, claim);
+    let view = buildServicerView(result, statement);
+    let claim = evaluateClaim(statement, view);
+    let cushionCase = decideCushionCase(result, statement, claim);
+
+    // Finding N7: the low point typed as the required minimum, UNDER the cap.
+    if (typedMinimumIsTheLowPointUnderTheCap(result, statement)) {
+      const viewAtTheCap = buildServicerView(result, statement, true);
+      const claimAtTheCap = evaluateClaim(statement, viewAtTheCap);
+      const claimIsUsable = claim !== null && claim.hasAmount && claim.isAboutTheTarget;
+      const smallerCushionIsReal = claimIsUsable && claim.isMatch && !claimAtTheCap.isMatch;
+      if (!smallerCushionIsReal) {
+        view = viewAtTheCap;
+        claim = claimAtTheCap;
+        cushionCase = "MIX_UP_UNDER_CAP";
+      }
+    }
     // Only a cushion the page is SURE about may be blamed in other sentences
     // ("the cushion is the likely reason"). Not a mix-up, and not a cannot-tell.
     if (cushionCase === "MIX_UP" || cushionCase === "CANNOT_TELL") view.extraCushionCents = 0;

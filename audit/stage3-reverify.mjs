@@ -1,5 +1,8 @@
 // stage3-reverify.mjs — Stage 3: independent re-verification of the 15 audit fixes (A1–A15) and the
 // director's B2 rule, against the engine's real code paths and generated text.
+// Updated in Stage 4 to fix order 3 (commits fa578c0, 3f67d12): the B2 nudge-only rule is replaced by the
+// three-case N1 rule, and N2 (payment ceiling when not current), N3 ("It shows"), N4 (letter headings) and
+// N5 ("line up") are now hard checks instead of NOTE lines. It passes on the fixed engine and fails on fa578c0^.
 // Usage: node stage3-reverify.mjs [path-to-engine/index.js] [--n 20000]
 // Lines:  ok / FAIL = a fix verified or not.   NOTE = a measurement or a new finding to read.
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -105,7 +108,11 @@ const corpus = [];
     ['flag alone: SPREAD_TOO_SHORT', base, { shortageSpreadMonths: 6 }, ['SPREAD_TOO_SHORT']],
     ['flag alone: AMOUNT_DIFFERS (payment lower than expected)', base, { newMonthlyEscrowCents: rb.baseMonthlyPaymentCents - 5000 }, ['AMOUNT_DIFFERS']],
     ['flag alone: LUMP_SUM_OFFERED', base, { lumpSumOfferedOnStatement: true }, ['LUMP_SUM_OFFERED']],
-    ['nudge alone (B2)', tv('TV01'), { requiredMinimumBalanceCents: 110000 }, []],
+    // N1, the three-case rule. TV01: cap $800.00, federal low point $1,100.00, federal surplus $300.00.
+    ['N1 (c) cannot tell: over-the-cap minimum that is also the low point, nothing else typed', tv('TV01'), { requiredMinimumBalanceCents: 110000 }, ['CUSHION_MAYBE_OVER_CAP']],
+    ['N1 (c) cannot tell, with a matching payment', tv('TV01'), { requiredMinimumBalanceCents: 110000, newMonthlyEscrowCents: 40000 }, ['CUSHION_MAYBE_OVER_CAP']],
+    ['N1 (a) mix-up: same minimum, and the statement\'s surplus matches the federal math (nudge alone)', tv('TV01'), { requiredMinimumBalanceCents: 110000, claimedKind: 'surplus', claimedAmountCents: 30000 }, []],
+    ['N1 (b) real cushion: same minimum, statement says "none" where the federal math finds $300.00', tv('TV01'), { requiredMinimumBalanceCents: 110000, claimedKind: 'none' }, ['CUSHION_OVER_CAP', 'KIND_DIFFERS']],
     ['refund due + statement matches', tv('TV01'), { claimedKind: 'surplus', claimedAmountCents: 30000, newMonthlyEscrowCents: 40000 }, []],
     ['too close to call + statement matches', tv('TV27'), { claimedKind: 'shortage', claimedAmountCents: 34600 }, []],
     ['question + discrepancy together', base, { lumpSumOfferedOnStatement: true, newMonthlyEscrowCents: max + 5000 }, ['PAYMENT_ABOVE_MAX', 'LUMP_SUM_OFFERED']],
@@ -120,12 +127,32 @@ const corpus = [];
     if (shouldBeNotice) noe++; else rfi++; if (!ok) { bad++; console.log(`     WRONG: ${name}: kind=${kind} flags=${t.c.flags.map((f) => f.kind)} title notice=${titleIsNotice} believes=${believes} step=${stepIsThere}`); }
     if (expectFlags) rows.push(`${name} -> ${kind === 'NOTICE_OF_ERROR' ? 'notice of error' : 'request for information'}`);
   }
-  check(bad === 0, `${scenarios.length} letters (30 vectors, 3 examples, every flag alone, nudge alone, refund-due-but-matching, too-close-but-matching, mixed): "Notice of error" title + "I believe the statement contains the error(s)" + the notice-of-error next step appear exactly when a discrepancy flag fires (${noe} notices, ${rfi} requests)`);
+  check(bad === 0, `${scenarios.length} letters (30 vectors, 3 examples, every flag alone, the three N1 cushion cases, refund-due-but-matching, too-close-but-matching, mixed): "Notice of error" title + "I believe the statement contains the error(s)" + the notice-of-error next step appear exactly when a discrepancy flag fires (${noe} notices, ${rfi} requests)`);
   rows.forEach((x) => console.log('     ' + x));
-  const mixed = corpus.find((x) => x.name === 'question + discrepancy together');
-  if (/I believe the statement contains the error\(s\) described below/.test(mixed.letter)) note('in a notice of error that also carries a pure question (lump-sum, refund timing, too-close), every numbered item sits under "I believe the statement contains the error(s) described below". Cosmetic: the question items are not errors.');
+  const nudgeCase = corpus.find((x) => x.name.startsWith('N1 (a)')); const maybeCase = corpus.find((x) => x.name === 'N1 (c) cannot tell, with a matching payment');
+  check(nudgeCase.c.nudges.length === 1 && nudgeCase.c.nudges[0].kind === 'MINIMUM_LOOKS_LIKE_LOW_POINT' && nudgeCase.c.rows[0].status === 'not-compared' && nudgeCase.c.overall === 'matches', 'N1 (a): the mix-up draws exactly one nudge, the cushion row is "not-compared", and overall comes from the other rows');
+  check(maybeCase.c.rows[0].status === 'differs' && maybeCase.c.nudges.length === 0 && maybeCase.c.overall === 'look-here' && maybeCase.v.tone === 'flag' && /Please confirm the required minimum balance/.test(maybeCase.letter) && !/I believe/.test(maybeCase.letter), 'N1 (c): cannot-tell is amber "Look here" even with a matching payment; its letter only asks the servicer to confirm the number');
+
+  // N4: in a notice of error, errors and questions sit under separate headings
+  const mixed = corpus.find((x) => x.name === 'question + discrepancy together'); const L = mixed.letter;
+  const iBelieve = L.indexOf('I believe the statement contains the error(s) described below.'); const iAsk = L.indexOf('I also have these questions:');
+  const errLine = mixed.c.flags.find((f) => f.kind === 'PAYMENT_ABOVE_MAX').letterLine; const qLine = mixed.c.flags.find((f) => f.kind === 'LUMP_SUM_OFFERED').letterLine;
+  check(iBelieve >= 0 && iAsk > iBelieve && L.indexOf('1. ' + errLine) > iBelieve && L.indexOf('1. ' + errLine) < iAsk && L.indexOf('1. ' + qLine) > iAsk && /Please also answer the question above\./.test(L), 'N4: notice of error + a pure question: the error is item 1 under "I believe…", the question is item 1 under "I also have these questions:"');
+  let n4bad = 0; let n4seen = 0;
+  for (const x of corpus) { const kind = E.letterKind(x.r, x.c); if (kind !== 'NOTICE_OF_ERROR') { if (/I believe|I also have these questions/.test(x.letter)) n4bad++; continue; } n4seen++;
+    const head = x.letter.indexOf('I believe the statement contains'); const q = x.letter.indexOf('I also have these questions:'); const errSection = x.letter.slice(head, q >= 0 ? q : x.letter.indexOf('Please review this calculation'));
+    for (const f of x.c.flags) { const asserting = DISCREPANCY.includes(f.kind) || (f.kind === 'AMOUNT_DIFFERS' && f.rowKey === 'claimedAmount'); if (errSection.includes(f.letterLine) !== asserting) n4bad++; }
+    for (const n of x.c.nudges) if (errSection.includes(n.letterLine)) n4bad++;
+    if (/By my math the account has a surplus|within a few dollars/.test(errSection)) n4bad++; }
+  check(n4bad === 0 && n4seen > 0, `N4: across the ${n4seen} notices of error generated so far, only discrepancy flags sit under "I believe…"; no question, nudge, refund-timing or too-close item does; no request-for-information letter uses either heading`, `${n4bad} wrong`);
+
+  // N5: "My numbers line up with the statement." only when something was compared and overall is "matches"
+  let n5bad = 0; let n5said = 0; for (const x of corpus) { const says = /My numbers line up with the statement/.test(x.letter); if (says) n5said++; if (says && x.c.overall !== 'matches') n5bad++; }
   const blank = corpus.find((x) => x.name === 'vector TV02');
-  if (/My numbers line up with the statement/.test(blank.letter)) note('with NO statement numbers typed (nothing compared), the letter still says "My numbers line up with the statement."', 'cosmetic, new');
+  check(n5bad === 0 && !/line up/.test(blank.letter) && /^For my records, please send me the escrow analysis worksheet/m.test(blank.letter) && blank.c.overall === 'not-provided', `N5: with nothing typed from the statement the letter says only "For my records, please send me…"; "My numbers line up" never appears unless overall is "matches" (${n5said} letters say it so far)`, `${n5bad} wrong`);
+  const plain = { startMonth: 1, startingBalanceCents: 120000, cushionMonths: 2, borrowerCurrent: true, disbursements: [{ label: 'Tax', month: 6, amountCents: 480000 }] }; const rp = E.analyze(plain);
+  const fullMatch = allText(plain, { newMonthlyEscrowCents: rp.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents, claimedKind: 'shortage', claimedAmountCents: rp.shortageCents });
+  check(rp.nearLine === null && fullMatch.c.overall === 'matches' && /^My numbers line up with the statement\. For my records, please send me/m.test(fullMatch.letter), 'N5: a compared, matching statement with nothing to ask still says "My numbers line up with the statement."', `overall=${fullMatch.c.overall} shortage=${rp.shortageCents}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,8 +169,26 @@ section('A3 — explainJump when the borrower is not current and has a deficienc
   const rt = E.analyze(tiny); const stT = { currentMonthlyEscrowCents: 30000, newMonthlyEscrowCents: rt.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents + 50000 };
   const ct = E.compareWithStatement(rt, stT); const jt = E.explainJump(rt, stT); const vt = E.explainVerdict(rt, ct);
   const rowT = ct.rows.find((x) => x.key === 'newMonthlyEscrow'); const deT = jt.parts.find((p) => p.key === 'deficiencyRepayment');
-  if (rowT.status === 'match' && deT.cents > rt.deficiencyCents) note(`NEW (wrong-answer, miss): borrower not current, deficiency only ${$(rt.deficiencyCents)}, new payment ${$(stT.newMonthlyEscrowCents)} = base + shortage/12 + $500.00. compare.js: "${rowT.status}" (overall ${ct.overall}, banner "${vt.label}"). explainJump: "${deT.sentence.slice(0, 140)}…". A $10.00 deficiency cannot explain $500.00 a month. (f)(4)(iii) removes the schedule, not the amount: the most that can be deficiency recovery in any month is the whole deficiency.`, JSON.stringify({ account: tiny, statement: stT }));
-  else check(true, 'a payment add-on larger than the whole deficiency is not waved through');
+  const unT = jt.parts.find((p) => p.key === 'unexplained');
+  check(rowT.status === 'over-limit' && has(ct, 'PAYMENT_ABOVE_MAX') && ct.overall === 'look-here' && vt.tone === 'flag' && deT.cents === rt.deficiencyCents && unT.cents === 50000 - rt.deficiencyCents && E.letterKind(rt, ct) === 'NOTICE_OF_ERROR',
+    `N2: borrower not current, deficiency only ${$(rt.deficiencyCents)}, new payment = base + shortage/12 + $500.00 -> PAYMENT_ABOVE_MAX, amber; explainJump gives the deficiency part the whole ${$(rt.deficiencyCents)} and calls the other ${$(50000 - rt.deficiencyCents)} unexplained`, `row=${rowT.status} overall=${ct.overall} deficiencyPart=${deT.cents} unexplained=${unT.cents}`);
+  // N2 edges, with the ceiling worked out from the ORACLE: bills/12 + shortage/12 + the WHOLE deficiency, tolerance $1 for each rounded part
+  let edgeBad = 0; let sumBad2 = 0; let partBad = 0; let curChanged = 0; let ex2 = null;
+  for (let i = 0; i < N; i++) {
+    const acc = randomAccount({ current: false }); if (rnd() < 0.5) acc.disbursements = [acc.disbursements[0]]; acc.startingBalanceCents = -int(1, 300000); const ref = oracle(acc); const rr = E.analyze(acc);
+    const sh12 = halfUp(ref.shortageCents, 12); const ceiling = ref.baseMonthlyPaymentCents + sh12 + ref.deficiencyCents; const tol = 100 * (2 + (sh12 > 0 ? 1 : 0));
+    const at = E.compareWithStatement(rr, { newMonthlyEscrowCents: ceiling + tol }); const past = E.compareWithStatement(rr, { newMonthlyEscrowCents: ceiling + tol + 1 });
+    if (has(at, 'PAYMENT_ABOVE_MAX') || at.overall !== 'matches' || !has(past, 'PAYMENT_ABOVE_MAX') || past.overall !== 'look-here') { edgeBad++; if (!ex2) ex2 = { acc, ceiling, tol }; }
+    const s3 = { currentMonthlyEscrowCents: int(0, 300000), newMonthlyEscrowCents: pick([ceiling + tol, ceiling + tol + 1, ceiling + int(2, 400000), int(0, ceiling)]) }; const j3 = E.explainJump(rr, s3);
+    if (j3.parts.reduce((s, p) => s + p.cents, 0) !== s3.newMonthlyEscrowCents - s3.currentMonthlyEscrowCents) sumBad2++;
+    const d3 = j3.parts.find((p) => p.key === 'deficiencyRepayment'); if (d3 && d3.cents > ref.deficiencyCents) partBad++;
+    // the same account with the borrower CURRENT must be judged by the old ceiling: base + shortage/12 + deficiency/2
+    const cur = E.analyze({ ...acc, borrowerCurrent: true }); const oldMax = ref.baseMonthlyPaymentCents + sh12 + halfUp(ref.deficiencyCents, 2); const tolCur = 100 * (2 + (sh12 > 0 ? 1 : 0));
+    if (has(E.compareWithStatement(cur, { newMonthlyEscrowCents: oldMax + tolCur }), 'PAYMENT_ABOVE_MAX') || !has(E.compareWithStatement(cur, { newMonthlyEscrowCents: oldMax + tolCur + 1 }), 'PAYMENT_ABOVE_MAX')) curChanged++;
+  }
+  check(edgeBad === 0, `N2: ${N} not-current deficiency accounts: a payment of exactly ceiling + tolerance is a match and green; one cent more is PAYMENT_ABOVE_MAX and amber`, edgeBad ? `${edgeBad} wrong, e.g. ${JSON.stringify(ex2)}` : '');
+  check(sumBad2 === 0 && partBad === 0, `N2: on the same ${N} accounts explainJump's parts still add up to exactly new − old, and "deficiency repayment" is never more than the whole deficiency`, `sum wrong ${sumBad2}, part too big ${partBad}`);
+  check(curChanged === 0, `N2: the same ${N} accounts with the borrower CURRENT keep the old ceiling (base + shortage/12 + deficiency/2, $1 per part)`, `${curChanged} wrong`);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +200,10 @@ section('A4–A11, A13, A15 — wording, scanned over everything the engine gene
   const src = readdirSync(dirname(enginePath)).filter((f) => f.endsWith('.js') && f !== 'vectors.js').map((f) => readFileSync(join(dirname(enginePath), f), 'utf8').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')).join('\n');
   const banned = [['A4', 'The most a servicer may collect each month is one-twelfth'], ['A5', 'a shortage has to be spread over at least 12 months'], ['A6', 'may lawfully round'], ['A10', 'Most payment jumps'], ['A11', 'That date is printed on your statement'], ['A13', '"Your bills changed"'], ['A15', '888-995'], ['A15', 'HOPE (4673)']];
   for (const [id, phrase] of banned) check(!every.includes(phrase.replace(/"/g, '')) && !src.includes(phrase), `${id}: "${phrase.replace(/"/g, '')}" is gone from generated text and from engine code`);
-  const step2 = corpus[0].steps[1].plain; check(/regular monthly payment is one-twelfth/.test(step2) && /shortage or deficiency can be added on top/.test(step2), 'A4: Step 2 now says the regular payment is one-twelfth and repayments can be added on top');
+  // A4: the wording sweep renamed the sentence ("regular escrow payment each month"). What matters is the substance:
+  // one-twelfth is the REGULAR payment, repayments can sit on top, and no step calls one-twelfth "the most" a servicer may collect.
+  const step2 = corpus[0].steps[1].plain; const allSteps = corpus.flatMap((x) => x.steps.map((s) => s.plain)).join('\n');
+  check(/The regular escrow payment each month is one-twelfth of the year's bills\./.test(step2) && /Repaying a shortage or deficiency can be added on top\./.test(step2) && !/the most [^.]{0,60}one-twelfth|one-twelfth[^.]{0,60}(is the most|at most|no more than|may not collect more)/i.test(allSteps), 'A4: Step 2 says the regular escrow payment is one-twelfth of the year\'s bills and that repayments can be added on top; no step calls one-twelfth a maximum');
   const dip = corpus.find((x) => x.name === 'dip-as-deficiency TV11').c.flags.find((f) => f.kind === 'KIND_DIFFERS'); const dipSmall = corpus.find((x) => x.name === 'dip-as-deficiency TV09').c.flags.find((f) => f.kind === 'KIND_DIFFERS');
   check(dip && /leave it alone, or spread it over at least 12 months\./.test(dip.sentence) && !/within 30 days/.test(dip.sentence.split('For this shortage')[1].split('A deficiency may')[0]) && /if your balance really was below \$0 on the day of the analysis/.test(dip.sentence), 'A5: large shortage mislabelled as a deficiency -> the two (f)(3)(ii) choices, plus the "really below $0 on the analysis date" caution');
   check(dipSmall && /leave it alone, ask for it within 30 days, or spread it over at least 12 months/.test(dipSmall.sentence), 'A5: small shortage -> the three (f)(3)(i) choices');
@@ -203,12 +251,15 @@ section('A14 — absurd, unvalidated statement numbers');
 }
 
 // ---------------------------------------------------------------------------
-section('B2 — the "is that really the required minimum?" nudge: how often does it hide a REAL oversized cushion?');
+section('N1 (was B2): a REAL oversized cushion that lands on the federal low point: the three-case rule, and is it ever green?');
 {
+  // Stage 3 measured the old rule (nudge only): 19,996 of 20,000 steady-state over-cushioning servicers were hidden and many came out green.
+  // The rule is now: (a) a typed claim that matches the federal math -> mix-up nudge; (b) a claim off by about (typed - cap) -> CUSHION_OVER_CAP; (c) anything else -> amber CUSHION_MAYBE_OVER_CAP.
+  // "hidden" below = the trigger was met (typed minimum over the cap AND within $7 of the federal low point), so the plain CUSHION_OVER_CAP rule did not decide it.
   const tally = {}; const bump = (k) => { tally[k] = (tally[k] || 0) + 1; }; const greens = [];
   const world = (name, makeBalance, current) => {
-    const out = { servicers: 0, nudged: 0, flagged: 0, neither: 0, typed: { 'minimum only': z(), 'minimum + new payment': z(), 'minimum + claimed shortage/surplus': z(), 'all three': z() } };
-    function z() { return { hidden: 0, surfacedByAnotherFlag: 0, fullyGreen: 0, amberForAnotherReason: 0, neutral: 0 }; }
+    const out = { servicers: 0, nudged: 0, flagged: 0, maybe: 0, neither: 0, typed: { 'minimum only': z(), 'minimum + new payment': z(), 'minimum + claimed shortage/surplus': z(), 'all three': z() } };
+    function z() { return { hidden: 0, overCap: 0, maybe: 0, nudgeOnly: 0, silent: 0, surfacedByAnotherFlag: 0, fullyGreen: 0, amberForAnotherReason: 0, neutral: 0 }; }
     for (let i = 0; i < N; i++) {
       const a = randomAccount({ current }); const ref = oracle(a); const A = ref.stepTwoAddCents; const cap = ref.cushionCapCents; const P = ref.baseMonthlyPaymentCents;
       const X = cap + pick([int(701, 5000), int(5001, 60000), Math.max(701, Math.floor(ref.annualDisbursementsCents / 12))]); // a cushion genuinely over the cap: a little, a lot, or 3 months instead of 2
@@ -217,26 +268,34 @@ section('B2 — the "is that really the required minimum?" nudge: how often does
       const claim = shS > 0 ? { claimedKind: 'shortage', claimedAmountCents: shS } : suS > 0 ? { claimedKind: 'surplus', claimedAmountCents: suS } : { claimedKind: 'none' };
       const variants = { 'minimum only': { requiredMinimumBalanceCents: X }, 'minimum + new payment': { requiredMinimumBalanceCents: X, newMonthlyEscrowCents: pay }, 'minimum + claimed shortage/surplus': { requiredMinimumBalanceCents: X, ...claim }, 'all three': { requiredMinimumBalanceCents: X, newMonthlyEscrowCents: pay, ...claim } };
       const first = E.compareWithStatement(r, variants['minimum only']); out.servicers++;
-      const nudged = (first.nudges ?? []).length > 0; const flagged = has(first, 'CUSHION_OVER_CAP'); if (nudged) out.nudged++; if (flagged) out.flagged++; if (!nudged && !flagged) out.neither++;
-      if (!nudged) continue;
+      const nudged = (first.nudges ?? []).length > 0; const flagged = has(first, 'CUSHION_OVER_CAP'); const maybe = has(first, 'CUSHION_MAYBE_OVER_CAP'); if (nudged) out.nudged++; if (flagged) out.flagged++; if (maybe) out.maybe++; if (!nudged && !flagged && !maybe) out.neither++;
+      const triggerMet = Math.abs(X - r.lowPoint.projectedBalanceCents) <= 700; // X is always over the cap by more than $7.00 here
+      if (!triggerMet) continue;
       for (const [vname, st] of Object.entries(variants)) {
         const c = E.compareWithStatement(r, st); const v = E.explainVerdict(r, c); const t = out.typed[vname]; t.hidden++;
-        if (asserts(c)) t.surfacedByAnotherFlag++; else if (c.overall === 'matches' && v.tone === 'clear') { t.fullyGreen++; if (greens.length < 1 && X - cap > 20000) greens.push({ account: a, statement: st, cushionOverCapBy: X - cap, overall: c.overall, banner: v.label + ': ' + v.headline, nudge: c.nudges[0].message.slice(0, 120) + '…' }); } else if (v.tone === 'flag') t.amberForAnotherReason++; else t.neutral++;
+        if (has(c, 'CUSHION_OVER_CAP')) t.overCap++; else if (has(c, 'CUSHION_MAYBE_OVER_CAP')) t.maybe++; else if ((c.nudges ?? []).length > 0) t.nudgeOnly++; else t.silent++;
+        // "green" = overall "matches" and no flag at all, whatever colour the banner takes for other reasons (a refund banner is amber but says nothing about the cushion)
+        if (c.overall === 'matches' && c.flags.length === 0) { t.fullyGreen++; if (greens.length < 3) greens.push({ account: a, statement: st, cushionOverCapBy: X - cap, overall: c.overall, banner: v.label + ': ' + v.headline }); }
+        else if (asserts(c)) t.surfacedByAnotherFlag++; else if (v.tone === 'flag') t.amberForAnotherReason++; else t.neutral++;
       }
     }
-    console.log(`  -- ${name}: ${out.servicers} over-cushioning servicers -> CUSHION_OVER_CAP ${out.flagged}, hidden behind the nudge ${out.nudged} (${(100 * out.nudged / out.servicers).toFixed(1)}%), neither ${out.neither}`);
-    for (const [k, t] of Object.entries(out.typed)) if (t.hidden) console.log(`       homeowner typed ${k.padEnd(34)}: another discrepancy flag fired ${String(t.surfacedByAnotherFlag).padStart(6)} | fully GREEN ${String(t.fullyGreen).padStart(6)} | amber for another reason (refund banner) ${String(t.amberForAnotherReason).padStart(6)} | neutral ${String(t.neutral).padStart(6)}`);
+    console.log(`  -- ${name}: ${out.servicers} over-cushioning servicers, minimum only -> CUSHION_OVER_CAP ${out.flagged}, amber CUSHION_MAYBE_OVER_CAP ${out.maybe}, nudge ${out.nudged}, silence ${out.neither}`);
+    for (const [k, t] of Object.entries(out.typed)) if (t.hidden) console.log(`       trigger met, homeowner typed ${k.padEnd(34)}: CUSHION_OVER_CAP ${String(t.overCap).padStart(6)} | CUSHION_MAYBE_OVER_CAP ${String(t.maybe).padStart(6)} | nudge only ${String(t.nudgeOnly).padStart(6)} | silent ${String(t.silent).padStart(6)} | GREEN (overall "matches", no flag) ${String(t.fullyGreen).padStart(6)}`);
     bump(name); return out;
   };
   const steady = world('steady state: balance sits on the servicer\'s own target (within $7), borrower current', (target) => target + int(-700, 700), true);
   const steadyLate = world('steady state, borrower NOT current', (target) => target + int(-700, 700), false);
   const drift = world('balance within $100 of the servicer\'s target, borrower current', (target) => target + int(-10000, 10000), true);
   const anywhere = world('balance anywhere (a shortage or surplus of up to $3,000 against the servicer\'s target)', (target) => target + int(-300000, 300000), true);
-  check(steady.neither + steadyLate.neither + drift.neither + anywhere.neither === 0, 'an oversized cushion always draws either CUSHION_OVER_CAP or the nudge (never silence)');
-  const claimAlwaysSurfaces = [steady, steadyLate, drift, anywhere].every((w) => w.typed['minimum + claimed shortage/surplus'].surfacedByAnotherFlag === w.typed['minimum + claimed shortage/surplus'].hidden && w.typed['all three'].surfacedByAnotherFlag === w.typed['all three'].hidden);
-  check(claimAlwaysSurfaces, 'whenever the homeowner also typed the claimed shortage / surplus / "none", KIND_DIFFERS or AMOUNT_DIFFERS still surfaces the problem (100% of hidden cases)');
-  const payOnlyGreen = [steady, steadyLate, drift, anywhere].reduce((s, w) => s + w.typed['minimum + new payment'].fullyGreen, 0);
-  if (payOnlyGreen > 0) { note(`NEW (wrong-answer, miss): when the homeowner typed the minimum and the new payment but NOT the claimed amount, ${payOnlyGreen} genuinely over-cushioned statements came out fully green ("Matches"). The payment does not catch it, because in the steady state the oversized cushion is already funded, so the payment is just bills ÷ 12.`); greens.forEach((g) => console.log('     example: ' + JSON.stringify(g))); }
+  const worlds = [steady, steadyLate, drift, anywhere]; const sumOver = (f) => worlds.reduce((s, w) => s + Object.values(w.typed).reduce((q, t) => q + f(t), 0), 0);
+  check(worlds.every((w) => w.neither === 0 && w.nudged === 0), 'N1: an oversized cushion typed alone always draws CUSHION_OVER_CAP or the amber CUSHION_MAYBE_OVER_CAP: never silence, and never just the mix-up nudge');
+  const noClaim = worlds.every((w) => ['minimum only', 'minimum + new payment'].every((k) => w.typed[k].maybe === w.typed[k].hidden));
+  check(noClaim, 'N1 (c): trigger met and no claim typed (minimum only, or minimum + new payment) -> CUSHION_MAYBE_OVER_CAP every time');
+  const claimAlwaysSurfaces = worlds.every((w) => ['minimum + claimed shortage/surplus', 'all three'].every((k) => w.typed[k].overCap === w.typed[k].hidden && w.typed[k].surfacedByAnotherFlag === w.typed[k].hidden));
+  check(claimAlwaysSurfaces, 'N1 (b): trigger met and the servicer\'s own shortage / surplus / "none" typed -> the real CUSHION_OVER_CAP every time (a notice of error)');
+  const greenTotal = sumOver((t) => t.fullyGreen); const silentTotal = sumOver((t) => t.silent + t.nudgeOnly);
+  check(greenTotal === 0 && silentTotal === 0, `N1: across all four worlds and all four ways of typing it (${sumOver((t) => t.hidden)} trigger-met comparisons), a genuinely oversized cushion came out green ${greenTotal} times and silent or nudge-only ${silentTotal} times`);
+  greens.forEach((g) => console.log('     GREEN example: ' + JSON.stringify(g)));
   // minimal repro, hand-sized
   const a = { startMonth: 1, startingBalanceCents: 180000, cushionMonths: 2, borrowerCurrent: false, disbursements: [{ label: 'Property tax', month: 6, amountCents: 360000 }, { label: 'Homeowners insurance', month: 12, amountCents: 360000 }] };
   const r = E.analyze(a); const st = { requiredMinimumBalanceCents: 180000, newMonthlyEscrowCents: 60000 }; const c = E.compareWithStatement(r, st); const v = E.explainVerdict(r, c);
@@ -244,7 +303,28 @@ section('B2 — the "is that really the required minimum?" nudge: how often does
   console.log(`       engine: low point ${$(r.lowPoint.projectedBalanceCents)} | cushion row "${c.rows[0].status}" | flags [${c.flags.map((f) => f.kind)}] | nudges ${c.nudges.length} | overall "${c.overall}" | banner ${v.tone} "${v.label}": ${v.headline}`);
   const a2 = { ...a, borrowerCurrent: true }; const r2 = E.analyze(a2); const c2 = E.compareWithStatement(r2, st); const v2 = E.explainVerdict(r2, c2);
   console.log(`       same account, borrower current: banner ${v2.tone} "${v2.label}": ${v2.headline}`);
-  if (/It shows a surplus/.test(v2.headline)) note('NEW (misleading-text): that headline says the STATEMENT "shows a surplus of $600.00". The homeowner typed no surplus; the surplus is the federal math\'s finding, caused by the oversized cushion the nudge just declined to flag.');
+  for (const [who, cc, vv, rr] of [['not current', c, v, r], ['current', c2, v2, r2]]) check(has(cc, 'CUSHION_MAYBE_OVER_CAP') && !has(cc, 'CUSHION_OVER_CAP') && cc.nudges.length === 0 && cc.rows[0].status === 'differs' && cc.overall === 'look-here' && vv.tone === 'flag' && E.letterKind(rr, cc) === 'REQUEST_FOR_INFORMATION', `N1: the Stage 3 repro (borrower ${who}) is no longer green: amber CUSHION_MAYBE_OVER_CAP, overall "look-here", letter a request for information`, `flags=${cc.flags.map((f) => f.kind)} overall=${cc.overall}`);
+}
+
+// ---------------------------------------------------------------------------
+section('N3: "It shows a surplus…" only when a claimed surplus row was typed and matches');
+{
+  const tv01 = E.accountFromVector(E.VECTORS.find((x) => x.id === 'TV01'));
+  const payOnly = allText(tv01, { newMonthlyEscrowCents: 40000 }); const withSurplus = allText(tv01, { claimedKind: 'surplus', claimedAmountCents: 30000, newMonthlyEscrowCents: 40000 });
+  check(payOnly.c.overall === 'matches' && !/It shows/.test(payOnly.v.headline) && /^The numbers you typed match the federal math\. The federal math also finds a surplus of \$300\.00/.test(payOnly.v.headline), 'N3: TV01 with only the payment typed: "The numbers you typed match the federal math. The federal math also finds a surplus of $300.00…", no "It shows"', payOnly.v.headline);
+  check(/^Your statement matches the federal math\. It shows a surplus of \$300\.00/.test(withSurplus.v.headline), 'N3: TV01 with the surplus typed and matching: "It shows a surplus of $300.00…"', withSurplus.v.headline);
+  let bad = 0; let said = 0; let refundMatches = 0; let ex = null;
+  for (let i = 0; i < N; i++) {
+    const a = randomAccount({ current: rnd() < 0.8 }); const ref = oracle(a); a.startingBalanceCents = ref.requiredStartingBalanceCents + pick([int(5000, 300000), int(5000, 300000), int(1, 4999), -int(1, 100000)]); const r = E.analyze(a);
+    const st = {}; if (rnd() < 0.7) st.newMonthlyEscrowCents = r.newMonthlyEscrowPayment.monthlyEscrowAfterDeficiencyRepaidCents; if (rnd() < 0.5) st.requiredMinimumBalanceCents = pick([r.cushionCapCents, r.lowPoint.projectedBalanceCents]);
+    const k = pick(['surplus', 'surplus', 'shortage', 'none', null, null]); if (k) { st.claimedKind = k; if (k !== 'none') st.claimedAmountCents = pick([r.surplusCents, r.shortageCents, r.surplusCents + int(-900, 900), int(0, 300000)].filter((x) => x >= 0)); }
+    const c = E.compareWithStatement(r, st); const v = E.explainVerdict(r, c); const says = /It shows a surplus/.test(v.headline);
+    const typedMatchingSurplus = st.claimedKind === 'surplus' && Number.isSafeInteger(st.claimedAmountCents) && Math.abs(st.claimedAmountCents - r.surplusCents) <= 700 && r.surplusCents > 0;
+    if (c.overall === 'matches' && r.classification === 'SURPLUS_REFUND_REQUIRED' && r.nearLine === null) refundMatches++;
+    if (says) said++; if (says && !typedMatchingSurplus) { bad++; if (!ex) ex = { a, st, headline: v.headline }; }
+    if (!says && typedMatchingSurplus && c.overall === 'matches' && r.classification === 'SURPLUS_REFUND_REQUIRED' && r.nearLine === null) { bad++; if (!ex) ex = { a, st, headline: v.headline, why: 'should have said It shows' }; }
+  }
+  check(bad === 0 && said > 0, `N3: ${N} random statements (${refundMatches} matching with a refundable surplus; "It shows a surplus" said ${said} times): said exactly when a surplus was typed and matches the federal surplus within $7.00`, bad ? `${bad} wrong, e.g. ${JSON.stringify(ex).slice(0, 500)}` : '');
 }
 
 console.log(`\n${failures === 0 ? 'ALL FIX CHECKS PASSED' : failures + ' FIX CHECK(S) FAILED'} (NOTE lines are measurements and new findings)`);

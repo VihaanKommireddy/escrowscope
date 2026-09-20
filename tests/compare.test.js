@@ -1145,3 +1145,123 @@ test("nudges is ALWAYS present, and empty when there is nothing to nudge", () =>
   assert.deepStrictEqual(compareWithStatement(analyze(surplusAccount()), undefined).nudges, []);
   assert.deepStrictEqual(compareWithStatement(analyze(surplusAccount()), { newMonthlyEscrowCents: 40000 }).nudges, []);
 });
+
+// ============================================================================
+// N6 and N7: found by the independent auditor in Stage 4 (math-audit.md §9).
+// Both repros are the auditor's, typed in by the director before the fix.
+// ============================================================================
+
+// Bills $3,600 in June and $3,600 in December: P $600, cap $1,200, Step 2 add $0,
+// required start $1,200. The lowest month is always the starting balance.
+function auditorStage4Account(startingBalanceCents, borrowerCurrent) {
+  return {
+    startMonth: 1,
+    startingBalanceCents: startingBalanceCents,
+    cushionMonths: 2,
+    borrowerCurrent: borrowerCurrent,
+    disbursements: [
+      { label: "Property tax", month: 6, amountCents: 360000 },
+      { label: "Property tax", month: 12, amountCents: 360000 },
+    ],
+  };
+}
+
+test("N6 auditor's repro: a 'deficiency $0.00' claim proves nothing about the cushion, so a $600 over-the-cap cushion is never green", () => {
+  const result = analyze(auditorStage4Account(180000, false));
+  const comparison = compareWithStatement(result, {
+    requiredMinimumBalanceCents: 180000,
+    newMonthlyEscrowCents: 60000,
+    claimedKind: "deficiency",
+    claimedAmountCents: 0,
+  });
+  assertWellFormed(comparison);
+  assert.equal(comparison.overall, "look-here", "must not be green");
+  assert.deepEqual(cushionOutcomes(comparison), ["flag:CUSHION_MAYBE_OVER_CAP"]);
+  assert.equal(letterKind(result, comparison), "REQUEST_FOR_INFORMATION");
+});
+
+test("N6: every deficiency amount from $0.00 to $7.00 lands in case (c), never in the mix-up case", () => {
+  const result = analyze(auditorStage4Account(180000, true));
+  for (const cents of [0, 1, 350, 700]) {
+    const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 180000, claimedKind: "deficiency", claimedAmountCents: cents });
+    assert.equal(comparison.overall, "look-here", "deficiency of " + cents + " cents must not be green");
+    assert.ok(flagByKind(comparison, "CUSHION_MAYBE_OVER_CAP"), "deficiency of " + cents + " cents");
+  }
+});
+
+test("N6 older root: 'deficiency $0.00' typed alone is not a comparison, and its note never says a shortage 'matches your statement'", () => {
+  const result = analyze(auditorStage4Account(100000, true)); // a $200.00 shortage, no deficiency
+  const comparison = compareWithStatement(result, { claimedKind: "deficiency", claimedAmountCents: 0 });
+  assertWellFormed(comparison);
+  const row = rowByKey(comparison, "claimedAmount");
+  assert.equal(row.status, "not-compared");
+  assert.doesNotMatch(row.note, /matches your statement/);
+  assert.match(row.note, /shortage of \$200\.00/);
+  assert.equal(comparison.overall, "not-provided", "a $0 deficiency line alone must not turn the page green");
+  assert.equal(comparison.flags.length, 0);
+});
+
+test("N6 guard: a deficiency claim past the tolerance with no real deficiency is still flagged, and a REAL deficiency claim still matches", () => {
+  const noDeficiency = analyze(auditorStage4Account(100000, true));
+  const flagged = compareWithStatement(noDeficiency, { claimedKind: "deficiency", claimedAmountCents: 701 });
+  assert.ok(flagByKind(flagged, "KIND_DIFFERS"));
+
+  const realDeficiency = analyze(auditorStage4Account(-45000, true));
+  const matched = compareWithStatement(realDeficiency, { claimedKind: "deficiency", claimedAmountCents: 45000 });
+  assert.equal(rowByKey(matched, "claimedAmount").status, "match");
+  assert.equal(matched.overall, "matches");
+});
+
+test("N7 auditor's repro: a lawful shortage statement with the LOW POINT mistyped as the required minimum (under the cap) is not accused", () => {
+  const result = analyze(auditorStage4Account(100000, true)); // low point $1,000, cap $1,200, shortage $200
+  assert.equal(result.lowPoint.projectedBalanceCents, 100000);
+  assert.equal(result.shortageCents, 20000);
+  const comparison = compareWithStatement(result, {
+    requiredMinimumBalanceCents: 100000, // the mix-up: this is the lowest projected balance
+    claimedKind: "shortage",
+    claimedAmountCents: 20000,
+    shortageSpreadMonths: 12,
+    newMonthlyEscrowCents: 61667,
+  });
+  assertWellFormed(comparison);
+  assert.deepEqual(kindsOf(comparison), [], "no flags: the statement is lawful");
+  assert.equal(comparison.overall, "matches");
+  assert.deepEqual(comparison.nudges.map((nudge) => nudge.kind), ["MINIMUM_LOOKS_LIKE_LOW_POINT"]);
+  assert.equal(rowByKey(comparison, "requiredMinimumBalance").status, "not-compared");
+  assert.equal(rowByKey(comparison, "claimedAmount").status, "match");
+  assert.equal(rowByKey(comparison, "newMonthlyEscrow").status, "match");
+  assert.equal(letterKind(result, comparison), "REQUEST_FOR_INFORMATION");
+  for (const nudge of comparison.nudges) assert.doesNotMatch(nudge.message, /over the limit|above the most/);
+});
+
+test("N7: the same mix-up with only the payment typed is compared at the full cap, with the nudge and no flag", () => {
+  const result = analyze(auditorStage4Account(100000, true));
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 100000, newMonthlyEscrowCents: 61667 });
+  assert.deepEqual(kindsOf(comparison), []);
+  assert.equal(comparison.nudges.length, 1);
+  assert.equal(rowByKey(comparison, "newMonthlyEscrow").status, "match");
+});
+
+test("N7 guard: a servicer that REALLY keeps a smaller cushion (its claim only fits the smaller cushion) keeps today's behavior", () => {
+  const result = analyze(auditorStage4Account(100000, true));
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 100000, claimedKind: "none", newMonthlyEscrowCents: 60000 });
+  assert.deepEqual(kindsOf(comparison), []);
+  assert.equal(comparison.nudges.length, 0, "the claim proves the smaller cushion is real");
+  assert.equal(rowByKey(comparison, "requiredMinimumBalance").status, "match");
+  assert.match(rowByKey(comparison, "requiredMinimumBalance").note, /smaller cushion/);
+  assert.equal(comparison.overall, "matches");
+});
+
+test("N7 guard: a smaller typed minimum that is NOT the low point is still read as a smaller cushion (no nudge)", () => {
+  const result = analyze(auditorStage4Account(100000, true));
+  const comparison = compareWithStatement(result, { requiredMinimumBalanceCents: 60000, claimedKind: "none" }); // $600 is not the $1,000 low point
+  assert.equal(comparison.nudges.length, 0);
+  assert.match(rowByKey(comparison, "requiredMinimumBalance").note, /smaller cushion/);
+});
+
+test("N7 edges: $7.00 from the low point is the mix-up, $7.01 is not", () => {
+  const result = analyze(auditorStage4Account(100000, true));
+  const claim = { claimedKind: "shortage", claimedAmountCents: 20000 };
+  assert.equal(compareWithStatement(result, { ...claim, requiredMinimumBalanceCents: 100700 }).nudges.length, 1);
+  assert.equal(compareWithStatement(result, { ...claim, requiredMinimumBalanceCents: 100701 }).nudges.length, 0);
+});

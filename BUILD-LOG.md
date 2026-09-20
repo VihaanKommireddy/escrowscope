@@ -311,9 +311,10 @@ part that has to stay independent.
 | 5.3 | `docs/HOW-IT-WORKS.md` (code walkthrough for the owner, 29 real snippets, 10 exercises, 20 hard questions) and `docs/VERIFICATION.md` (every number and flag mapped to its paragraph of the rule, marked REG / HUD GUIDANCE / OUR CHOICE). The writer read every file and reported two real inconsistencies, fixed in 5.4. | Docs Writer agent |
 | 5.4 | Leftovers: one spread-month limit (`MAX_SPREAD_MONTHS`, the page used 120 while the engine allowed 360) with a regression test; comment drift in `compare.js`; "when a refund is due" reworded; example 3 blurb uses "escrow payments"; `AI-DISCLOSURE-LOG.md` brought up to 30 vectors and the Phase 4 agents; `docs/BUILD-CONTRACT.md` §6 lists what Phase 4 added; `README.md` rewritten for v1; `npm test` script fixed for Node 26; service worker re-stamped. | Director |
 | 5.5 | Stage 4 of the math audit (scripts updated to the three-case rule, the rule measured against simulated servicers, N1–N5 verified independently). Result recorded in `docs/verification/math-audit.md`, "Stage 4". | Fresh independent auditor agent |
+| 5.6 | Stage 4 found two more: **N6** (a "deficiency $0.00" claim unlocked the green path for an over-the-cap cushion of any size: 77,842 of 80,000 simulated) and **N7** (the low point mistyped as the required minimum UNDER the cap drew a notice of error against a lawful statement: 19,922 of 19,923). Both fixed in `engine/compare.js`, test first with the auditor's repros. The auditor's own `stage4-measure.mjs` now reports 0 of 80,000 and 0 of 19,923. The director wrote this fix, so it has script evidence behind it but no independent line-by-line review. | Director |
 
-**Final numbers, run by the director on the final commit:** `npm test` 637 of
-637; `audit/check-vectors.mjs` 30 of 30; `audit/fuzz.mjs --n 20000 --seed 99`
+**Final numbers, run by the director on the final commit:** `npm test` 646 of
+646; `audit/check-vectors.mjs` 30 of 30; `audit/fuzz.mjs --n 20000 --seed 99`
 PASS; `audit/stage2-code-checks.mjs` ALL PASSED.
 
 **Final real-browser pass (Chromium, by the director):** three examples correct;

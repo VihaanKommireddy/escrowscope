@@ -29,10 +29,19 @@ parts the oracle does not cover:
 |---|---|
 | `stage2-code-checks.mjs` | parseDollars attack strings, month conversion for every start month, "validateAccount really guards analyze", extreme amounts, frozen-input (no mutation) test, static scan for Date / random / globals / division. |
 | `stage2-compare-checks.mjs` | `projectWithPayment`, `paymentJumpDecomposition`, `explainJump`, `refundDeadline` (every date 1900–2999), and `compareWithStatement` against **simulated servicers**: lawful ones must not be accused, unlawful ones must be caught. |
+| `stage3-reverify.mjs` | Stage 3: re-verifies each of the 15 audit fixes (A1–A15) against generated text and code paths. Since Stage 4 it also holds the hard checks for N1 (the three-case cushion rule, never green), N2, N3, N4 and N5. |
+| `stage4-measure.mjs` | Stage 4: measures the three-case N1 rule on 20,000 simulated statements per world. (i) real over-the-cap servicers at steady state: how often green. (ii) lawful servicers whose homeowner mistypes the low point as the minimum: how often a hard accusation. (iii) the overlap of cases (a) and (b), and what the other order would cost. Also carries the repros for the open findings N6 and N7. |
 
-| `stage3-reverify.mjs` | Stage 3: re-verifies each of the 15 audit fixes (A1–A15) against generated text and code paths, and measures how often the B2 "low-point mix-up" nudge hides a real oversized cushion. |
+`stage2-compare-checks.mjs` was updated in Stage 3 to the engine's deliberate new rules (A1 scaled payment tolerance, A3, A12 four-part sum, B2 nudge), and again in Stage 4 to fix order 3: the B2 nudge-only rule is replaced by the three-case N1 rule, and the N2 payment ceiling (borrower not current) is checked against a ceiling worked out from the oracle. `stage3-reverify.mjs` was updated the same way, and N2 to N5 became hard checks instead of NOTE lines. Both pass on the current engine. Against the engine before fix order 3 (`fa578c0^`) stage2 fails 7 hard checks, stage3 fails 16 and stage4 fails 2.
 
-`stage2-compare-checks.mjs` was updated in Stage 3 to the engine's deliberate new rules (A1 scaled payment tolerance, A3, A12 four-part sum, B2 nudge). It passes on the current engine and fails 7 hard checks on the pre-fix engine.
+To repeat that regression proof without touching the working tree:
+
+```
+mkdir -p /tmp/escrow-prefix && git -C .. archive 'fa578c0^' engine examples.js | tar -x -C /tmp/escrow-prefix
+node stage2-compare-checks.mjs /tmp/escrow-prefix/engine/index.js --n 20000
+node stage3-reverify.mjs /tmp/escrow-prefix/engine/index.js --n 20000
+node stage4-measure.mjs /tmp/escrow-prefix/engine/index.js --n 20000
+```
 
 Two changes were made to `fuzz.mjs` / `compare.mjs` in Stage 2 at the
 director's request (SPEC E3a.6): `result.inputs` is left out of the "bill order
@@ -60,6 +69,7 @@ node prove-harness.mjs --n 5000
 node stage2-code-checks.mjs
 node stage2-compare-checks.mjs --n 20000
 node stage3-reverify.mjs --n 20000
+node stage4-measure.mjs --n 20000
 #    "NOTE" lines are findings to read; "FAIL" lines are hard failures.
 
 # 5. Rebuild the hand-derived vectors and re-check them

@@ -24,6 +24,12 @@ genuinely over-cushioned statement can come out green because of the low-point
 nudge (N1), and a not-current borrower with any deficiency has no upper limit on
 the payment (N2). Details in section 8.
 
+**Stage 4 update (same day, engine at bb43bf9):** N1 to N5 are verified fixed.
+Two new items were found. **N6 is a miss and is open:** an over-the-cap cushion
+of any size still comes out green if the homeowner picks "deficiency" and types
+$0.00 to $7.00. N7 is a false accusation from the same typing mix-up on the
+other side of the cap. Details in section 9.
+
 ## 1. Where the law was checked
 
 | Source | What it confirmed |
@@ -275,6 +281,11 @@ against commit messages. Script: `audit/stage3-reverify.mjs` (35 checks pass).
 
 ### B2, quantified
 
+> **Superseded (Stage 4).** The numbers in this subsection describe the old
+> nudge-only rule at f686075. Fix order 3 (fa578c0) replaced it with the
+> three-case rule, and the same simulation now gives 0 green. Current numbers
+> are in section 9. This table is kept only as the record of why the rule changed.
+
 Simulated servicers that **really** hold a cushion over the cap (by $7.01 to
 about a month's payment), 20,000 each:
 
@@ -361,3 +372,199 @@ The project's own suite shows 575 of 577 passing; the two failures
 ("banned-text pattern is proven", "sw.js CACHE_NAME is up to date") belong to
 uncommitted service-worker / page work in progress, not to `engine/` or
 `audit/`.
+
+## 9. Stage 4: fix order 3 re-verified (2026-09-19, engine at bb43bf9)
+
+A second auditor finished the audit after the first was cut off. Everything
+here was checked by running the engine and reading what it generates. New
+script: `audit/stage4-measure.mjs`. "Green" below means `overall` is "matches"
+and there is no flag at all. "Hard accusation" means `CUSHION_OVER_CAP`, or a
+letter of kind "NOTICE_OF_ERROR".
+
+### Most important: N6, an unlawful statement that still comes out green (OPEN)
+
+**N6 (wrong-answer, miss, open).** Case (a) of the new N1 rule accepts any
+matching claim as proof that the statement agrees with the federal math. A
+**deficiency** claim proves nothing about the cushion. When the N1 trigger is
+met the balance is always above $0, so the federal deficiency is always $0.00,
+and a claimed deficiency of $0.00 to $7.00 always "matches".
+
+*Minimal repro:* the Stage 3 account (bills $3,600 in June and $3,600 in
+December, balance $1,800.00, a payment was more than 30 days late; the cap is
+$1,200.00). Statement: required minimum $1,800.00, new payment $600.00, claimed
+kind "deficiency", amount $0.00. Engine: cushion row "not-compared", claimed
+row "match", payment row "match", no flags, one nudge, `overall` "matches",
+banner green "Matches: Your statement's math matches the federal method." The
+cushion is $600.00 over the legal limit. The claimed row's note reads "The
+federal math finds a surplus of $600.00. That matches your statement."
+
+*How often:* in the steady-state simulation of part (i) below, typing the
+minimum, the payment and "deficiency $0.00" turned **77,842 of 80,000**
+genuinely over-the-cap statements green (the other 2,158 drew a flag for a
+different reason, mostly `PAYMENT_ABOVE_MAX` on a whole-dollar payment). The
+largest was $4,090.77 over the cap. There is no upper bound.
+
+*How likely:* the page offers "A deficiency (balance below zero)" with an
+amount box, and `validateStatement` accepts $0.00 with no warning. A homeowner
+whose statement prints "Deficiency: $0.00" can do this. It is not the common
+path, but it is reachable, silent and unbounded.
+
+*Fix:* in `decideCushionCase`, case (a) and case (b) should only listen to a
+claim about the surplus / shortage / "none". A "deficiency" claim while the
+federal deficiency is $0.00 goes to case (c). Same root, no cushion typed at
+all: "deficiency $0.00" by itself is a "match" that turns the page green, and
+its note says a $200.00 shortage "matches your statement" (balance $1,000.00
+on the same bills). That row should not make `overall` "matches", and the note
+should say the federal math finds no deficiency and does find a shortage. This
+second part is older than fix order 3 (it behaves the same at fa578c0^).
+
+### N1 to N5
+
+| # | Status | Evidence |
+|---|---|---|
+| N1 | **Fixed for surplus / shortage / "none" claims. Still open through N6.** | The three cases behave as ruled. TV01 (cap $800.00, low point $1,100.00): minimum alone, or with a matching payment, gives `CUSHION_MAYBE_OVER_CAP`, row "differs", `overall` "look-here", a request for information whose line only asks the servicer to confirm the number. Minimum plus a matching surplus of $300.00 gives one `MINIMUM_LOOKS_LIKE_LOW_POINT` nudge, row "not-compared", no flag. Minimum plus "none" gives `CUSHION_OVER_CAP` and `KIND_DIFFERS` with "the cushion is the likely reason", a notice of error. The Stage 3 repro ($600 over, payment typed) is now amber for a current and a not-current borrower. |
+| N2 | **Fixed** | Ceiling worked out from the oracle, not the engine: bills ÷ 12 + shortage ÷ 12 + the whole deficiency, $1.00 per rounded part. On 20,000 not-current deficiency accounts: exactly ceiling + tolerance is a match and green, one cent more is `PAYMENT_ABOVE_MAX` and amber, every time. The same 20,000 accounts with the borrower current keep the old ceiling (deficiency ÷ 2). The $10.00 repro: $510.00 to $513.00 passes, $513.01, $1,000.00 and $5,000.00 are flagged with "at least $490.00 a month more" and no yearly figure. `explainJump` gives the deficiency part the whole $10.00 and calls the other $490.00 "more than the federal math supports"; on 20,000 cases its parts add up to exactly new − old and the deficiency part never exceeds the deficiency (it did in 15,011 of 20,000 before the fix). TV23 at $300 to $550 is still a match: $150 shortage repayment, $100 deficiency repayment, $0 unexplained. |
+| N3 | **Fixed** | TV01 with only the payment typed: "The numbers you typed match the federal math. The federal math also finds a surplus of $300.00…". With the surplus typed and matching: "Your statement matches the federal math. It shows a surplus of $300.00…". On 20,000 random statements "It shows a surplus" was said 1,179 times, each time with a surplus typed and matching within $7.00, and never otherwise. |
+| N4 | **Fixed** | Notice of error plus a lump-sum question: the payment error is item 1 under "I believe the statement contains the error(s) described below.", the question is item 1 under "I also have these questions:", and the closing adds "Please also answer the question above." Across every notice generated in the run, only discrepancy flags sit under "I believe…". No request for information uses either heading. |
+| N5 | **Fixed** | Nothing typed: the letter says only "For my records, please send me the escrow analysis worksheet…". "My numbers line up with the statement." appears only when `overall` is "matches" and there is nothing to ask. |
+
+A4 is intact after the wording sweep: Step 2 reads "The regular escrow payment
+each month is one-twelfth of the year's bills. Repaying a shortage or
+deficiency can be added on top." No step calls one-twelfth a maximum.
+
+### The three measurements (20,000 simulated statements each)
+
+**(i) Servicers that really hold a cushion over the cap, account at steady
+state** (balance within $7.00 of the servicer's own target; over the cap by
+$7.01 to a full extra month). Green counts:
+
+| Servicer | Minimum only | + new payment | + claim | All three |
+|---|---:|---:|---:|---:|
+| To the cent, borrower current | 0 of 20,000 | 0 | 0 | 0 |
+| To the cent, borrower not current | 0 of 20,000 | 0 | 0 | 0 |
+| Whole dollars, borrower current | 0 of 20,000 | 0 | 67 | 65 |
+| Whole dollars, borrower not current | 0 of 20,000 | 0 | 67 | 64 |
+
+Without a claim the result is `CUSHION_MAYBE_OVER_CAP` (19,996 to 20,000 of
+20,000; the rest are plain `CUSHION_OVER_CAP`). With the claim the servicer
+would print, it is `CUSHION_OVER_CAP`: 20,000 of 20,000 to the cent, 19,933 of
+20,000 in whole dollars. The 263 green cases (of 320,000 comparisons) are all
+whole-dollar servicers over the cap by **$7.01 to $7.48**: the $7.00 tolerance
+plus up to 50¢ of the servicer's own rounding. The same simulation on the
+pre-fix engine gives 78,105 green, the largest $4,090.77 over the cap.
+
+**(ii) Lawful servicers, homeowner mistypes the lowest projected balance as
+the required minimum.** Hard accusations:
+
+| World | Minimum only | + new payment | + claim | All three |
+|---|---:|---:|---:|---:|
+| To the cent, low point over the cap | 0 of 20,000 | 0 | 0 | 0 |
+| Whole dollars, low point over the cap | 0 of 19,046 | 0 | 0 | 0 |
+| To the cent, low point **under** the cap (a shortage account) | 0 of 19,923 | 0 | **19,922** | **19,922** |
+
+Over the cap the rule does what it should: amber `CUSHION_MAYBE_OVER_CAP` with
+no claim, one nudge and nothing else with a claim. The third row is N7, below.
+
+**(iii) The known overlap.** A servicer $7.01 to $14.00 over the cap, within
+$7.00 of its own target, whose statement says "none": 5,058 of 20,000 (25.3%)
+have a federal surplus of $7.00 or less, read as case (a), and come out green
+("matches", one nudge). Both (a) and (b) are true in exactly those 5,058. The
+most held over the cap in any of them is **$13.93**; the bound is $14.00. When
+the servicer prints its real shortage or surplus instead of "none", the overlap
+does not happen (0 of 11,602 to-the-cent cases in that band).
+
+*Is that acceptable? Yes.* The money at stake is at most $14.00, it stays in the
+escrow account, and the page already lets $7.00 over the cap pass in silence.
+Putting (b) before (a) is the wrong cure: it would turn 747 of 19,046 (3.9%)
+lawful whole-dollar servicers whose homeowner made the mix-up from a nudge into
+a hard `CUSHION_OVER_CAP` and a notice of error, and for a "none" claim (b) is
+true whenever the trigger is met, so every such mix-up would be accused. If the
+director wants zero green here, the change that fits the ruling is "when both
+(a) and (b) are true, answer (c)": never green, never a hard accusation. Its
+whole cost is those 747 lawful statements going from green with a nudge to
+amber with a question.
+
+### N7, the same mix-up on the other side of the cap (OPEN)
+
+**N7 (wrong-answer, false accusation, open; older than fix order 3).** N1 only
+covers a mistyped low point that is over the cap. In a shortage account the low
+point is under the cap. Typed as the required minimum, it is read as "the
+servicer uses a smaller cushion", the shortage disappears from the federal
+side, and the lawful statement's real shortage draws `KIND_DIFFERS` and a
+notice of error. No nudge is offered. A shortage is the usual reason someone
+opens this page.
+
+*Minimal repro:* bills $3,600 in June and $3,600 in December, balance
+$1,000.00, borrower current. A lawful statement: required minimum $1,200.00,
+lowest projected balance $1,000.00, shortage $200.00 over 12 months, new
+payment $616.67. Typed correctly: "matches", no flags. With $1,000.00 typed as
+the required minimum: `KIND_DIFFERS` ("Your statement shows a shortage of
+$200.00. … the federal math finds no shortage and no surplus … instead"),
+`overall` "look-here", letter kind "NOTICE_OF_ERROR".
+
+*Fix:* mirror N1. When the typed minimum is under the cap and within $7.00 of
+the federal low point, let the claim decide: if it matches the federal math at
+the full cap, it is a mix-up (nudge, compare the claim at the cap); if it
+matches only with the smaller cushion, the smaller cushion is real; otherwise
+keep today's behavior and add the nudge.
+
+### Scripts
+
+`stage2-compare-checks.mjs` and `stage3-reverify.mjs` had 4 failing checks on
+the fixed engine. All 4 were confirmed to be the scripts, not the engine: three
+encoded the old nudge-only rule and one was a regex pinned to the old Step 2
+sentence. Both scripts now encode the three-case rule and N2 to N5 as hard
+checks. They still catch regressions: against the pre-fix engine (fa578c0^ =
+e750774, extracted read-only with `git archive`) stage2 fails 7 hard checks,
+stage3 fails 16 and stage4 fails 2.
+
+### Re-run, exact counts (engine at bb43bf9)
+
+| Run | Result |
+|---|---|
+| `check-vectors.mjs` | 30 of 30 vs the oracle; 30 of 30 vs the engine |
+| `prove-harness.mjs --n 5000` | 2 correct engines pass; 12 of 12 planted bugs caught; 4 of 4 `nearLine` convention variants named (exit 3) |
+| `fuzz.mjs`, seeds 20260919, 1, 424242 × 20,000 | **60,000 cases: 0 threw, 0 disagree with the oracle, 0 invariant failures, 0 soft diffs, 0 convention diffs** |
+| `stage2-code-checks.mjs` | 109 of 109 pass |
+| `stage2-compare-checks.mjs --n 20000` | 70 of 70 hard checks pass; lawful to-the-cent servicers 0 of 20,000 accused; whole-dollar servicers 0 of 20,000 accused |
+| `stage3-reverify.mjs --n 20000` | 52 of 52 pass |
+| `stage4-measure.mjs --n 20000` | 5 of 5 expectations met; N6 and N7 print as open NOTE lines with their repros |
+
+## 10. Director's addendum: N6 and N7 fixed (2026-09-19, after Stage 4)
+
+This section was written by the director agent, not by an auditor. The auditors'
+text above is unchanged.
+
+Both open findings from Stage 4 were fixed in `engine/compare.js`, test first,
+using the auditor's repros typed in before any engine change (6 new tests red,
+then green; 3 guard tests green throughout). The director wrote the fix, so the
+fix is NOT independently reviewed line by line. What stands behind it is the
+auditor's own scripts, which the director did not write or edit.
+
+- **N6.** Only a claim about the target (surplus, shortage, "none") may decide
+  the cushion case. A deficiency claim falls through to case (c). A deficiency
+  line of about $0 when the balance is not below $0 is now a "not-compared" row
+  with an honest note, so it can never turn the page green by itself.
+- **N7.** New trigger: the typed minimum is under the cap by more than $7.00 and
+  within $7.00 of the federal low point. If the claim fits only the smaller
+  cushion, the smaller cushion is real and nothing changes. Otherwise it is
+  read as a typing mix-up: everything is compared at the full cap, the cushion
+  row is "not-compared", and a nudge asks which line was typed. No flag.
+
+Results from the auditor's scripts on the fixed engine:
+
+| Script | Result |
+|---|---|
+| `stage4-measure.mjs` | ALL STAGE 4 EXPECTATIONS MET. N6: 0 of 80,000 over-the-cap statements green (was 77,842). N7: 0 of 19,923 lawful servicers accused, with a claim and with all three typed (was 19,922). |
+| `stage3-reverify.mjs --n 20000` | ALL FIX CHECKS PASSED |
+| `stage2-compare-checks.mjs --n 20000` | ALL HARD CHECKS PASSED |
+| `stage2-code-checks.mjs` | ALL CODE CHECKS PASSED |
+| `fuzz.mjs`, seeds 99 and 20260919 × 20,000 | PASS, 0 disagreements |
+| `check-vectors.mjs` | 30 of 30 |
+| `prove-harness.mjs` | every planted bug still caught |
+| `npm test` | 646 of 646 |
+
+Still true after the fix, measured by the auditor and accepted: 263 of 320,000
+whole-dollar over-cushioners come out green, every one of them only $7.01 to
+$7.48 over the cap (the $7.00 tolerance plus the servicer's own rounding), and
+the $7.01 to $14.00 "none" overlap, with at most $13.93 at stake.
