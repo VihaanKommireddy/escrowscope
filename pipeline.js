@@ -273,10 +273,10 @@ export function readInputs(values) {
       if (claimedKind === "shortage" || claimedKind === "deficiency") {
         if (!isBlank(source.spreadMonths)) {
           const months = parseWholeNumber(source.spreadMonths);
-          if (months === null || months < 1 || months > 120) {
+          if (months === null || months < 1 || months > engine.MAX_SPREAD_MONTHS) {
             errors.push({
               field: "statement.shortageSpreadMonths",
-              message: "Type the number of months as a whole number, like 12.",
+              message: "Type the number of months as a whole number from 1 to " + engine.MAX_SPREAD_MONTHS + ". Most statements use 12.",
             });
           } else {
             statement.shortageSpreadMonths = months;

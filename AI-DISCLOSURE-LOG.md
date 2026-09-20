@@ -23,8 +23,10 @@ direction. The running detail (which agent built which file, and when) is in
   and the logs including this one.
 - Written by Claude Code agents (model: Claude Fable 5.1): a director agent, a
   Build Chief agent, and the sub-agents they spawned (regulation researcher,
-  competitor researcher, statement-anatomy researcher, Engine Builder, UI
-  Builder, and any helpers listed in `BUILD-LOG.md`).
+  competitor researcher, statement-anatomy researcher, Engine Builder, Engine
+  Finisher, UI Builder and its helpers, an independent math auditor, an
+  independent QA auditor, a docs writer, and any others listed in
+  `BUILD-LOG.md`).
 - The logo and favicon in `assets/` came from an earlier AI-agent brand-kit run
   (2026-07-08).
 
@@ -40,11 +42,25 @@ direction. The running detail (which agent built which file, and when) is in
 
 ## How the numbers were checked (so nobody has to take AI's word for it)
 
-- The 22 test vectors' expected values were derived from the regulation's own
-  method, not from the engine, and include the worked example printed in the
-  regulation itself (Appendix E) and two examples HUD published.
-- The page can re-run all 22 on the visitor's own device ("Don't take our word
+- There are 30 test vectors. 22 came from the research phase and include
+  Vihaan's hand-derived test case #1, the worked example printed in the
+  regulation itself (Appendix E) and two examples HUD published. 8 were added
+  during verification by an independent auditor agent, derived by hand from the
+  regulation without looking at the engine. Expected values come from the
+  regulation's method, never from the engine's output.
+- The page can re-run all 30 on the visitor's own device ("Don't take our word
   for it").
-- Phase 4 of the build is an independent math audit and a browser
-  QA / accessibility / security pass by agents that did not write the code.
-  Their findings are recorded in `BUILD-LOG.md`.
+- The independent math auditor wrote a second implementation from eCFR before it
+  was allowed to read the engine, then ran 150,000 random accounts through both.
+  Zero disagreements. It also found 20 defects in the comparison flags and the
+  wording, and all 20 were ordered fixed. Report: `docs/verification/math-audit.md`.
+- The independent QA auditor found 14 defects. The two worst were the page
+  claiming more privacy than its mechanism proves. Those were fixed by changing
+  the words to say exactly what the browser enforces. Report:
+  `docs/verification/qa-audit.md`.
+- One miss was caused by the director agent itself: a rule it ordered (treat a
+  "required minimum" that equals the lowest projected balance as a typing
+  mix-up) let a genuinely over-cushioned statement come out green. The
+  independent auditor caught it and the rule was replaced.
+- Not verified by anyone: Safari, Firefox, a real phone, a screen reader. The
+  page was tested in Chromium only.

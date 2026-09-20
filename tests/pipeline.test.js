@@ -707,3 +707,19 @@ test("#6: the typed analysis date is handed to the letter", () => {
   const inputs = readInputs(exampleToValues(exampleById("holding-too-much")));
   assert.equal(inputs.details.analysisDate, "2026-09-01");
 });
+
+// Docs-writer finding (Phase 5): pipeline.js used to refuse a spread over 120 months
+// while the engine allowed 360. One limit now, owned by the engine.
+test("spread months: the page and the engine share ONE limit (engine.MAX_SPREAD_MONTHS)", async () => {
+  const engine = await import("../engine/index.js");
+  const { exampleToValues, readInputs } = await import("../pipeline.js");
+  const { EXAMPLES } = await import("../examples.js");
+  const base = exampleToValues(EXAMPLES[0]);
+  const atLimit = readInputs({ ...base, spreadMonths: String(engine.MAX_SPREAD_MONTHS) });
+  assert.equal(atLimit.errors.filter((e) => e.field === "statement.shortageSpreadMonths").length, 0);
+  assert.equal(atLimit.statement.shortageSpreadMonths, engine.MAX_SPREAD_MONTHS);
+  const pastLimit = readInputs({ ...base, spreadMonths: String(engine.MAX_SPREAD_MONTHS + 1) });
+  assert.equal(pastLimit.errors.filter((e) => e.field === "statement.shortageSpreadMonths").length, 1);
+  const twoHundred = readInputs({ ...base, spreadMonths: "200" });
+  assert.equal(twoHundred.errors.filter((e) => e.field === "statement.shortageSpreadMonths").length, 0, "200 months used to be refused by the page only");
+});

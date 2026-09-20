@@ -47,8 +47,9 @@
 //               LUMP_SUM_OFFERED   the shortage being repaid
 //   overall   "look-here" if there is any flag, else "matches" if we checked
 //             something, else "not-provided".
-// Every row that is not a "match" has a flag pointing at it (`rowKey`), so the
-// table and the verdict can never disagree.
+// Every row that is not a "match" has a flag pointing at it (`rowKey`), except a
+// "not-compared" row, which has a nudge instead (the low-point mix-up, case (a)).
+// So the table and the verdict can never disagree.
 
 import { TOLERANCE_BALANCE_CENTS, paymentToleranceCents, countPaymentParts, paymentCeiling, splitDifference } from "./analyze.js";
 import { formatCents, divideRoundHalfUp, noNegativeZero, MAX_MONEY_CENTS } from "./money.js";

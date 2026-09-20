@@ -212,3 +212,25 @@ Everything in the Build Chief brief's "Quality bar" and "shell test" paragraphs,
 plus: the test walks the **static import graph** starting at the scripts in
 `index.html` and fails if any imported file is missing on disk or missing from
 the `sw.js` precache list; fails on any `import(` (dynamic import) in the shell.
+
+## 6. Exports added during Phase 4 (so this contract matches the code)
+
+As of the end of Phase 4:
+
+`engine/index.js` also exports:
+
+- `MAX_BILL_LABEL_LENGTH` (60) and `MAX_SPREAD_MONTHS` (360) from `validate.js`:
+  the one bill-name limit and the one spread-month limit. The page reads both
+  from the engine instead of keeping its own numbers.
+- `letterKind(result, comparison)` from `letter.js`: `"NOTICE_OF_ERROR"` only
+  when a flag asserts a discrepancy, otherwise `"REQUEST_FOR_INFORMATION"`. The
+  letter, the next steps and the page's letter panel all read this one function.
+- NOT re-exported from `index.js`, but shared inside the engine: `analyze.js`
+  exports `paymentCeiling(result)`, `paymentToleranceCents(parts)` and
+  `countPaymentParts(result)` for `compare.js` and `explain.js`. They hold the
+  most the federal math supports for a monthly payment (including the
+  not-current deficiency ceiling, audit finding N2) and the $1-per-rounded-part
+  tolerance (audit finding A1).
+- `comparison.nudges` (always present) and the flag kind
+  `CUSHION_MAYBE_OVER_CAP` (audit finding N1, the three-case rule in
+  `engine/compare.js`).

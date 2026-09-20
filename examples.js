@@ -89,7 +89,7 @@ export const EXAMPLES = [
     id: "cushion-too-big",
     title: "The cushion is too big",
     blurb:
-      "The statement keeps a $1,800 cushion. That is 3 months of payments. The most the federal rule allows is 2 months: $1,200. The extra $600 shows up as a shortage the federal math does not find.",
+      "The statement keeps a $1,800 cushion. That is 3 months of escrow payments. The most the federal rule allows is 2 months: $1,200. The extra $600 shows up as a shortage the federal math does not find.",
     account: {
       startMonth: 4, // escrow year starts in April
       startingBalanceCents: 180000, // $1,800.00

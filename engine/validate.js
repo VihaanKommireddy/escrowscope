@@ -29,7 +29,7 @@ const MAX_BILLS = 100;
 // loaded file that the box itself could not hold.
 export const MAX_BILL_LABEL_LENGTH = 60;
 
-const MAX_SPREAD_MONTHS = 360; // 30 years; nobody spreads a shortage longer than the loan
+export const MAX_SPREAD_MONTHS = 360; // 30 years; nobody spreads a shortage longer than the loan
 
 const SMALL_BILL_CENTS = 10000; // $100 — below this for a whole year, ask "monthly or yearly?"
 const LARGE_TOTAL_CENTS = 10000000; // $100,000 a year in escrow bills is possible, but worth a second look

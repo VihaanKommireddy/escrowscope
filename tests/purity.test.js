@@ -24,7 +24,7 @@ const EXPECTED_FILES = [
 
 const EXPECTED_EXPORTS = [
   "parseDollars", "formatCents", "calendarToEscrowMonth", "escrowToCalendarMonth", "MONTH_NAMES",
-  "validateAccount", "validateStatement", "MAX_BILL_LABEL_LENGTH",
+  "validateAccount", "validateStatement", "MAX_BILL_LABEL_LENGTH", "MAX_SPREAD_MONTHS",
   "analyze", "projectWithPayment", "TOLERANCE_BALANCE_CENTS", "TOLERANCE_PAYMENT_CENTS",
   "compareWithStatement",
   "explainVerdict", "explainSteps", "explainJump", "nextSteps", "explainServicerLine",
