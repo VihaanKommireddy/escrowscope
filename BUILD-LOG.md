@@ -295,3 +295,55 @@ the shell scan; developer comments in `chart.js` still say "we" (comments are
 outside the voice scan). **SHOULD items:** D7 (download / load my numbers)
 shipped; D8 (refund clock) shipped and hidden inside the too-close band.
 Extras nobody asked for: `#example-N` links, dialable `tel:` links, a glossary.
+
+### Phase 4 close-out and Phase 5 — Execute (2026-09-19, evening)
+
+The Build Chief and the first math auditor were both cut off by the account's
+usage limit before they finished (the Chief before its closing drill, the
+auditor during Stage 4). Resuming them would have replayed very large contexts,
+so the director did the close-out by hand and used one small fresh agent for the
+part that has to stay independent.
+
+| Row | What | Who |
+|---|---|---|
+| 5.1 | Fix Order 3, engine: N1 (three-case cushion rule, new flag `CUSHION_MAYBE_OVER_CAP`), N2 (payment ceiling for a borrower who is not current), N3–N5 wording. Commits `fa578c0`, `3f67d12`. | Engine Finisher agent |
+| 5.2 | Ran the auditor's N1, N2 and N3 repros through the engine by hand before accepting the fix: N1 repro amber with a request-for-information letter; cases (a), (b), (c) each behave; N2 flags $1,000, passes at the $510 ceiling, flags past the tolerance; N3 headline corrected. | Director |
+| 5.3 | `docs/HOW-IT-WORKS.md` (code walkthrough for the owner, 29 real snippets, 10 exercises, 20 hard questions) and `docs/VERIFICATION.md` (every number and flag mapped to its paragraph of the rule, marked REG / HUD GUIDANCE / OUR CHOICE). The writer read every file and reported two real inconsistencies, fixed in 5.4. | Docs Writer agent |
+| 5.4 | Leftovers: one spread-month limit (`MAX_SPREAD_MONTHS`, the page used 120 while the engine allowed 360) with a regression test; comment drift in `compare.js`; "when a refund is due" reworded; example 3 blurb uses "escrow payments"; `AI-DISCLOSURE-LOG.md` brought up to 30 vectors and the Phase 4 agents; `docs/BUILD-CONTRACT.md` §6 lists what Phase 4 added; `README.md` rewritten for v1; `npm test` script fixed for Node 26; service worker re-stamped. | Director |
+| 5.5 | Stage 4 of the math audit (scripts updated to the three-case rule, the rule measured against simulated servicers, N1–N5 verified independently). Result recorded in `docs/verification/math-audit.md`, "Stage 4". | Fresh independent auditor agent |
+
+**Final numbers, run by the director on the final commit:** `npm test` 637 of
+637; `audit/check-vectors.mjs` 30 of 30; `audit/fuzz.mjs --n 20000 --seed 99`
+PASS; `audit/stage2-code-checks.mjs` ALL PASSED.
+
+**Final real-browser pass (Chromium, by the director):** three examples correct;
+live proof 30 of 30; the N1 over-cushion case typed through the real form is
+amber with the two-sided sentence; a $52.00 surplus reads "Too close to call"
+with no refund date; the "page problem" note is hidden on a healthy load; the
+privacy panel carries the corrected wording and the "Offline copy: saved" line;
+with the server stopped the page still loads, checks Example 3, passes its own
+30 checks, and the request counter reads 0; script injection through every
+free-text box stays inert text; no sideways page scroll at 320px; console clean
+throughout.
+
+**A trap the director fell into, worth keeping:** the first re-check after the
+fixes showed OLD code. The browser still had the service worker from hours
+earlier, which serves saved files first, and the old saved `sw-register.js` did
+not know the `?nosw` switch yet. One more load let the new hash-stamped worker
+replace it. That is the exact failure the QA audit predicted for returning
+visitors (defect #4), seen live, and it is also the evidence that the hash stamp
+fixes it: the old cache was replaced without anyone bumping a name by hand.
+
+**Accepted, not fixed:** with the (a)-before-(b) order, a servicer only
+$7.01–$14.00 over the cap, with "none" claimed and a federal surplus of $7 or
+less, reads as a typing mix-up and comes out "matches". Under $14 of cushion is
+at stake. The install-to-home-screen prompt is not a goal (the manifest icon is
+an SVG data URI so the request counter stays at 0); offline is.
+
+**Verified by nobody:** Safari, Firefox, a real phone, a screen reader,
+forced-colors mode on Windows, the `blob:` download under this CSP in Safari.
+Chromium only. DOM behavior has no unit tests (no jsdom, zero dependencies
+stands); it is checked by real-browser runs.
+
+**Not done on purpose:** nothing was pushed, `main` was not touched, the live
+site is unchanged. Shipping is the owner's click.
