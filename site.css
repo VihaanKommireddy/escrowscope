@@ -804,26 +804,29 @@ main:focus {
   border-top: 1px solid var(--border);
 }
 
-.step-nav {
+.step-nav,
+.form-actions-main {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+}
+
+.form-actions-main {
+  margin-left: auto;
 }
 
 .step-nav .btn {
   min-width: 96px;
 }
 
+/* The line under the buttons only takes up room when it has something to say. */
 .tool-card .form-status {
   margin-top: var(--space-2);
   gap: var(--space-1) var(--space-3);
 }
 
-.tool-card .form-status .btn-quiet {
-  margin-left: -14px;
-}
-
-@media (max-width: 479px) {
+@media (max-width: 559px) {
   .tool-card .form-actions {
     flex-direction: column;
     align-items: stretch;
@@ -832,6 +835,54 @@ main:focus {
   .step-nav .btn {
     flex: 1 1 0;
   }
+
+  .form-actions-main {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    margin-left: 0;
+  }
+}
+
+/* Room is tight inside the card, so two short boxes share a line when the card
+   is wide enough: "How much?" and "Spread over how many months?". */
+@media (min-width: 700px) {
+  .tool-card .field-grid[data-guide-region="claimed"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
+  }
+
+  .tool-card .field-grid[data-guide-region="claimed"] > .field:first-child,
+  .tool-card .field-grid[data-guide-region="claimed"] > .field-slot {
+    grid-column: 1 / -1;
+  }
+}
+
+/* "Remove this bill" sits on the bill's own title line instead of on a line of
+   its own under the boxes. One line saved for every bill. */
+.tool-card .bill-row {
+  position: relative;
+  padding-top: 0;
+}
+
+/* A floated legend stops being drawn ON the fieldset's border and becomes an
+   ordinary box, which is what lets the button share its line. It is still the
+   fieldset's legend for screen readers. */
+.tool-card .bill-legend {
+  float: left;
+  display: flex;
+  align-items: center;
+  width: auto;
+  min-height: 44px;
+}
+
+.tool-card .bill-grid {
+  clear: both;
+}
+
+.tool-card .bill-remove-cell {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 /* "More": the less common situations and the save / load buttons, folded away. */
@@ -915,7 +966,7 @@ main:focus {
 /* ───────────────────────── 6. The tool: the result as six tabs ───────────────────────── */
 
 .page-check .results {
-  padding-block: clamp(32px, 5vw, 56px);
+  padding-block: clamp(28px, 4vw, 44px);
 }
 
 /* The same serif tabs as the examples, left-aligned and a little smaller. On a
