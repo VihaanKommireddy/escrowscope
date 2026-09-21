@@ -248,6 +248,11 @@ export const REVEAL_STAGGER_CAP = 8;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 const FINE_POINTER = "(hover: hover) and (pointer: fine)";
 
+// The picture plays once this much of it is on the screen (and stops below it),
+// so on a phone the first example starts as the frame scrolls into view, not
+// while only its top edge is showing.
+const SEEN_ENOUGH = 0.4;
+
 function nothing() {}
 
 // ───────── 1. the sample result plays, with its Pause button ─────────
@@ -411,12 +416,15 @@ function startPlayer(stage, stageBox, loop) {
   // long as the page does: it is what starts the cycle again.
   let watcher = null;
   if ("IntersectionObserver" in window) {
-    watcher = new IntersectionObserver(function (entries) {
-      const onScreen = entries[entries.length - 1].isIntersecting;
-      stageBox.classList.toggle("is-offscreen", !onScreen);
-      if (onScreen) release("offscreen");
-      else hold("offscreen");
-    });
+    watcher = new IntersectionObserver(
+      function (entries) {
+        const onScreen = entries[entries.length - 1].intersectionRatio >= SEEN_ENOUGH;
+        stageBox.classList.toggle("is-offscreen", !onScreen);
+        if (onScreen) release("offscreen");
+        else hold("offscreen");
+      },
+      { threshold: SEEN_ENOUGH }
+    );
     watcher.observe(stageBox);
   }
 
@@ -425,7 +433,11 @@ function startPlayer(stage, stageBox, loop) {
   stageBox.append(button);
 
   const box = stageBox.getBoundingClientRect();
-  if (box.bottom <= 0 || box.top >= window.innerHeight) reasons.add("offscreen");
+  const showing = Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0);
+  if (!(box.height > 0) || showing / box.height < SEEN_ENOUGH) {
+    reasons.add("offscreen");
+    stageBox.classList.add("is-offscreen");
+  }
   if (document.hidden) reasons.add("hidden");
   sync();
 
@@ -539,16 +551,21 @@ export function startScrollFallback(stageBox, loop) {
 
 // ───────── 3. the big figures count up ─────────
 
-// While a figure counts, the element holds two things: the true number, hidden
-// from the eye but read by screen readers, and an aria-hidden copy that moves.
-// The moving copy sits on top of an invisible print of the final number, so the
-// space it takes never changes. When the count ends, the element goes back to
+// A figure shows its real, final number at all times EXCEPT the 1.2 seconds in
+// which it counts, and it only starts to count once it is (just) on the screen.
+// So no number ever rests on the page at a value that is not true.
+//
+// While it counts, the element holds two things: the true number, hidden from
+// the eye but read by screen readers, and an aria-hidden copy that moves. The
+// moving copy lies on top of an invisible print of the final number, so the
+// room it takes never changes. When the count ends, the element goes back to
 // being one plain piece of text: the final number, exactly as index.html had it.
+const COUNT_UP_MS = 1200;
+
 function startFigures(loop) {
   if (!("IntersectionObserver" in window)) return nothing;
-  const waiting = new Map(); // the box being watched → what to count
+  const waiting = new Map(); // the box being watched → the figure inside it
   const counting = new Set();
-  let watcher = null;
 
   function restore(job) {
     job.node.classList.remove("is-counting");
@@ -556,22 +573,29 @@ function startFigures(loop) {
   }
 
   function begin(job) {
-    const startedAt = window.performance.now();
+    const live = el("span", { className: "count-live", text: formatCount(0) });
+    job.node.replaceChildren(
+      el("span", { className: "visually-hidden", text: job.finalText }),
+      el("span", { className: "count-visual", attrs: { "aria-hidden": "true" } }, [el("span", { className: "count-ghost", text: job.finalText }), live])
+    );
+    job.node.classList.add("is-counting");
     counting.add(job);
+    let startedAt = null;
     loop.add(function countTask(now) {
       if (!counting.has(job)) return false;
-      const progress = clamp01((now - startedAt) / 1200);
+      if (startedAt === null) startedAt = now;
+      const progress = clamp01((now - startedAt) / COUNT_UP_MS);
       if (progress >= 1) {
         counting.delete(job);
         restore(job);
         return false;
       }
-      job.live.textContent = formatCount(countAt(job.target, progress));
+      live.textContent = formatCount(countAt(job.target, progress));
       return true;
     });
   }
 
-  watcher = new IntersectionObserver(
+  const watcher = new IntersectionObserver(
     function (entries) {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
@@ -583,7 +607,7 @@ function startFigures(loop) {
       }
       if (waiting.size === 0) watcher.disconnect();
     },
-    { threshold: 0.25 }
+    { threshold: 0.2 }
   );
 
   for (const node of document.querySelectorAll("[data-count-to]")) {
@@ -593,20 +617,13 @@ function startFigures(loop) {
     // (the request counter showing a dash): leave it alone.
     if (!Number.isInteger(target) || target <= 0 || finalText !== formatCount(target)) continue;
     const box = node.closest(".figure-number") || node;
-    const live = el("span", { className: "count-live", text: formatCount(0) });
-    node.replaceChildren(
-      el("span", { className: "visually-hidden", text: finalText }),
-      el("span", { className: "count-visual", attrs: { "aria-hidden": "true" } }, [el("span", { className: "count-ghost", text: finalText }), live])
-    );
-    node.classList.add("is-counting");
-    waiting.set(box, { node: node, live: live, target: target, finalText: finalText });
+    waiting.set(box, { node: node, target: target, finalText: finalText });
     watcher.observe(box);
   }
   if (waiting.size === 0) watcher.disconnect();
 
   return function stopFigures() {
     watcher.disconnect();
-    for (const job of waiting.values()) restore(job);
     for (const job of counting) restore(job);
     waiting.clear();
     counting.clear();

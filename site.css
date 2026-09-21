@@ -204,6 +204,23 @@ main:focus {
   mask-image: radial-gradient(circle closest-side, #000 74%, transparent 100%);
 }
 
+/* Until landing.js has built the preview, its place is kept: about as tall as
+   the finished frame (it grows with its width, as the chart does), with the two
+   sheets of paper already lying there. So the page below barely moves when the
+   picture arrives, and the big circle waits for it instead of jumping with it.
+   (If the picture could not be built, preview.js gives the place back.) */
+.preview:empty {
+  padding-top: calc(376px + 21.4%);
+}
+
+.preview.preview-failed:empty {
+  padding-top: 0;
+}
+
+.hero-backdrop:has(+ .preview:empty) {
+  display: none;
+}
+
 /* The circle is taller than the hero once it starts to move. Nothing of it may
    hang over the band below, so the hero clips top and bottom too (styles.css
    already clips it left and right). */
@@ -309,7 +326,7 @@ main:focus {
 .count-live {
   position: absolute;
   top: 0;
-  right: 0;
+  left: 0;
 }
 
 @media (min-width: 620px) {

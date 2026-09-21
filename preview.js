@@ -216,7 +216,10 @@ export function initHeroPreview(holder) {
     }
 
     const first = factsFor(PREVIEW_EXAMPLE_INDEX);
-    if (first === null) return null;
+    if (first === null) {
+      holder.classList.add("preview-failed");
+      return null;
+    }
     clear(holder);
     holder.classList.remove("is-cycling", "is-playing", "is-leaving");
 
@@ -262,7 +265,11 @@ export function initHeroPreview(holder) {
     const cushion = chip("chip--cushion", "chip-dot--warn", first.cushionChip.words, first.cushionChip.figure);
     const low = chip("chip--low", "chip-dot--accent", first.lowChip.words, first.lowChip.figure);
     const checks = chip("chip--checks", first.allChecksPassed ? "chip-dot--ok" : "chip-dot--warn", first.checksChip, "");
-    const pill = el("p", { className: "chip preview-chip chip--example", text: "Example" });
+    // The dark pill: the word "Example", then (only while the picture plays)
+    // which one of how many. Two pieces, so a very narrow phone can drop the word
+    // and keep the count clear of the chip next to it.
+    const pillCount = el("span", { className: "pill-count" });
+    const pill = el("p", { className: "chip preview-chip chip--example" }, [el("span", { className: "pill-word", text: "Example" }), pillCount]);
 
     function setNumbers(centsList) {
       numberNodes.forEach(function (node, position) {
@@ -283,7 +290,9 @@ export function initHeroPreview(holder) {
       cushion.figureNode.textContent = facts.cushionChip.figure;
       low.wordsNode.textContent = facts.lowChip.words;
       low.figureNode.textContent = facts.lowChip.figure;
-      pill.textContent = options && options.counted ? "Example " + facts.exampleNumber + " of " + EXAMPLES.length : "Example";
+      const counted = Boolean(options && options.counted);
+      pillCount.textContent = counted ? " " + facts.exampleNumber + " of " + EXAMPLES.length : "";
+      pill.classList.toggle("is-counted", counted);
       return true;
     }
 
@@ -307,8 +316,10 @@ export function initHeroPreview(holder) {
       setNumbers: setNumbers,
     };
   } catch (problem) {
-    // The picture is optional. Leave the space empty rather than break the page.
+    // The picture is optional. Leave the space empty rather than break the page,
+    // and give back the room the stylesheet was keeping for it.
     clear(holder);
+    holder.classList.add("preview-failed");
     return null;
   }
 }

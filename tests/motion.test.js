@@ -500,3 +500,44 @@ test("sections that rise: the groups named in motion.js exist on the landing pag
   assert.ok(/transition: opacity 400ms ease-out, transform 400ms ease-out;\s*transition-delay: calc\(var\(--reveal-i, 0\) \* 40ms\);/.test(css), "16px rise and fade, 400ms ease-out, 40ms apart.");
   assert.ok(/transform: translateY\(16px\);/.test(css));
 });
+
+test("the big figures: a number only leaves its true value while it counts, it starts from the watcher (never at start-up), and it goes back to plain text", () => {
+  const code = withoutJsComments(motionJs);
+  const figures = blockAfter(code, "function startFigures(loop)");
+  assert.ok(figures !== null);
+  const begin = blockAfter(figures.body, "function begin(job)");
+  assert.ok(begin !== null);
+  // The only place a figure's text is replaced by the moving copy is begin()…
+  assert.equal((figures.body.match(/replaceChildren\(/g) || []).length, 1);
+  assert.ok(/job\.node\.replaceChildren\(/.test(begin.body));
+  // …which keeps the true number for screen readers and hides the moving copy from them…
+  assert.ok(/el\("span", \{ className: "visually-hidden", text: job\.finalText \}\)/.test(begin.body));
+  assert.ok(/className: "count-visual", attrs: \{ "aria-hidden": "true" \}/.test(begin.body));
+  // …and begin() is only ever called by the watcher, for a figure that is on the screen.
+  assert.equal((figures.body.match(/begin\(job\)/g) || []).length, 2, "begin is defined once and called once.");
+  assert.ok(/if \(!entry\.isIntersecting\) continue;[\s\S]*?begin\(job\);/.test(figures.body));
+  // When the count is over (or motion is stopped half-way) the element is plain text again: the final number.
+  assert.ok(/job\.node\.textContent = job\.finalText;/.test(figures.body));
+  assert.ok(/for \(const job of counting\) restore\(job\);/.test(figures.body));
+  // A figure whose text is not exactly its number (the request counter's dash), or a zero, is left alone.
+  assert.ok(/target <= 0 \|\| finalText !== formatCount\(target\)\) continue;/.test(figures.body));
+  // The room it takes is kept by an invisible print of the final number (site.css).
+  const site = withoutCssComments(read("site.css"));
+  assert.ok(/\.count-ghost \{\s*visibility: hidden;\s*\}/.test(site));
+  assert.ok(/\.count-live \{\s*position: absolute;\s*top: 0;\s*left: 0;\s*\}/.test(site), "The moving copy is taken out of the flow and grows from a fixed left edge, so nothing shifts.");
+  assert.ok(/\.figure-number \{[^}]*font-variant-numeric: tabular-nums;/.test(site), "Tabular figures: the digits do not jiggle.");
+});
+
+test("no layout shift when the picture arrives: its place is kept while the holder is empty, and given back if the picture fails", () => {
+  const site = withoutCssComments(read("site.css"));
+  assert.ok(/\.preview:empty \{\s*padding-top: calc\(\d+px \+ [\d.]+%\);\s*\}/.test(site), "site.css must keep the preview's place until landing.js fills it.");
+  assert.ok(/\.preview\.preview-failed:empty \{\s*padding-top: 0;\s*\}/.test(site));
+  assert.ok(/\.hero-backdrop:has\(\+ \.preview:empty\) \{\s*display: none;\s*\}/.test(site), "The big circle waits for the picture instead of jumping with it.");
+  const preview = read("preview.js");
+  assert.equal((preview.match(/holder\.classList\.add\("preview-failed"\)/g) || []).length, 2, "Both ways the picture can fail give the room back.");
+  // The cycle itself never changes the frame's height: every example's card and chart share one grid cell.
+  const base = withoutCssComments(read("styles.css"));
+  assert.ok(/\.preview-verdicts > \*,\s*\.preview-charts > \* \{\s*grid-area: 1 \/ 1;/.test(base));
+  assert.ok(/\.preview-verdicts > :not\(\.is-current\),\s*\.preview-charts > :not\(\.is-current\) \{\s*visibility: hidden;/.test(base), "visibility, not display: a hidden card still holds its height.");
+  assert.ok(/verdicts\.append\(card\);\s*chartHolder\.append\(chart\);/.test(preview));
+});

@@ -947,6 +947,9 @@ code,
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px 14px;
   align-items: start;
+  /* A short verdict sits in the middle of a slot kept tall enough for the
+     longest one (see .preview-verdicts below). */
+  align-content: center;
   padding: 14px 16px;
   border: 1px solid var(--warn-mark);
   border-radius: var(--radius-lg);
@@ -1199,10 +1202,28 @@ code,
   }
 }
 
-/* Under 380px two chips is enough; the third would cover the numbers. */
+/* Phones: the dark pill moves toward the corner, clear of the cushion chip. */
+@media (max-width: 479px) {
+  .chip--example {
+    right: 8px;
+  }
+}
+
+/* Under 380px two chips is enough; the third would cover the numbers. While the
+   picture plays, the pill says "1 of 3" without the word, for the same reason.
+   The three small labels shrink a touch so "PROJECTED" stays in one piece. */
 @media (max-width: 379px) {
   .chip--low {
     display: none;
+  }
+
+  .chip--example.is-counted .pill-word {
+    display: none;
+  }
+
+  .preview-number dt {
+    font-size: 10px;
+    letter-spacing: 0.02em;
   }
 }
 
