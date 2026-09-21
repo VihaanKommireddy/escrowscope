@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- The privacy rule, enforced by the browser: with connect-src 'none' this page
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <!-- The line above is the privacy rule, enforced by the browser. Every page of
+       this site carries exactly the same one. With connect-src 'none' a page
        cannot make background connections (fetch, XHR, web sockets, beacons) to
        anywhere. That is how pages normally send data out without you noticing.
        It does not stop a link you click from opening another site, and it cannot
@@ -11,7 +13,6 @@
        No inline scripts or styles are allowed either, so this line is real.
        font-src 'self' lets the page use exactly one font file, and only from this
        site's own folder (assets/fonts). No font can come from anywhere else. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
@@ -21,28 +22,27 @@
   <meta name="description" content="Type the numbers from your yearly mortgage escrow statement and see whether the math follows the federal escrow rule. Free. Nothing you type leaves the page.">
   <!-- The tab icon is written inline (a data: address) on purpose. Browsers fetch a
        file-based icon by themselves just AFTER the page loads, which would make the
-       "requests since load" counter in the privacy panel read 1 instead of 0.
+       "requests since load" counter read 1 instead of 0.
        It is the same drawing as assets/favicon.svg. -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%231D3A63' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="manifest" href="./manifest.webmanifest">
   <!-- The one font file (the serif used for headings) is asked for here, WHILE the
        page loads, for the same reason the tab icon is inline: a font that is first
-       fetched later (when a result paints a heading) would make the "requests
-       since load" counter read 1 instead of 0. It comes from this site's own
-       folder; the policy above allows a font from nowhere else. -->
+       fetched later would make the "requests since load" counter read 1 instead
+       of 0. It comes from this site's own folder; the policy above allows a font
+       from nowhere else. -->
   <link rel="preload" as="font" type="font/woff2" crossorigin href="./assets/fonts/Fraunces-Variable.woff2">
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./guide.css">
-  <link rel="stylesheet" href="./chart.css">
-  <link rel="stylesheet" href="./selfcheck.css">
-  <script type="module" src="./app.js"></script>
+  <link rel="stylesheet" href="./site.css">
+  <link rel="stylesheet" href="./motion.css">
+  <script type="module" src="./landing.js"></script>
 </head>
-<body>
-  <a class="skip-link" href="#form-heading">Skip to the form</a>
+<body class="page-landing">
+  <a class="skip-link" href="#main">Skip to the main content</a>
 
   <header class="masthead">
     <div class="wrap masthead-inner">
-      <a class="brand" href="#top">
+      <a class="brand" href="./index.html" aria-current="page">
         <span class="brand-tile" aria-hidden="true">
           <svg class="brand-mark" viewBox="0 0 100 100" width="20" height="20" focusable="false">
             <g fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
@@ -53,462 +53,165 @@
         </span>
         <span class="brand-name">EscrowScope</span>
       </a>
-      <nav class="masthead-nav" aria-label="On this page">
-        <a class="masthead-link" href="#how">How it works</a>
-        <a class="masthead-link" href="#selfcheck-section">Check the checker</a>
-        <a class="masthead-link" href="#privacy-proof">Privacy</a>
-        <a class="btn btn-primary masthead-cta" href="#form-heading">Check my statement</a>
+      <nav class="masthead-nav" aria-label="Main">
+        <a class="masthead-link" href="./proof.html">How it’s checked</a>
+        <a class="masthead-link" href="./privacy.html">Privacy</a>
+        <a class="btn btn-primary masthead-cta" href="./check.html">Check my statement</a>
+        <details class="masthead-menu">
+          <summary class="masthead-menu-button"><span class="menu-icon" aria-hidden="true"></span><span class="menu-word">Menu</span></summary>
+          <ul class="masthead-menu-list">
+            <li><a href="./proof.html">How it’s checked</a></li>
+            <li><a href="./privacy.html">Privacy</a></li>
+          </ul>
+        </details>
       </nav>
     </div>
   </header>
 
-  <main id="main">
-    <p id="framed-warning" class="page-alert wrap" hidden>This page is being shown inside another website, so the form is switched off here. To use EscrowScope, open it directly in its own browser tab.</p>
-
+  <main id="main" tabindex="-1">
     <!-- ───────────── Hero ───────────── -->
     <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap hero-grid">
+      <div class="wrap hero-grid" data-reveal>
         <div class="hero-pitch">
           <p class="eyebrow hero-eyebrow">A free check of your escrow statement</p>
           <h1 id="hero-title" class="hero-title">See why your mortgage payment <em>jumped.</em></h1>
           <p class="hero-lede">Type the numbers from your yearly escrow statement. This page redoes the math the federal rule requires, shows every step, and tells you in plain English what it found.</p>
           <div class="cta-row">
-            <a class="btn btn-primary btn-large" href="#form-heading">Check my statement</a>
-            <a class="btn btn-secondary btn-large" href="#examples-heading" data-run-example="1">Watch an example</a>
+            <a class="btn btn-primary btn-large" href="./check.html">Check my statement</a>
+            <a class="btn btn-secondary btn-large" href="./check.html#example-1">Watch an example</a>
           </div>
           <ul class="hero-claims">
-            <li><a href="#privacy-proof">This page never sends what you type</a></li>
+            <li><a href="./privacy.html">This page never sends what you type</a></li>
             <li>Free, with no account and no tracking</li>
             <li>Works offline after your first visit, in most browsers</li>
           </ul>
         </div>
 
         <!-- A small picture of a real result. Every number in it is worked out by
-             this page's own calculator from example 2 when the page loads
-             (preview.js); nothing in it is typed by hand. Screen readers get the
-             one sentence below instead of a result that is not theirs. -->
+             this site's own calculator when the page loads (preview.js); nothing
+             in it is typed by hand. Standing still it shows example 2. When the
+             visitor has not asked for less motion, motion.js plays the three
+             examples one after another and adds a Pause button next to it.
+             Screen readers get the one sentence below instead of a result that
+             is not theirs.
+             Hooks for the motion layer: #hero-preview is the picture, its chips
+             carry the class preview-chip, and .hero-backdrop is an empty
+             decorative layer behind it (the big soft circle). -->
         <div class="hero-stage">
-          <p class="visually-hidden">Picture: a sample result from example 2, “They’re holding too much”. It is an example, not your result. You can run the same example yourself further down the page.</p>
+          <p class="visually-hidden">Picture: a sample result from example 2, “They’re holding too much”, or from each of the three examples in turn when the picture is playing. It is an example, not your result. You can open the same examples in the tool from the examples on this page.</p>
+          <div class="hero-backdrop" aria-hidden="true"></div>
           <div id="hero-preview" class="preview" aria-hidden="true"></div>
         </div>
       </div>
     </section>
 
-    <!-- ───────────── Intro + examples + pre-check ───────────── -->
-    <section class="intro" aria-labelledby="intro-heading">
-      <div class="wrap">
-        <span class="eyebrow">Start here</span>
-        <h2 id="intro-heading">Your escrow payment went up. Is the math right?</h2>
-        <div class="intro-copy">
-          <p><strong>Escrow</strong> is the part of your mortgage payment that your <strong>servicer</strong> (the company you send the payment to) sets aside to pay your property taxes and insurance. A federal rule limits how much they may collect, and once a year they must send you a statement showing their math.</p>
-          <p>Many payment jumps are lawful: tax or insurance bills went up. Some statements have mistakes. This page tells you which one you are holding, in about two minutes.</p>
-        </div>
+    <!-- ───────────── Big figures ─────────────
+         Each number is either counted on this device when the page loads
+         (landing.js) or pinned by a test (tests/shell.test.js). The motion layer
+         finds them by data-count-to; the text inside is always the final number.
+         While a figure counts up, screen readers still get the final number and
+         the moving copy is hidden from them (motion.js).
+         #figure-passed and #figure-total get theirs from landing.js at start-up,
+         because the number of worked cases is never written down by hand. -->
+    <section class="figures" aria-labelledby="figures-heading">
+      <div class="wrap" data-reveal>
+        <h2 id="figures-heading" class="visually-hidden">EscrowScope in four numbers</h2>
+        <dl class="figures-list">
+          <div class="figure">
+            <dt class="figure-label">worked cases passed on this device, counted when this page loaded. <a href="./proof.html">Run them yourself</a></dt>
+            <dd class="figure-number"><span id="figure-passed">–</span><span class="figure-of"> of </span><span id="figure-total">–</span></dd>
+          </div>
+          <div class="figure">
+            <dt class="figure-label">random accounts were checked against a second calculator, written separately from the federal rule. Zero disagreements. <a href="https://github.com/VihaanKommireddy/escrowscope/blob/main/docs/verification/math-audit.md" rel="noopener noreferrer">Read the math audit</a></dt>
+            <dd class="figure-number"><span data-count-to="150000">150,000</span></dd>
+          </div>
+          <div class="figure">
+            <dt class="figure-label" id="figure-requests-label">requests made by this page since it finished loading. A live reading from your browser. <a href="./privacy.html">How it is counted</a></dt>
+            <dd class="figure-number"><span id="figure-requests" data-count-to="0">0</span></dd>
+          </div>
+          <div class="figure">
+            <dt class="figure-label">to use. There is no account, no sign-up and no tracking.</dt>
+            <dd class="figure-number"><span class="figure-unit">$</span><span data-count-to="0">0</span></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
 
+    <!-- ───────────── How it works ───────────── -->
+    <section class="steps3" id="how" aria-labelledby="how-heading">
+      <div class="wrap" data-reveal>
+        <span class="eyebrow">How it works</span>
+        <h2 id="how-heading">Your escrow payment went up. Is the math right?</h2>
+        <p class="steps3-lede"><strong>Escrow</strong> is the part of your mortgage payment that your <strong>servicer</strong> (the company you send the payment to) sets aside to pay your property taxes and insurance. A federal rule limits how much they may collect, and once a year they must send you a statement showing their math.</p>
+        <ol class="steps3-list">
+          <li class="steps3-item">
+            <span class="steps3-num" aria-hidden="true">01</span>
+            <h3>Type the numbers</h3>
+            <p>Copy a few numbers from your yearly escrow statement into four short steps. A sample statement shows where to find each one.</p>
+          </li>
+          <li class="steps3-item">
+            <span class="steps3-num" aria-hidden="true">02</span>
+            <h3>The federal math runs on your device</h3>
+            <p>Add up the year’s bills, divide by 12, walk the balance forward month by month, and keep a cushion no bigger than one sixth of the year’s bills. That is the method in federal rule 12 CFR 1024.17.</p>
+          </li>
+          <li class="steps3-item">
+            <span class="steps3-num" aria-hidden="true">03</span>
+            <h3>A plain answer and a letter</h3>
+            <p>A verdict in plain English, every step of the math, and a calm letter you can send your servicer if a number does not add up.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────── The three examples ───────────── -->
+    <section class="intro examples-section" aria-labelledby="examples-heading">
+      <div class="wrap" data-reveal>
         <div class="examples">
-          <h3 id="examples-heading" class="examples-heading" tabindex="-1">No statement handy? Watch it work on an example.</h3>
-          <p class="muted small examples-lede">Pick an example, then press its button: it fills in the form and checks the math. You can change any number afterwards to see what happens.</p>
+          <h2 id="examples-heading" class="examples-heading">No statement handy? Watch it work on an example.</h2>
+          <p class="muted small examples-lede">Pick an example, then press its button: the tool opens with those numbers filled in and the math already checked. You can change any number afterwards to see what happens.</p>
           <div id="example-buttons" class="example-tabs">
             <p class="page-problem">The examples have not loaded. Your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser.</p>
           </div>
         </div>
-
-        <details class="disclosure precheck">
-          <summary><span class="summary-title">Is this the right tool for me? Three quick questions</span></summary>
-          <ol class="precheck-list">
-            <li>
-              <h4>Does your monthly mortgage payment include money for property taxes or home insurance?</h4>
-              <p>If yes, you have an escrow account and this page can check it. If you pay those bills yourself, there is no escrow account and nothing here to check.</p>
-            </li>
-            <li>
-              <h4>Is it a regular home mortgage from a bank, credit union, or mortgage company?</h4>
-              <p>The federal escrow rule covers most of these loans. It may not cover a home equity line of credit (HELOC), a loan from the seller or a relative, or some loans a small lender keeps for itself. If you are not sure, ask your servicer: “Is my loan a federally related mortgage loan?” If it is not, these results may not apply to you.</p>
-            </li>
-            <li>
-              <h4>Do you have your yearly escrow statement in front of you?</h4>
-              <p>It is often titled “Annual Escrow Account Disclosure Statement” or “Escrow Analysis”. Your servicer must send one every year. If you cannot find yours, ask them for a copy, or try an example above first.</p>
-            </li>
-          </ol>
-        </details>
-
         <noscript>
-          <p class="noscript-note">This page does its math with JavaScript, which is turned off in your browser. Nothing is sent anywhere either way. Turn JavaScript on for this page to use the checker.</p>
+          <p class="noscript-note">This site does its math with JavaScript, which is turned off in your browser. Nothing is sent anywhere either way. Turn JavaScript on for this site to use the checker.</p>
         </noscript>
       </div>
     </section>
 
-    <!-- ───────────── The form + the statement guide ───────────── -->
-    <section class="workbench" aria-labelledby="form-heading">
-      <div class="wrap workbench-grid">
-        <div class="form-col">
-          <span class="eyebrow">Your statement</span>
-          <h2 id="form-heading" tabindex="-1">Type the numbers from your statement</h2>
-          <p class="section-lede">The boxes follow the order most statements use, top to bottom. Two parts are required. Everything else is optional, and the more you fill in, the more this page can check. Type dollar amounts like <span class="num">1,234.56</span> or <span class="num">1234.56</span>. Commas are fine, and no dollar sign is needed.</p>
-
-          <div id="error-summary" class="error-summary" role="group" tabindex="-1" aria-labelledby="error-summary-title" hidden>
-            <h3 id="error-summary-title" class="error-summary-title"></h3>
-            <ul id="error-summary-list" class="error-summary-list"></ul>
+    <!-- ───────────── Two claims you can test ───────────── -->
+    <section class="trust" aria-labelledby="trust-heading">
+      <div class="wrap" data-reveal>
+        <span class="eyebrow">Check it yourself</span>
+        <h2 id="trust-heading">Two claims you can test.</h2>
+        <div class="trust-grid">
+          <!-- The link is the card's heading. Its ::after is stretched over the
+               whole card (site.css), so the card is one big target while a screen
+               reader hears one short link name. -->
+          <div class="trust-card">
+            <span class="eyebrow">Check the checker</span>
+            <h3><a class="trust-card-link" href="./proof.html">Don’t take this page’s word for it.</a></h3>
+            <p>A tool that checks someone else’s math should let you check its own. Run the calculator against a set of worked cases, on your device, and see every number.</p>
+            <span class="trust-card-go" aria-hidden="true">See how it’s checked →</span>
           </div>
-
-          <form id="escrow-form" class="escrow-form" novalidate autocomplete="off">
-
-            <fieldset class="part">
-              <legend class="part-legend"><span class="part-index">Part 1</span> <span class="part-title">Your payment</span> <span class="tag tag-optional">optional</span></legend>
-              <p class="part-hint">Only the escrow part, not your whole mortgage payment. The whole payment also has principal and interest in it, and is a bigger number.</p>
-              <div class="field-grid">
-                <div class="field" data-guide-region="current-payment" data-guide-focus="f-current-payment">
-                  <label class="field-label" for="f-current-payment"><span class="field-badge" aria-hidden="true">1</span> Current escrow payment</label>
-                  <p class="hint" id="f-current-payment-hint">What you pay into escrow each month now. Also called “Escrow Deposit”, “Current Escrow Payment”, or the escrow line under “Current Monthly Mortgage Payment”.</p>
-                  <div class="money"><input class="input input-money" id="f-current-payment" name="currentPayment" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="f-current-payment-hint f-current-payment-error"></div>
-                  <p class="field-error" id="f-current-payment-error"></p>
-                  <div data-guide-slot></div>
-                </div>
-                <div class="field" data-guide-region="new-payment" data-guide-focus="f-new-payment">
-                  <label class="field-label" for="f-new-payment"><span class="field-badge" aria-hidden="true">2</span> New escrow payment</label>
-                  <p class="hint" id="f-new-payment-hint">What the statement says it is changing to, each month. Also called “New Escrow Payment”, or the escrow line under “New Monthly Mortgage Payment”. If a “Shortage Installment” is listed separately, type the total with it added in.</p>
-                  <div class="money"><input class="input input-money" id="f-new-payment" name="newPayment" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="f-new-payment-hint f-new-payment-error"></div>
-                  <p class="field-error" id="f-new-payment-error"></p>
-                  <div data-guide-slot></div>
-                </div>
-              </div>
-            </fieldset>
-
-            <fieldset class="part">
-              <legend class="part-legend"><span class="part-index">Part 2</span> <span class="part-title">Your balance</span></legend>
-              <div class="field-grid">
-                <div class="field" data-guide-region="starting-balance" data-guide-focus="f-starting-balance">
-                  <label class="field-label" for="f-starting-balance"><span class="field-badge" aria-hidden="true">3</span> Escrow balance at the start of the next 12 months <span class="tag tag-required">required</span></label>
-                  <p class="hint" id="f-starting-balance-hint">The balance the statement’s forecast starts from. Also called “Beginning Balance”, “Anticipated Beginning Balance”, or “Starting Balance”.</p>
-                  <div class="money"><input class="input input-money" id="f-starting-balance" name="startingBalance" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-required="true" aria-describedby="f-starting-balance-hint f-starting-balance-error"></div>
-                  <p class="field-error" id="f-starting-balance-error"></p>
-                  <label class="choice choice-inline"><input type="checkbox" id="f-balance-negative" name="balanceNegative"> <span>This balance is below zero (shown with a minus sign or in brackets)</span></label>
-                  <div data-guide-slot></div>
-                </div>
-                <div class="field" data-guide-region="start-month" data-guide-focus="f-start-month">
-                  <label class="field-label" for="f-start-month"><span class="field-badge" aria-hidden="true">4</span> First month of those 12 months <span class="tag tag-required">required</span></label>
-                  <p class="hint" id="f-start-month-hint">The first month in the statement’s forecast table. It is usually the month the new payment starts (“Effective…”). Often the next 12 months do not start in January.</p>
-                  <select class="input input-select" id="f-start-month" name="startMonth" aria-required="true" aria-describedby="f-start-month-hint f-start-month-guess f-start-month-error"></select>
-                  <p class="field-note" id="f-start-month-guess">This page guessed this month. Check it against your statement.</p>
-                  <p class="field-error" id="f-start-month-error"></p>
-                  <div data-guide-slot></div>
-                </div>
-                <div class="field" data-guide-region="required-minimum" data-guide-focus="f-required-minimum">
-                  <label class="field-label" for="f-required-minimum"><span class="field-badge" aria-hidden="true">5</span> Required minimum balance <span class="tag tag-optional">optional</span></label>
-                  <p class="hint" id="f-required-minimum-hint">The <strong>cushion</strong>: a safety buffer your servicer says must stay in the account. Also called “Minimum Balance”, “Target Balance”, “Cushion”, or “Two-Month Reserve”. Sometimes it is only highlighted in the forecast table, not named. <strong>This is not the “lowest projected balance” line.</strong> That line is how low your balance is expected to drop. This box is the floor your servicer wants to keep under it. If your statement only shows a lowest projected balance, leave this box empty.</p>
-                  <div class="money"><input class="input input-money" id="f-required-minimum" name="requiredMinimum" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="f-required-minimum-hint f-required-minimum-error"></div>
-                  <p class="field-error" id="f-required-minimum-error"></p>
-                  <div data-guide-slot></div>
-                </div>
-              </div>
-            </fieldset>
-
-            <fieldset class="part">
-              <legend class="part-legend"><span class="part-index">Part 3</span> <span class="part-title">What the statement concluded</span> <span class="tag tag-optional">optional</span></legend>
-              <p class="part-hint">A <strong>shortage</strong> means the account has money, but less than it should. A <strong>surplus</strong> (some servicers say “overage”) means it has more than it needs. A <strong>deficiency</strong> means the balance is below zero.</p>
-              <div class="field-grid" data-guide-region="claimed" data-guide-focus="f-claimed-kind">
-                <div class="field">
-                  <label class="field-label" for="f-claimed-kind"><span class="field-badge" aria-hidden="true">6</span> The statement says there is…</label>
-                  <p class="hint" id="f-claimed-kind-hint">Look in the summary near the top. Also called “Escrow Shortage”, “Surplus”, “Overage”, or “Deficiency”.</p>
-                  <select class="input input-select" id="f-claimed-kind" name="claimedKind" aria-describedby="f-claimed-kind-hint f-claimed-kind-error">
-                    <option value="">I’m skipping this</option>
-                    <option value="shortage">A shortage (less than it should have)</option>
-                    <option value="surplus">A surplus or overage (more than it needs)</option>
-                    <option value="deficiency">A deficiency (balance below zero)</option>
-                    <option value="none">None of these: the account is on target</option>
-                  </select>
-                  <p class="field-error" id="f-claimed-kind-error"></p>
-                </div>
-                <div class="field" id="claimed-amount-field" hidden>
-                  <label class="field-label" for="f-claimed-amount">How much?</label>
-                  <p class="hint" id="f-claimed-amount-hint">Copy the amount straight from the statement’s summary. Also called “Shortage Amount” or “Surplus Amount”.</p>
-                  <div class="money"><input class="input input-money" id="f-claimed-amount" name="claimedAmount" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="f-claimed-amount-hint f-claimed-amount-error"></div>
-                  <p class="field-error" id="f-claimed-amount-error"></p>
-                </div>
-                <div class="field" id="spread-months-field" hidden>
-                  <label class="field-label" for="f-spread-months">Spread over how many months?</label>
-                  <p class="hint" id="f-spread-months-hint">How many monthly payments the statement spreads the repayment over. Most use 12. Also called “Shortage Installment” or “Shortage Spread”.</p>
-                  <input class="input input-short num" id="f-spread-months" name="spreadMonths" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="12" aria-describedby="f-spread-months-hint f-spread-months-error">
-                  <p class="field-error" id="f-spread-months-error"></p>
-                </div>
-                <div class="field-slot" data-guide-slot></div>
-              </div>
-
-              <fieldset class="choice-group" id="lump-sum-field" data-guide-region="lump-sum" data-guide-focus="f-lump-sum-unsure" hidden>
-                <legend class="field-label"><span class="field-badge" aria-hidden="true">7</span> Does the statement offer a “pay the shortage in full” option?</legend>
-                <p class="hint" id="f-lump-sum-hint">Often a tear-off coupon, or a line such as “Option 1: pay the full shortage now”.</p>
-                <div class="choices">
-                  <label class="choice"><input type="radio" id="f-lump-sum-yes" name="lumpSumOffered" value="yes" aria-describedby="f-lump-sum-hint"> <span>Yes</span></label>
-                  <label class="choice"><input type="radio" id="f-lump-sum-no" name="lumpSumOffered" value="no" aria-describedby="f-lump-sum-hint"> <span>No</span></label>
-                  <label class="choice"><input type="radio" id="f-lump-sum-unsure" name="lumpSumOffered" value="" checked aria-describedby="f-lump-sum-hint"> <span>Not sure</span></label>
-                </div>
-                <div data-guide-slot></div>
-              </fieldset>
-
-              <div class="field" data-guide-region="analysis-date" data-guide-focus="f-analysis-date">
-                <label class="field-label" for="f-analysis-date"><span class="field-badge" aria-hidden="true">8</span> Date of the analysis</label>
-                <p class="hint" id="f-analysis-date-hint">The date of the analysis. It is usually printed near the top of the statement, though the rule does not require it. Also called “Analysis Date” or “Statement Date”. It is only used to work out the 30-day date when the rule calls for a refund.</p>
-                <input class="input input-date num" id="f-analysis-date" name="analysisDate" type="date" autocomplete="off" aria-describedby="f-analysis-date-hint f-analysis-date-error">
-                <p class="field-error" id="f-analysis-date-error"></p>
-                <div data-guide-slot></div>
-              </div>
-            </fieldset>
-
-            <fieldset class="part" id="bills-fieldset" data-guide-region="bills" aria-describedby="bills-hint bills-error">
-              <legend class="part-legend"><span class="part-index">Part 4</span> <span class="part-title"><span class="field-badge" aria-hidden="true">9</span> Your bills for the next 12 months</span> <span class="tag tag-required">required</span></legend>
-              <p class="part-hint" id="bills-hint">Every bill your servicer plans to pay out of escrow in the next 12 months, and the month it gets paid. Also called “Expected Escrow Payments”, “Anticipated Disbursements”, or “What We Expect to Pay Out”.</p>
-              <ul class="tips">
-                <li>Type each bill’s full amount, not a monthly share.</li>
-                <li>If property tax is paid twice a year, add it twice: once for each month.</li>
-                <li>Check for flood insurance and mortgage insurance (PMI or MIP). They are easy to miss.</li>
-              </ul>
-              <p class="field-error" id="bills-error"></p>
-              <div id="bill-rows" class="bill-rows"></div>
-              <div class="bills-footer">
-                <button type="button" class="btn btn-secondary" id="add-bill" aria-describedby="bills-hint bills-error">
-                  <span aria-hidden="true">+</span> Add another bill
-                </button>
-                <p class="bills-total"><span class="bills-total-label">Total for the year</span> <span class="num bills-total-figure" id="bills-total">$0.00</span></p>
-              </div>
-              <div data-guide-slot></div>
-            </fieldset>
-
-            <details class="disclosure less-common" id="less-common">
-              <summary><span class="summary-title">Less common situations</span> <span class="summary-note">Most people can skip this</span></summary>
-              <div class="disclosure-body">
-                <div class="field">
-                  <label class="field-label" for="f-cushion-months">How big a cushion do your mortgage documents allow?</label>
-                  <p class="hint" id="f-cushion-months-hint">The federal limit is 2 months of escrow payments, and most loans use it. Pick a smaller number only if your mortgage documents or your state’s law set a smaller cushion.</p>
-                  <select class="input input-select" id="f-cushion-months" name="cushionMonths" aria-describedby="f-cushion-months-hint f-cushion-months-error">
-                    <option value="2" selected>2 months (the federal limit)</option>
-                    <option value="1">1 month</option>
-                    <option value="0">No cushion</option>
-                  </select>
-                  <p class="field-error" id="f-cushion-months-error"></p>
-                </div>
-                <div class="field">
-                  <label class="choice choice-block"><input type="checkbox" id="f-behind" name="behind" aria-describedby="f-behind-hint"> <span>I am more than 30 days behind on a mortgage payment</span></label>
-                  <p class="hint" id="f-behind-hint">This changes what the rule says about refunding extra money. It does not change the math.</p>
-                </div>
-              </div>
-            </details>
-
-            <p class="field-error" id="general-error"></p>
-            <p id="page-problem" class="page-problem">If the buttons on this page do nothing, your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser. What you typed was not sent anywhere.</p>
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary btn-large" id="check-button">Check the math</button>
-              <button type="button" class="btn btn-quiet" id="clear-button">Clear the form</button>
-            </div>
-            <p class="form-status">
-              <span id="form-status" role="status"></span>
-              <button type="button" class="btn btn-quiet" id="undo-clear" hidden>Put my numbers back</button>
-            </p>
-
-            <div class="file-actions" id="file-actions" hidden>
-              <h3 class="file-actions-title">Keep your numbers. This page does not keep them.</h3>
-              <p class="small muted">This page stores nothing. If you want to come back later, save your numbers as a small file on your own device and load it next time. The file never goes anywhere else.</p>
-              <div class="file-actions-row">
-                <button type="button" class="btn btn-secondary" id="download-numbers">Download my numbers</button>
-                <label class="btn btn-secondary file-picker" for="load-numbers">Load a numbers file</label>
-                <input class="visually-hidden file-input" type="file" id="load-numbers" accept=".json,application/json">
-              </div>
-              <p class="file-status small" id="file-status" role="status"></p>
-            </div>
-          </form>
-
-          <details class="disclosure glossary">
-            <summary><span class="summary-title">Words on your statement, in plain English</span></summary>
-            <dl class="glossary-list">
-              <div><dt>Escrow</dt><dd>A savings-like account your mortgage company holds for you. It is used only to pay your property taxes and insurance when they are due.</dd></div>
-              <div><dt>Servicer</dt><dd>The company that collects your mortgage payment and runs your escrow account. It is not always the company that first gave you the loan.</dd></div>
-              <div><dt>Escrow analysis</dt><dd>The yearly checkup your servicer does on the account: did they collect the right amount last year, and how much should they collect next year?</dd></div>
-              <div><dt>Disbursement</dt><dd>A payment your servicer makes out of your escrow account, like a property tax bill or an insurance premium.</dd></div>
-              <div><dt>Cushion</dt><dd>A safety buffer your servicer may keep in the account. Federal law caps it at one sixth of your yearly bills, which is the same as 2 months of escrow payments.</dd></div>
-              <div><dt>Low point</dt><dd>The lowest your escrow balance is expected to drop to in the next 12 months.</dd></div>
-              <div><dt>Shortage</dt><dd>The account has money in it, but not as much as it is supposed to have.</dd></div>
-              <div><dt>Deficiency</dt><dd>The account went below zero. The servicer paid a bill with money that was not there yet.</dd></div>
-              <div><dt>Surplus</dt><dd>The account has more money in it than it needs. Some servicers call this an “overage”.</dd></div>
-              <div><dt>Computation year</dt><dd>The 12-month cycle your servicer uses to review the account. It often starts on the month of your first payment, not in January.</dd></div>
-              <div><dt>RESPA and Regulation X</dt><dd>RESPA is the federal law that sets the rules for mortgage escrow accounts. Regulation X is the detailed rule written under it. The escrow section is “12 CFR 1024.17”.</dd></div>
-              <div><dt>CFPB</dt><dd>The Consumer Financial Protection Bureau: the federal agency that writes these rules and takes complaints from consumers.</dd></div>
-              <div><dt>Notice of error</dt><dd>A letter you send your servicer asking them to look at a specific mistake. They have set deadlines to answer it.</dd></div>
-              <div><dt>Request for information</dt><dd>A letter asking your servicer for the worksheet behind your statement, or for an explanation of a number. It does not say anything is wrong. They generally have set deadlines to answer it.</dd></div>
-              <div><dt>HUD-approved housing counselor</dt><dd>A trained advisor, approved by the Department of Housing and Urban Development, who gives free or low-cost independent help with your mortgage.</dd></div>
-            </dl>
-          </details>
-        </div>
-
-        <aside id="guide-panel" class="guide-col" aria-label="Sample escrow statement: where to find each number"></aside>
-      </div>
-    </section>
-
-    <!-- ───────────── Results (filled in by render.js) ───────────── -->
-    <section id="results" class="results" aria-labelledby="verdict-heading" hidden>
-      <div class="wrap">
-        <div class="print-header" aria-hidden="true">
-          <p class="print-title">EscrowScope report</p>
-          <p class="print-sub" id="print-date"></p>
-        </div>
-
-        <span class="eyebrow">The result</span>
-        <p id="stale-note" class="stale-note" hidden>
-          <span class="stale-mark" aria-hidden="true">!</span>
-          <span><strong>These results are from your last valid numbers.</strong> Fix the box marked above and they will update.</span>
-        </p>
-
-        <p id="render-problem" class="stale-note" hidden>
-          <span class="stale-mark" aria-hidden="true">!</span>
-          <span><strong>Part of the results could not be drawn.</strong> What is shown below may be out of date. Try reloading the page. What you typed was not sent anywhere.</span>
-        </p>
-
-        <div id="verdict" class="verdict">
-          <div class="verdict-mark" id="verdict-mark" aria-hidden="true"></div>
-          <div class="verdict-text">
-            <p class="verdict-label" id="verdict-label"></p>
-            <h2 id="verdict-heading" class="verdict-headline" tabindex="-1"></h2>
-            <p class="verdict-body" id="verdict-body"></p>
-          </div>
-          <div class="verdict-figure" id="verdict-figure"></div>
-        </div>
-        <!-- Only this one line is announced while you edit (SPEC D4). -->
-        <p id="verdict-live" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
-
-        <div id="refund-clock" class="refund-clock" hidden></div>
-        <div id="nudges" class="nudges" hidden></div>
-
-        <div id="three-numbers" class="three-numbers"></div>
-
-        <section class="result-block" id="sec-compare">
-          <h3 id="sec-compare-h">Your statement vs. the federal math</h3>
-          <div id="compare-body"></div>
-        </section>
-
-        <section class="result-block" id="sec-chart">
-          <h3 id="sec-chart-h">Your escrow balance, month by month</h3>
-          <div id="chart-body" class="chart-body"></div>
-        </section>
-
-        <section class="result-block" id="sec-jump">
-          <h3 id="sec-jump-h">Why did it jump?</h3>
-          <div id="jump-body"></div>
-        </section>
-
-        <section class="result-block" id="sec-payment">
-          <h3 id="sec-payment-h">The payment the federal math gives</h3>
-          <div id="payment-body"></div>
-        </section>
-
-        <section class="result-block" id="sec-steps">
-          <h3 id="sec-steps-h">Show the math</h3>
-          <p class="muted small block-lede">Each step opens to show the numbers and where the method comes from: the paragraph of the federal rule, or the official guidance.</p>
-          <div id="steps-body"></div>
-        </section>
-
-        <section class="result-block" id="sec-next">
-          <h3 id="sec-next-h">What you can do next</h3>
-          <div id="next-body"></div>
-        </section>
-
-        <section class="result-block" id="sec-letter">
-          <h3 id="sec-letter-h">A letter you can send</h3>
-          <p class="block-lede" id="letter-lede">A calm, neutral letter asking your servicer to explain the calculation. It states arithmetic, not legal conclusions. Read it, change anything you like, and decide for yourself whether to send it.</p>
-          <div class="letter-details">
-            <div class="field">
-              <label class="field-label" for="f-servicer-name">Your servicer’s name <span class="tag tag-optional">optional</span></label>
-              <p class="hint" id="f-servicer-name-hint">Typed here only to fill in the letter. It is not saved or sent.</p>
-              <input class="input" id="f-servicer-name" type="text" autocomplete="off" aria-describedby="f-servicer-name-hint">
-            </div>
-            <div class="field">
-              <label class="field-label" for="f-loan-number">Your loan number <span class="tag tag-optional">optional</span></label>
-              <p class="hint" id="f-loan-number-hint">Also not saved or sent. You can leave it blank and write it in by hand.</p>
-              <input class="input num" id="f-loan-number" type="text" autocomplete="off" spellcheck="false" aria-describedby="f-loan-number-hint">
-            </div>
-          </div>
-          <label class="field-label" for="letter-text">The letter (you can edit it here)</label>
-          <textarea id="letter-text" class="letter-text" rows="18" spellcheck="true" aria-describedby="letter-lede letter-status"></textarea>
-          <p class="small muted" id="letter-status" role="status"></p>
-          <div class="letter-actions">
-            <button type="button" class="btn btn-secondary" id="copy-letter">Copy the letter</button>
-            <button type="button" class="btn btn-secondary" id="print-letter">Print the letter</button>
-            <button type="button" class="btn btn-quiet" id="reset-letter" hidden>Start the letter over</button>
-            <span class="action-status small" id="copy-status" role="status"></span>
-          </div>
-          <div id="letter-print" class="letter-print" aria-hidden="true"></div>
-        </section>
-
-        <div class="report-actions">
-          <button type="button" class="btn btn-primary" id="print-report">Print this report</button>
-          <p class="small muted">A one-page summary you can bring to a housing counselor. It prints from your device; nothing is uploaded.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ───────────── Honest limits (always visible) ───────────── -->
-    <section class="limits" id="limits" aria-labelledby="limits-heading">
-      <div class="wrap">
-        <span class="eyebrow">The fine print, up front</span>
-        <h2 id="limits-heading">What this page can’t tell you</h2>
-        <ul class="limits-list">
-          <li><strong>This is math, not legal advice.</strong> It does not tell you whether you have a legal claim, and it is not a lawyer or a substitute for one.</li>
-          <li><strong>It is only as good as the numbers typed in.</strong> It cannot see your real bills or your servicer’s records. It can only redo the math from what you enter.</li>
-          <li><strong>Your servicer may know something you don’t.</strong> A gap between your statement and the federal math can come from a newer tax bill or insurance premium than the one you typed. A mismatch is a question to ask, not proof of a mistake.</li>
-          <li><strong>It only covers escrow.</strong> It checks the escrow rule (12 CFR 1024.17) and nothing else about your loan: not your interest rate, not whether mortgage insurance can come off.</li>
-          <li><strong>Not every loan is covered by this rule.</strong> Some loans, like home equity lines of credit and some seller-financed loans, fall outside it. See “Is this the right tool for me?” near the top of the page.</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- ───────────── How this works + the sources ───────────── -->
-    <section class="how" id="how" aria-labelledby="how-heading">
-      <div class="wrap how-grid">
-        <div>
-          <span class="eyebrow">How it works</span>
-          <h2 id="how-heading">The federal method, run on your numbers.</h2>
-          <div class="how-copy">
-            <p>Federal rule 12 CFR 1024.17 tells every mortgage servicer how to run an escrow account: add up the year’s bills, divide by 12, walk the balance forward month by month, and keep a cushion no bigger than one sixth of the year’s bills. This page runs that same method on the numbers you type and compares the answer with your statement.</p>
-            <p>The whole thing is a handful of plain files that run in your browser. There is no account and no tracking. The files are hosted on GitHub Pages, which, like any web host, can see that your browser downloaded them. It never sees what you type. After your first visit the page works with the internet turned off in most browsers.</p>
+          <div class="trust-card">
+            <span class="eyebrow">Privacy you can check</span>
+            <h3><a class="trust-card-link" href="./privacy.html">This page does not send your numbers anywhere.</a></h3>
+            <p>Your browser blocks this site from making background connections, and a live counter shows every request a page has made since it loaded.</p>
+            <span class="trust-card-go" aria-hidden="true">Check the privacy yourself →</span>
           </div>
         </div>
-        <div>
-          <span class="eyebrow">Read it yourself</span>
-          <h3 id="sources-heading" class="how-h">The rule, the agency, and this page’s code</h3>
-          <ul class="link-list">
-            <li><a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The federal escrow rule, 12 CFR 1024.17 (eCFR)</a></li>
-            <li><a href="https://www.consumerfinance.gov/rules-policy/regulations/1024/17/" rel="noopener noreferrer">The same rule on the CFPB’s site</a></li>
-            <li><a href="https://www.consumerfinance.gov/find-a-housing-counselor/" rel="noopener noreferrer">Find a HUD-approved housing counselor (CFPB)</a></li>
-            <li><a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">This page’s source code</a></li>
-          </ul>
-          <p class="small muted">These links open other websites. Clicking a link like these is the only way this page ever leads anywhere else.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ───────────── Check the checker (SPEC D1) ───────────── -->
-    <section class="selfcheck-section" id="selfcheck-section" aria-labelledby="selfcheck-heading">
-      <div class="wrap">
-        <span class="eyebrow">Check the checker</span>
-        <h2 id="selfcheck-heading">Don’t take this page’s word for it.</h2>
-        <p class="section-lede">A tool that checks someone else’s math should let you check its own. This button runs this page’s calculator against a set of worked cases, right here on your device, and shows you every number. Some of the cases were worked out from the regulation before this calculator existed. Others were added later by an independent checker who had not seen the calculator’s code. The exact count of each is listed below.</p>
-        <div id="selfcheck"></div>
-      </div>
-    </section>
-
-    <!-- ───────────── Privacy you can check ───────────── -->
-    <section id="privacy-proof" class="privacy-section privacy-proof" aria-labelledby="privacy-heading" tabindex="-1">
-      <div class="wrap">
-        <span class="eyebrow">Privacy you can check</span>
-        <h2 id="privacy-heading">This page does not send your numbers anywhere. Check it yourself.</h2>
-        <div id="proof-panel"></div>
       </div>
     </section>
 
     <!-- ───────────── Closing ───────────── -->
     <section class="closing" aria-labelledby="closing-heading">
-      <div class="wrap">
+      <div class="wrap" data-reveal>
         <h2 id="closing-heading">See the math behind your new payment.</h2>
         <p class="closing-lede">Many payment jumps are lawful. Some statements have mistakes. It takes about two minutes to find out which one you are holding.</p>
         <div class="cta-row cta-row--center">
-          <a class="btn btn-primary btn-large" href="#form-heading">Check my statement</a>
-          <a class="btn btn-secondary btn-large" href="#examples-heading" data-run-example="1">Watch an example</a>
+          <a class="btn btn-primary btn-large" href="./check.html">Check my statement</a>
+          <a class="btn btn-secondary btn-large" href="./check.html#example-1">Watch an example</a>
         </div>
       </div>
     </section>
@@ -518,9 +221,11 @@
     <div class="wrap footer-inner">
       <p class="footer-brand">EscrowScope · free and independent</p>
       <nav class="footer-nav" aria-label="Footer">
+        <a href="./check.html">Check my statement</a>
+        <a href="./proof.html">How it’s checked</a>
+        <a href="./privacy.html">Privacy you can check</a>
         <a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">Source code</a>
         <a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The rule on eCFR</a>
-        <a href="#privacy-proof">Privacy you can check</a>
       </nav>
       <p class="footer-note">This is math, not legal advice. EscrowScope is not affiliated with any mortgage servicer or government agency. It shows math. What you do next is up to you.</p>
     </div>

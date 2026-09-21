@@ -664,10 +664,11 @@ test("B3: box numbers have no gaps whether the pay-in-full box is hidden or show
   assert.doesNotThrow(() => numberVisibleRegions(undefined));
 });
 
-test("B3: the form in index.html lists its boxes in the same order as the guide numbers them", async () => {
+test("B3: the form in check.html lists its boxes in the same order as the guide numbers them", async () => {
   // A source scan: the numbering only reads right if the page order matches GUIDE_REGIONS.
   const { readFileSync } = await import("node:fs");
-  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  // (The form lived in index.html while the site was one page. It is on check.html now.)
+  const html = readFileSync(new URL("../check.html", import.meta.url), "utf8");
   const keysInPageOrder = [];
   for (const piece of html.split('data-guide-region="').slice(1)) {
     keysInPageOrder.push(piece.slice(0, piece.indexOf('"')));

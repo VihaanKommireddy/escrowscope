@@ -139,11 +139,19 @@ export function numberVisibleRegions(hiddenKeys) {
 
 // Which boxes are hidden in the form right now (a `hidden` attribute on the
 // box or on something around it)?
+//
+// One kind of `hidden` does NOT count: a step of the form that is not showing.
+// check.html shows one step at a time, and the steps that are waiting their
+// turn are hidden tab panels. Their boxes are still part of the form, so they
+// keep their numbers and stay on the sample statement. Only a box that is
+// switched off (the pay-in-full question, when there is no shortage) drops out.
+const HIDDEN_BUT_NOT_A_WAITING_STEP = '[hidden]:not([role="tabpanel"])';
+
 function hiddenRegionKeys(form) {
   const keys = [];
   for (const region of GUIDE_REGIONS) {
     const wrapper = form.querySelector('[data-guide-region="' + region.key + '"]');
-    if (wrapper && wrapper.closest("[hidden]")) keys.push(region.key);
+    if (wrapper && wrapper.closest(HIDDEN_BUT_NOT_A_WAITING_STEP)) keys.push(region.key);
   }
   return keys;
 }
@@ -642,6 +650,11 @@ function isNotShown(node) {
   return node.getClientRects().length === 0;
 }
 
+// The form on check.html shows one step at a time. initGuide can be handed a
+// `reveal(node)` function that brings the right step forward before a box in it
+// takes focus. Without one, nothing extra happens.
+let revealBox = null;
+
 // Returns true if focus really moved to the box for `key`.
 function focusFormBox(form, key) {
   const wrapper = form.querySelector('[data-guide-region="' + key + '"]');
@@ -649,6 +662,7 @@ function focusFormBox(form, key) {
   const target = findFocusTarget(wrapper);
   if (!target) return false;
   openClosedDetails(target);
+  if (typeof revealBox === "function") revealBox(target);
   if (isNotShown(target)) return false;
 
   // Focus first without scrolling, then scroll on our own terms.
@@ -735,8 +749,9 @@ function fillSlots(form, example) {
 
 // ───────────────────────── Start-up ─────────────────────────
 
-export function initGuide({ panel, form, example }) {
+export function initGuide({ panel, form, example, reveal }) {
   if (!example || !example.account || !example.statement) return;
+  revealBox = typeof reveal === "function" ? reveal : null;
 
   // key → the region's button on the sample sheet. Filled in by buildPanel.
   const buttons = {};

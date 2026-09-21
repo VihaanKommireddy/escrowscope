@@ -29,7 +29,7 @@ Two words you need before anything else:
   The visitor presses "Check the math"
                 |
                 v
-  app.js        readFormValues()         every box on the form becomes a plain string
+  check.js      readFormValues()         every box on the form becomes a plain string
                 |
                 v
   pipeline.js   runCheck(values)         the only door between the page and the engine
@@ -51,7 +51,7 @@ One sentence per box:
 
 | Step | Where | What it does |
 |---|---|---|
-| read the form | `app.js` `readFormValues` | Copies what is in each box into one plain object of strings, exactly as typed. No math. |
+| read the form | `check.js` `readFormValues` | Copies what is in each box into one plain object of strings, exactly as typed. No math. |
 | `runCheck` | `pipeline.js` | Runs steps 1 to 5 in order and hands back one object with everything the page needs. It never throws. |
 | 1. `readInputs` | `pipeline.js` | Turns dollar strings into whole cents (using the engine's `parseDollars`) and calendar months into escrow-year months. |
 | 2. `validate` | `engine/validate.js` | Finds problems in plain English. Errors stop the math. Warnings are "are you sure?" and never stop it. |
@@ -83,19 +83,28 @@ One sentence per box:
 
 | File | Lines | Pure or DOM | What it is |
 |---|---:|---|---|
-| `index.html` | about 470 | the page | One page: intro, form, results, proof panels. Carries the Content-Security-Policy. |
+| `index.html` | about 210 | page | The landing page: the pitch, the framed sample result, four big figures, how it works, the three examples, links to the proof and privacy pages. Short on purpose. |
+| `check.html` | about 480 | page | The tool: the form as four steps in one card, the sample statement next to it, the result as six tabs, the honest limits. |
+| `proof.html` | about 120 | page | "Don't take this page's word for it": the self-check, run on the visitor's device as the page opens. |
+| `privacy.html` | about 170 | page | The privacy panel, the five limits in full, how the site works, the glossary. |
+| `landing.js`, `check.js`, `proof-page.js`, `privacy-page.js` | about 135, 1,070, 15, 15 | DOM | One small script per page. Each imports only what its page shows. `check.js` is the old `app.js`. |
+| `site.js` | about 40 | DOM | What every page does: the narrow-screen menu's Escape key, and turning the service worker on. |
+| `example-link.js` | about 25 | pure | Reads the `#example-2` on the end of `check.html`'s address. One small whole number, nothing else. |
+| `tabs.js` | about 175 | DOM | The ARIA tabs pattern: one Tab stop, arrow keys, Home and End. Used for the examples, the four steps and the six result tabs. Also slides the one navy line under the serif tabs and marks a newly chosen panel so it can fade in. |
+| `preview.js` | about 325 | DOM | The framed sample result on the landing page. Every number in it comes from the engine. It builds and fills the picture (example 2 standing still, all three when asked) and never moves it. |
+| `motion.js` | about 790 | pure on top, DOM below | Everything on the landing page that moves: the playing preview and its Pause button, the lean toward the mouse, the scroll fallback, the count-up, the sections that rise. Starts nothing for a visitor who asked for less motion. |
 | `pipeline.js` | about 560 | pure | The seam. Strings in, everything the results need out. Also the numbers-file save and load. |
 | `examples.js` | about 120 | pure (data) | The three built-in examples, each with what the engine is expected to conclude. |
 | `dom.js` | about 80 | DOM | `el()` and `svgEl()`: the only way the scripts create page elements. No HTML strings. |
-| `app.js` | about 950 | DOM | Wiring only. Reads the form, calls `runCheck`, calls `render`. |
 | `render.js` | about 690 | DOM | Draws the results. |
 | `chart.js` | about 1,310 | DOM | The balance chart (SVG) plus the same data as a real table, and the jump bar. |
 | `guide.js` | about 780 | DOM | The "Where do I find this?" sample statement. |
-| `proof.js` | about 460 | DOM | The privacy proof panel: the request counter and the honest notes around it. |
-| `selfcheck-ui.js` | about 870 | DOM | The "check the checker" section that runs all the vectors in the visitor's browser. |
+| `proof.js` | about 490 | DOM | The privacy panel on `privacy.html`: the request counter and the honest notes around it. It also hands the same count, as one number, to the slim status line on the other pages. |
+| `selfcheck-ui.js` | about 880 | DOM | The self-check on `proof.html`: runs all the vectors in the visitor's browser and shows every number. |
 | `sw-register.js` | about 130 | browser | Turns the service worker on (or off with `?nosw`). |
 | `sw.js` | about 180 | service worker | Keeps an offline copy of the site's own files. |
-| `styles.css`, `chart.css`, `guide.css`, `selfcheck.css` | about 4,600 together | styling | No inline styles anywhere, because the CSP forbids them. |
+| `motion.css` | about 415 | styling | The landing page's movement (only `index.html` links it). Every moving rule sits in one `prefers-reduced-motion: no-preference` block. |
+| `styles.css`, `site.css`, `chart.css`, `guide.css`, `selfcheck.css` | about 5,400 together | styling | No inline styles anywhere, because the CSP forbids them. |
 | `manifest.webmanifest` | about 20 | data | Name, colors, icon for the installed-page case. |
 
 **Tools, tests, records**
@@ -800,7 +809,7 @@ function assertSafeAttributeName(name) {
 
 ### `pipeline.js`: the seam
 
-`app.js` touches the DOM, so Node cannot run it. `pipeline.js` never touches the DOM, and `app.js` must go through it for all the math. So `tests/pipeline.test.js` runs the exact path the page uses, with strings exactly as a person would type them.
+`check.js` touches the DOM, so Node cannot run it. `pipeline.js` never touches the DOM, and `check.js` must go through it for all the math. So `tests/pipeline.test.js` runs the exact path the page uses, with strings exactly as a person would type them.
 
 The core of `runCheck`:
 
@@ -822,15 +831,65 @@ Details worth knowing:
 - The refund date is only produced when the classification is `SURPLUS_REFUND_REQUIRED`, `nearLine` is not set, and a date was typed.
 - "Download my numbers" and "Load a numbers file" live here too. A loaded file is untrusted: only a fixed list of known keys is copied, every value is forced to a short string, and the result goes through `readInputs` and the engine's validation like anything typed by hand. The servicer name and loan number are never written to the file.
 
-### `app.js`
+### `check.js` (it was `app.js` while the site was one page)
 
 Wiring only. The interesting parts:
 
 - The form's `submit` handler calls `event.preventDefault()` and then `checkNow()`. The form never submits anywhere. There is no `action`, and the CSP's `form-action 'none'` would block one anyway.
 - **Live what-if.** After the first good check, any edit re-runs the math 250 ms after the last keystroke (`LIVE_EDIT_DELAY_MS = 250`). Waiting for a pause like that is called debouncing. While someone is mid-number ("1," on the way to "1,234"), `looksUnfinished` keeps it quiet instead of flashing an error. If an edit makes the input invalid, the last good results stay on screen, marked stale.
-- **The error boundary.** `index.html` carries a plain paragraph that starts "If the buttons on this page do nothing…". The last line of `start()` hides it. If anything in start-up throws, that line never runs and the message stays visible. Listeners for `error` and `unhandledrejection` bring it back if something breaks later. Before the QA audit, a failed start-up meant a form whose button silently did nothing.
+- **The error boundary.** `check.html` carries a plain paragraph that starts "If the buttons on this page do nothing…". The last line of `start()` hides it. If anything in start-up throws, that line never runs and the message stays visible. Listeners for `error` and `unhandledrejection` bring it back if something breaks later. Before the QA audit, a failed start-up meant a form whose button silently did nothing.
 - **The framing guard.** If the page is shown inside another website's frame, it switches the form off and says why. A `<meta>` CSP cannot set `frame-ancestors`, so the code does it.
 - Every module the page will ever need is imported at the top. No lazy loading anywhere. That is what keeps the privacy counter honestly at 0 no matter what gets clicked.
+
+### Four pages, not one (2026-09-21)
+
+Until now the whole site was one long page: about 10 screens before a result, about 19 with one. It is four pages now.
+
+| Page | Its script | What it loads |
+|---|---|---|
+| `index.html` | `landing.js` | The sample result (`preview.js`), the engine for the figures and the examples, `tabs.js`. Never the results drawer, the chart or the guide. |
+| `check.html` | `check.js` | Everything the tool needs: `pipeline.js`, `render.js`, `chart.js`, `guide.js`, `tabs.js`. |
+| `proof.html` | `proof-page.js` | `selfcheck-ui.js` and the engine. |
+| `privacy.html` | `privacy-page.js` | `proof.js`. No engine at all. |
+
+Every page also loads `site.js` (the menu and the service worker) and `proof.js` (its own request count). `tests/shell.test.js` has a test called "each page loads only what it needs" that fails if, say, the landing page starts importing the chart.
+
+Things worth knowing:
+
+- **The top bar and the footer are copied, not generated.** Same markup on all four pages, and the only thing allowed to differ is `aria-current="page"` on the links to the page you are on. There is no build step to stamp them in, so a test compares them byte for byte.
+- **The form is four steps, and they are real tabs.** Your payment, your balance, what the statement concluded, your bills. The row of tabs is written in `check.html` (so nothing jumps when the script starts) and `tabs.js` adds the keys. Back and Next move focus to the step's heading. "Check the math" is on every step. Every box kept its old `id`, so reading the form, errors and the sample statement needed almost no change.
+- **A failed check goes to the mistake.** Press "Check the math" on step 1 with a blank bill on step 4: the page switches to step 4, marks that tab, and puts focus on the error summary. Each link in the summary switches to the right step and focuses the box.
+- **One thing broke and got fixed:** `guide.js` used to treat any box inside a `hidden` element as switched off, and drop it from the numbering and the sample statement. A step that is waiting its turn is a hidden tab panel, so steps 2 to 4 lost their numbers. Now only `hidden` that is NOT a tab panel counts.
+- **The result is six tabs.** Verdict, Compare, Chart, Why it jumped, The math, What next. Live what-if redraws all six in place, whichever one is showing. The one line that is read out while editing (`#verdict-live`) sits outside the tabs, because a line inside a hidden tab is never read out.
+- **The chart needs a width.** It measures the box it is drawn into, and a tab that is not showing has no width. So `check.js` lays every panel out while `renderResults` runs and puts the tabs back before the browser paints. Nobody sees it.
+- **Printing ignores the tabs.** On paper `site.css` hides the row of tabs and turns every panel into `display: contents`, so the same one-page report prints from any tab. Checked by printing example 3 from each of the six tabs with headless Chrome: one page every time, the same bytes every time.
+- **`./check.html#example-2`** opens the tool with example 2 filled in and checked. That is how the landing page's example buttons work. `example-link.js` is the only code that reads the address, and all it takes is one digit that names a real example.
+- **Offline covers all four.** `sw.js` saves every page and every file any page loads, on the first visit to any of them. It also answers a page's address without `.html`, the way GitHub Pages does.
+
+### What moves, and how (2026-09-21)
+
+The landing page is finished before anything moves. `landing.js` builds the tabs, the still picture of example 2 and the figures, and only then calls `initMotion`. If `motion.js` never ran, or threw on its first line, you would have the page as it was the day before. That order is the whole safety story, so it is worth keeping.
+
+`motion.js` has two halves. The top half is plain arithmetic with no page in it, so `tests/motion.test.js` runs it in Node:
+
+- `easeOutCubic` and `countAt`: where a count-up is at a given moment. It never passes its target, and at the end it IS the target, not something close to it.
+- `formatCount`: 150000 becomes "150,000", written by hand so it reads the same whatever language the browser is set to.
+- `createCycle`: the loop as a small state machine with NO clock of its own. Whoever drives it says how many milliseconds went by, and it answers with what just happened: `show` (an example starts), `settle` (it is finished), `leave` (it fades). That is why a test can run three full rounds in a millisecond with a pretend clock.
+- `createFrameLoop`: the ONE `requestAnimationFrame` loop on the page. Tasks join it, say "again" or "done", and when none are left it stops asking for frames. An idle page runs nothing.
+
+The bottom half touches the page, in five parts that start and stop separately (if one fails, the others still run):
+
+1. **The player.** It asks `preview.js` for all three examples. Their verdict cards and charts are laid in ONE grid cell, on top of each other, with only the current one visible (`visibility`, not `display`, so a hidden card still holds its height). So the frame is always as tall as the tallest example and never changes height. On `show` the player puts the class `is-playing` on the picture and the figures at $0.00; `motion.css` does the rest with keyframes that each wait their turn (line at 1000ms, cushion line at 2400ms, low point at 2700ms, verdict at 3100ms, all over by 3500ms, which is `CYCLE_TIMING.playMs`; a test holds the two files together). The figures are the only thing the script animates frame by frame, for about a second and a half. For the rest of the 6.5 seconds it waits on a single timer, not on frames.
+2. **Pause.** A set of reasons the cycle is standing still: `user` (the button), `hover`, `focus`, `hidden` (the tab), `offscreen` (less than 40% of the hero showing), `print`. It runs only when the set is empty. Pausing always jumps to the FINISHED state of the example that is showing, because a picture frozen mid-count would show a dollar figure the calculator never produced. The button sits next to the picture, not inside it: the picture is `aria-hidden`, and a button must never be.
+3. **Depth.** Three layers read three numbers. `--par` runs from -1 to 1 as the hero travels through the screen; in Chrome and Safari that is pure CSS (a `view()` scroll timeline animating a registered custom property, behind `@supports`), and everywhere else `startScrollFallback` writes the same number from a passive scroll listener. `--lean-x` and `--lean-y` follow the mouse on fine pointers. The stylesheet turns them into pixels: the circle behind moves with the scroll and away from the mouse, the chips in front the other way, the frame barely at all. The float on the chips uses `translate` and the layer offset uses `transform`, so the two add up instead of fighting.
+4. **The count-up.** A figure is its real number at all times except the 1.2 seconds it counts, and it starts only when the number itself is on the screen. While it counts, the element holds the true number (visually hidden, for screen readers) and an `aria-hidden` copy that moves, lying on top of an invisible print of the final number so the space never changes. Afterwards it is one plain piece of text again.
+5. **The rise.** The rule that matters: nothing is hidden in a stylesheet and then "revealed" by script, because a script that fails would leave a blank page. The class `reveal-pending` is added by `motion.js` only, only to pieces wholly below the screen, and only after the `IntersectionObserver` that takes it off exists. Each watcher disconnects when it has nothing left to watch.
+
+How script talks to CSS: classes, and CSS custom properties set on the style OBJECT (`element.style.setProperty("--par", …)`). The Content-Security-Policy blocks style ATTRIBUTES, and `tests/shell.test.js` still bans `setAttribute("style", …)`. It now also fails if any script sets a real property through `.style` (only `--names` are allowed), so how things look stays in the stylesheets, where `tools/contrast.mjs` can read it.
+
+With `prefers-reduced-motion: reduce` none of this starts: no button, no classes, no watchers. The CSS agrees on its own, because every moving rule in `motion.css` sits inside one `no-preference` block. The small touches that all four pages share (the sliding tab line, the 150ms panel fade, pills that lift and press, the verdict easing in) live in `site.css` section 6b and `tabs.js`, behind the same media query.
+
+One thing this work fixed by accident: the preview is built by script, so the page used to jump when it arrived (layout shift 0.065 on a desktop). `site.css` now keeps its place while the holder is empty (`.preview:empty`), and the shift is gone.
 
 ### `render.js`
 
@@ -879,7 +938,7 @@ So the number is: files this page asked for after it finished loading. Checking 
 | | other tabs, other apps, browser extensions |
 | | anything after the browser's log fills up (about 250 entries) |
 
-**What the CSP blocks.** The Content-Security-Policy is one `<meta>` line near the top of `index.html`, with ten directives (the tenth, `font-src 'self'`, was added on 2026-09-21 for the one serif font file, which comes from this site's own folder). `connect-src 'none'` makes the browser itself refuse background connections from the page: `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`. `form-action 'none'` blocks form posts. `script-src 'self'` and `style-src 'self'` block inline and third-party scripts and styles. `default-src 'none'` blocks everything not listed.
+**What the CSP blocks.** The Content-Security-Policy is one `<meta>` line at the top of every page (the same bytes on all four, and `tests/shell.test.js` checks that), with ten directives (the tenth, `font-src 'self'`, was added on 2026-09-21 for the one serif font file, which comes from this site's own folder). `connect-src 'none'` makes the browser itself refuse background connections from the page: `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`. `form-action 'none'` blocks form posts. `script-src 'self'` and `style-src 'self'` block inline and third-party scripts and styles. `default-src 'none'` blocks everything not listed.
 
 **What the CSP does not block** (straight from the QA audit, defect 1):
 
@@ -923,7 +982,7 @@ It is deliberately narrow:
 
 Only GET. Only this site. Only files on its list. For anything else it returns without answering and the browser carries on as if the worker did not exist. It has no `message` listener, so the page cannot hand it data.
 
-**The stale-cache trap.** The browser only installs a new worker when `sw.js` itself changes, byte for byte. If `app.js` changes and `sw.js` does not, the browser sees the same worker, installs nothing, and a returning visitor keeps getting the old saved `app.js`, possibly forever. The cache name used to be bumped by hand. The QA audit proved from this repo's own history that two commits changed site files and shipped with the same cache name, with every test green.
+**The stale-cache trap.** The browser only installs a new worker when `sw.js` itself changes, byte for byte. If `check.js` changes and `sw.js` does not, the browser sees the same worker, installs nothing, and a returning visitor keeps getting the old saved `app.js`, possibly forever. The cache name used to be bumped by hand. The QA audit proved from this repo's own history that two commits changed site files and shipped with the same cache name, with every test green.
 
 **The fix.** `tools/stamp-sw.mjs` makes the cache name depend on the files:
 
@@ -1000,11 +1059,12 @@ Counts are from the last full run while this doc was being written (2026-09-19, 
 | `tests/properties.test.js` | 14 | Layer 2. | "THE SECOND ORACLE agrees on every number, the low month, the classification, nearLine and the new payment." |
 | `tests/purity.test.js` | 23 | The engine's source has no DOM, clock, network or globals, and `/` appears only in the two helpers. | "The engine loads with no `document`, `window` or `fetch` defined." |
 | `tests/pipeline.test.js` | 51 | The exact path the page uses: examples, garbage, hostile text, negative balances, non-January years, file round trip. | "`runCheck` never throws, whatever it is handed." |
-| `tests/shell.test.js` | 50 | The files keep the page's promises: exact CSP, no inline code, no banned calls, relative paths, precache list matches the import graph, cache name is fresh. | "`index.html` carries EXACTLY the ten directives of the spec, no more and no fewer." |
-| `tests/sw.test.js` | 16 | Runs the real `sw.js` inside Node's `node:vm` with a fake network and fake cache, and watches what it does. | "Requests to another website are NEVER answered, and never cause a download." |
+| `tests/shell.test.js` | 73 | The files keep the site's promises, on all four pages: exact CSP (the same bytes on each), no inline code, no banned calls, relative paths, every link between the pages lands on a real file and a real id, the top bar and footer match, the precache list matches the import graph from every page's script, cache name is fresh. | "Every page carries EXACTLY the ten directives of the spec, no more and no fewer." |
+| `tests/sw.test.js` | 18 | Runs the real `sw.js` inside Node's `node:vm` with a fake network and fake cache, and watches what it does. | "Requests to another website are NEVER answered, and never cause a download." |
 | `tests/serve.test.js` | 11 | The local preview server cannot be crashed or tricked into serving files outside the folder. | "A malformed percent sign is a 400, never an exception." |
 | `tests/contrast.test.js` | 4 | Added 2026-09-21 with the Keepbook-style reskin. Every text and control color pair in `styles.css` clears WCAG 2.1 AA in the light and the dark theme, worked out by `tools/contrast.mjs` from the tokens themselves. | "Every text and control color pair clears WCAG 2.1 AA in the light and the dark theme." |
-| `tests/preview.test.js` | 5 | Added 2026-09-21. The sample result pictured in the hero is built from the engine at load, never typed in; the example tabs wrap round with the arrow keys. | "The hero preview shows example 2, and every string in it is what the engine gives for example 2." |
+| `tests/motion.test.js` | 24 | Added 2026-09-21 with the motion layer. The count-up ends on the real figure, the cycle (run with a pretend clock) pauses only on a finished example, one animation-frame loop, and source scans: everything that moves or hides sits inside `prefers-reduced-motion: no-preference`, only transform and opacity are animated plus the one line, no hiding class in any HTML file. | "Pausing mid-count must finish the example that is showing." |
+| `tests/preview.test.js` | 8 | Added 2026-09-21. The sample result pictured in the hero is built from the engine at load, never typed in, for all three examples the loop plays; the example tabs wrap round with the arrow keys. | "The hero preview shows example 2, and every string in it is what the engine gives for example 2." |
 
 One honest limit, written in `BUILD-LOG.md`: there is no browser in the test suite (zero dependencies, so no jsdom). Focus handling, the live region, the error boundary and the framing guard are verified by real-browser runs, not by unit tests. A green `npm test` does not by itself prove the page behaves.
 

@@ -1,0 +1,1368 @@
+/* site.css — EscrowScope as four pages.
+   Everything that came with the move from one long page to a small site lives
+   here: the shared top bar's menu, the landing page's bands, the form as four
+   steps, the result as six tabs, the slim "requests since load" line, and the
+   print rules that put the tabs back onto one sheet of paper.
+
+   It adds NO new colors. Every color below is a token from styles.css, used in a
+   pair that tools/contrast.mjs already checks. The look is unchanged: Fraunces
+   for headings, the system sans for reading, monospace for every number, pills,
+   hairlines, flat surfaces.
+
+   One rule to remember when editing: tests/shell.test.js reads selectors, and a
+   rule whose selector contains the word "select" (as in aria-selected) may not
+   carry a font size under 16px. So sizes sit on their own label classes. */
+
+/* ───────────────────────── 1. The top bar, on every page ───────────────────────── */
+
+/* Where you are. The text links get a navy line; the menu items get a bar. */
+.masthead-link[aria-current="page"] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+  border-radius: 0;
+}
+
+/* Narrow screens: the logo, the filled pill, and a small menu for the two text
+   links. The menu is a <details>, so it works with no script at all. */
+.masthead-menu {
+  position: relative;
+  margin-left: var(--space-1);
+}
+
+.masthead-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.masthead-menu-button::-webkit-details-marker {
+  display: none;
+}
+
+.masthead-menu-button:hover {
+  border-color: var(--ink);
+  background: var(--sunken);
+}
+
+.masthead-menu-button:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+/* Three short bars, drawn with gradients: no icon file, no icon font. */
+.menu-icon {
+  flex: none;
+  width: 16px;
+  height: 12px;
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 2px no-repeat,
+    linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 2px no-repeat;
+}
+
+.masthead-menu[open] .menu-icon {
+  background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
+}
+
+.masthead-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  min-width: 220px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.masthead-menu-list a {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 9px;
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.masthead-menu-list a:hover {
+  background: var(--sunken);
+}
+
+.masthead-menu-list a[aria-current="page"] {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-subtle);
+}
+
+@media (min-width: 860px) {
+  .masthead-menu {
+    display: none;
+  }
+}
+
+/* Phones: the word "Menu" goes, the three bars stay (the button keeps its name
+   for screen readers), and everything tightens so the logo, the name, the pill
+   and the menu share one line from 380px up. */
+@media (max-width: 479px) {
+  .masthead-menu {
+    margin-left: 0;
+  }
+
+  .masthead-menu-button {
+    padding: 0;
+  }
+
+  .menu-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .masthead-inner {
+    gap: 6px;
+  }
+
+  .masthead-nav {
+    gap: 6px;
+  }
+
+  .brand-name {
+    font-size: 19px;
+  }
+
+  .masthead-cta {
+    padding-inline: 12px;
+    font-size: 13.5px;
+  }
+}
+
+/* Under 380px there is no room for the name next to the pill and the menu: the
+   tile stands in for it. The name is still there for screen readers. */
+@media (max-width: 379px) {
+  .brand {
+    min-width: 44px;
+  }
+
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* main takes focus from the skip link; it needs no ring of its own. */
+main:focus {
+  outline: none;
+}
+
+/* ───────────────────────── 2. The landing page ───────────────────────── */
+
+/* One huge, soft navy circle, partly behind the framed preview and running off
+   the right edge of the page. It is ruled like a ledger, and its edge melts
+   away (the mask). Decoration only: it is aria-hidden and holds nothing. No
+   image file: two gradients. motion.css moves it slower than the page. */
+.hero-backdrop {
+  position: absolute;
+  top: -20%;
+  left: 24%;
+  z-index: -1;
+  width: min(136%, 780px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, var(--backdrop-mid) 27px 28px),
+    radial-gradient(circle closest-side, var(--backdrop-core) 0%, var(--backdrop-mid) 78%, var(--backdrop-mid) 100%);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 74%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 74%, transparent 100%);
+}
+
+/* Until landing.js has built the preview, its place is kept: about as tall as
+   the finished frame (it grows with its width, as the chart does), with the two
+   sheets of paper already lying there. So the page below barely moves when the
+   picture arrives, and the big circle waits for it instead of jumping with it.
+   (If the picture could not be built, preview.js gives the place back.) */
+.preview:empty {
+  padding-top: calc(376px + 21.4%);
+}
+
+.preview.preview-failed:empty {
+  padding-top: 0;
+}
+
+.hero-backdrop:has(+ .preview:empty) {
+  display: none;
+}
+
+/* The circle is taller than the hero once it starts to move. Nothing of it may
+   hang over the band below, so the hero clips top and bottom too (styles.css
+   already clips it left and right). */
+.page-landing .hero {
+  overflow: clip;
+}
+
+/* The landing page is short on purpose: its sections breathe a little less than
+   they did when they were the whole site. */
+.page-landing .hero-grid {
+  padding-block: clamp(32px, 5vw, 64px) clamp(40px, 6vw, 72px);
+}
+
+/* The big figures: one confident, full-width navy block with ivory numerals.
+   Every color in it is a --band token, and tools/contrast.mjs checks each pair.
+   (position + z-index: the band always paints over anything the hero lets out.) */
+.figures {
+  position: relative;
+  z-index: 1;
+  border-block: 1px solid var(--border);
+  background: var(--band-bg);
+  color: var(--band-ink);
+}
+
+/* The page's focus ring is navy, which would vanish on navy. Here it is ivory. */
+.figures :focus-visible {
+  outline-color: var(--band-ink);
+}
+
+.figures-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+}
+
+.figure {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--band-rule);
+}
+
+.figure:first-child {
+  border-top: 0;
+}
+
+.figure-number {
+  margin: 0;
+  color: var(--band-ink);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-size: clamp(36px, 1.6rem + 2.2vw, 56px);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.figure-of {
+  color: var(--band-ink-3);
+  font-size: 0.5em;
+  letter-spacing: 0;
+}
+
+.figure-unit {
+  color: var(--band-ink-3);
+}
+
+.figure-label {
+  max-width: 34ch;
+  color: var(--band-ink-2);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.figure-label a,
+.figure-label a:hover {
+  color: var(--band-ink);
+  text-decoration-color: var(--band-ink-3);
+  white-space: nowrap;
+}
+
+.figure-label a:hover {
+  text-decoration-color: var(--band-ink);
+}
+
+/* While a figure counts up (motion.js), the moving copy lies on top of an
+   invisible print of the final number, so the room it takes never changes and
+   nothing next to it moves. The digits are tabular, so they do not jiggle. */
+.count-visual {
+  position: relative;
+  display: inline-block;
+}
+
+.count-ghost {
+  visibility: hidden;
+}
+
+.count-live {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+@media (min-width: 620px) {
+  .figures-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .figure {
+    padding: var(--space-6) var(--space-6) var(--space-6) 0;
+  }
+
+  .figure:nth-child(2) {
+    border-top: 0;
+  }
+
+  .figure:nth-child(even) {
+    padding-left: var(--space-6);
+    border-left: 1px solid var(--band-rule);
+  }
+}
+
+@media (min-width: 1000px) {
+  .figures-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .figure {
+    padding: clamp(34px, 4vw, 56px) var(--space-5) clamp(34px, 4vw, 56px) 0;
+    border-top: 0;
+  }
+
+  .figure + .figure {
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--band-rule);
+  }
+}
+
+/* How it works: three short steps on hairlines, numbered in monospace. */
+.steps3,
+.trust {
+  padding-block: clamp(44px, 6vw, 76px);
+}
+
+.steps3 h2,
+.trust h2 {
+  max-width: 24ch;
+  margin-top: var(--space-3);
+}
+
+.steps3-lede {
+  max-width: 68ch;
+  margin-top: var(--space-4);
+  color: var(--ink-2);
+  font-size: 17px;
+}
+
+.steps3-lede strong {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.steps3-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-6) clamp(24px, 4vw, 56px);
+  margin-top: clamp(28px, 4vw, 44px);
+  list-style: none;
+}
+
+.steps3-item {
+  min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-strong);
+}
+
+.steps3-num {
+  display: block;
+  margin-bottom: var(--space-3);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+}
+
+.steps3-item p {
+  margin-top: var(--space-2);
+  color: var(--ink-2);
+}
+
+/* The examples keep their serif tabs. On the landing page they are one section
+   among five, so the space above them is a section's, not a sub-heading's. */
+.examples-section {
+  padding-block: clamp(44px, 6vw, 76px);
+}
+
+.examples-section .examples {
+  margin-top: 0;
+}
+
+/* Two claims you can test: two flat cards. The heading is the link, and its
+   ::after is stretched over the card, so the whole card is one target. */
+.trust {
+  border-top: 1px solid var(--border);
+}
+
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-5);
+  margin-top: clamp(24px, 4vw, 40px);
+}
+
+.trust-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: clamp(20px, 3vw, 32px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  transition: border-color 140ms ease-out;
+}
+
+.trust-card:hover {
+  border-color: var(--border-strong);
+}
+
+.trust-card h3 {
+  max-width: 20ch;
+}
+
+.trust-card p {
+  max-width: 46ch;
+  color: var(--ink-2);
+}
+
+.trust-card-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.trust-card-link:hover {
+  color: var(--ink);
+}
+
+.trust-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+}
+
+.trust-card-link:focus-visible {
+  outline: none;
+}
+
+.trust-card-link:focus-visible::after {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.trust-card-go {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+}
+
+.trust-card:hover .trust-card-go {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ───────────────────────── 3. The top of the inner pages ───────────────────────── */
+
+.page-head {
+  padding-block: clamp(36px, 6vw, 72px) 0;
+}
+
+.page-title {
+  max-width: 20ch;
+  margin-top: var(--space-3);
+  font-size: clamp(34px, 1.4rem + 3.2vw, 56px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.page-head .section-lede {
+  margin-top: var(--space-5);
+  font-size: 17px;
+}
+
+.page-h2 {
+  max-width: 28ch;
+  font-size: clamp(24px, 1.1rem + 1vw, 30px);
+}
+
+/* The first section after the page's heading carries on from it: no rule, less air. */
+.selfcheck-section--page,
+.privacy-section--page {
+  padding-top: clamp(28px, 4vw, 44px);
+  border-top: 0;
+}
+
+.selfcheck-section--page .page-h2,
+.privacy-section--page .page-h2 {
+  margin-top: 0;
+  margin-bottom: var(--space-5);
+}
+
+.how--page .page-h2 {
+  margin-top: var(--space-3);
+}
+
+/* "On this page": a row of quiet pills under the heading. */
+.page-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.page-toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.page-toc a:hover {
+  border-color: var(--ink);
+  background: var(--sunken);
+}
+
+.page-toc a:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+.glossary-section {
+  padding-block: clamp(48px, 7vw, 88px);
+  border-top: 1px solid var(--border);
+}
+
+.glossary-section:focus {
+  outline: none;
+}
+
+.glossary-section h2 {
+  max-width: 22ch;
+  margin-top: var(--space-3);
+}
+
+.glossary-list--page {
+  max-width: none;
+  margin-top: var(--space-6);
+  padding-bottom: 0;
+}
+
+.glossary-list--page > div {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+@media (min-width: 860px) {
+  .glossary-list--page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5) clamp(32px, 6vw, 88px);
+  }
+}
+
+.closing--page {
+  padding-block: clamp(40px, 6vw, 64px);
+}
+
+.closing--page .cta-row {
+  margin-top: var(--space-5);
+}
+
+/* ───────────────────────── 4. The tool: what sits above the form ───────────────────────── */
+
+.tool-head {
+  padding-block: clamp(28px, 4.5vw, 52px) 0;
+}
+
+.tool-title {
+  max-width: 22ch;
+  margin-top: var(--space-3);
+  font-size: clamp(30px, 1.3rem + 2.4vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+/* Three small "load an example" buttons in one row. */
+.example-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.example-row-label {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+}
+
+.example-row-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.example-load {
+  min-height: 44px;
+  padding: 6px 16px 6px 8px;
+  font-size: 15px;
+  text-align: left;
+}
+
+.example-load-num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-subtle);
+  color: var(--accent-deep);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+}
+
+.example-load.is-loaded {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tool-head .disclosure {
+  margin-top: var(--space-5);
+}
+
+.precheck-q {
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
+}
+
+.precheck-list .precheck-q {
+  margin-top: 0;
+  color: var(--ink);
+}
+
+/* ───────────────────────── 5. The tool: the form as four steps in one card ───────────────────────── */
+
+.page-check .workbench {
+  padding-block: clamp(24px, 3.5vw, 40px) clamp(32px, 5vw, 56px);
+  border-top: 0;
+}
+
+.page-check .form-col {
+  max-width: 720px;
+}
+
+.tool-card {
+  margin-top: 0;
+  padding: clamp(14px, 2.6vw, 28px);
+  padding-top: clamp(6px, 1.2vw, 12px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.page-check .error-summary {
+  margin-bottom: var(--space-4);
+}
+
+/* The row of steps. Real tabs (tabs.js): one Tab stop, arrow keys between them.
+   The hairline is an inset shadow for the same reason as on the example tabs. */
+.steps-list {
+  display: flex;
+  gap: 2px;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.step-tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 44px;
+  min-height: 56px;
+  margin: 0;
+  padding: 8px 10px 8px 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.step-tab:hover {
+  color: var(--ink);
+}
+
+.step-tab:focus-visible {
+  outline-offset: -3px;
+  border-radius: var(--radius-sm);
+}
+
+.step-tab-num {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.step-tab-label {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+}
+
+.step-tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.step-tab[aria-selected="true"] .step-tab-num {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* A step with a box to fix: a red dot on its number. The tab's name also says
+   so in words, for screen readers (check.js). Never color alone. */
+.step-tab.has-error .step-tab-num::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.step-tab.has-error .step-tab-label {
+  text-decoration: underline;
+  text-decoration-color: var(--danger);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+/* Narrow screens: four numbers in a row, and only the step that is showing
+   spells out its name. The other names are still there for screen readers. */
+@media (max-width: 699px) {
+  .step-tab {
+    flex: 0 0 auto;
+    justify-content: center;
+    padding-inline: 8px;
+  }
+
+  .step-tab[aria-selected="true"] {
+    flex: 1 1 0;
+    justify-content: flex-start;
+  }
+
+  .step-tab[aria-selected="false"] .step-tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.step-panel {
+  padding-top: var(--space-5);
+}
+
+/* Inside the card a step needs no rule above it and no gap: the tabs do that. */
+.tool-card .part {
+  margin-top: 0;
+}
+
+.tool-card .part-legend {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.step-heading {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.step-heading:focus {
+  outline-offset: 6px;
+}
+
+/* Back and Next on the left, the one primary button on the right. */
+.tool-card .form-actions {
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.step-nav,
+.form-actions-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.form-actions-main {
+  margin-left: auto;
+}
+
+.step-nav .btn {
+  min-width: 96px;
+}
+
+/* The line under the buttons only takes up room when it has something to say. */
+.tool-card .form-status {
+  margin-top: var(--space-2);
+  gap: var(--space-1) var(--space-3);
+}
+
+@media (max-width: 559px) {
+  .tool-card .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .step-nav .btn {
+    flex: 1 1 0;
+  }
+
+  .form-actions-main {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    margin-left: 0;
+  }
+}
+
+/* Room is tight inside the card, so two short boxes share a line when the card
+   is wide enough: "How much?" and "Spread over how many months?". */
+@media (min-width: 700px) {
+  .tool-card .field-grid[data-guide-region="claimed"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
+  }
+
+  .tool-card .field-grid[data-guide-region="claimed"] > .field:first-child,
+  .tool-card .field-grid[data-guide-region="claimed"] > .field-slot {
+    grid-column: 1 / -1;
+  }
+}
+
+/* "Remove this bill" sits on the bill's own title line instead of on a line of
+   its own under the boxes. One line saved for every bill. */
+.tool-card .bill-row {
+  position: relative;
+  padding-top: 0;
+}
+
+/* A floated legend stops being drawn ON the fieldset's border and becomes an
+   ordinary box, which is what lets the button share its line. It is still the
+   fieldset's legend for screen readers. */
+.tool-card .bill-legend {
+  float: left;
+  display: flex;
+  align-items: center;
+  width: auto;
+  min-height: 44px;
+}
+
+.tool-card .bill-grid {
+  clear: both;
+}
+
+.tool-card .bill-remove-cell {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+/* "More": the less common situations and the save / load buttons, folded away. */
+.tool-card .more {
+  margin-top: var(--space-3);
+  border-bottom: 0;
+}
+
+.more-body {
+  display: grid;
+  gap: var(--space-6);
+  padding-bottom: var(--space-4);
+}
+
+.more-group {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.more-group .small {
+  margin-top: calc(var(--space-3) * -1);
+}
+
+.more-title,
+.tool-card .file-actions-title {
+  font-size: 20px;
+}
+
+.tool-card .file-actions {
+  margin-top: 0;
+}
+
+/* The slim status line: a live reading from the browser's own log (proof.js). */
+.request-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-3);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--ink-3);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.request-line a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.request-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok-mark);
+}
+
+.request-count {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.request-line--center {
+  justify-content: center;
+  margin-top: var(--space-6);
+  border-top: 0;
+}
+
+.form-aside {
+  margin-top: var(--space-4);
+}
+
+.form-aside a {
+  display: inline-block;
+  padding-block: 12px;
+}
+
+/* ───────────────────────── 6. The tool: the result as six tabs ───────────────────────── */
+
+.page-check .results {
+  padding-block: clamp(28px, 4vw, 44px);
+}
+
+/* The same serif tabs as the examples, left-aligned and a little smaller. On a
+   narrow screen the row scrolls sideways inside its own box; the page never does. */
+.result-tabs-list {
+  gap: clamp(16px, 2.6vw, 34px);
+  margin-top: var(--space-4);
+}
+
+.result-tab:first-of-type {
+  margin-left: 0;
+}
+
+.result-tab:last-of-type {
+  margin-right: 0;
+}
+
+.result-tab {
+  min-height: 52px;
+}
+
+.result-tab-label {
+  font-size: clamp(17px, 0.9rem + 0.5vw, 21px);
+}
+
+.result-panel {
+  padding-top: var(--space-5);
+}
+
+.result-panel:focus-visible {
+  outline-offset: 6px;
+}
+
+.result-panel > .verdict {
+  margin-top: 0;
+}
+
+/* The first block in a tab sits right under the tabs: no rule, no big gap. */
+.result-panel > .result-block:first-child {
+  margin-top: 0;
+}
+
+.result-panel > .result-block:first-child > h3 {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.result-panel > .result-block + .result-block {
+  margin-top: clamp(32px, 4.5vw, 52px);
+}
+
+.flags-body:empty {
+  display: none;
+}
+
+/* The honest limits stay on the page, always: one line, and all five a click away. */
+.limits--brief {
+  padding-block: clamp(24px, 3.5vw, 40px);
+}
+
+.limits .limits-brief-title {
+  max-width: none;
+  margin-top: 0;
+  font-size: clamp(21px, 1rem + 0.7vw, 25px);
+}
+
+.limits-brief-line {
+  max-width: 78ch;
+  margin-top: var(--space-2);
+  color: var(--ink-2);
+}
+
+.limits-brief-line strong {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.limits-more {
+  margin-top: var(--space-3);
+  border-bottom: 0;
+}
+
+.limits-more .limits-list {
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-5);
+}
+
+/* ───────────────────────── 6b. Small movements, on every page ─────────────────────────
+
+   Four quiet touches, shared by all four pages. Each one animates transform or
+   opacity only, lasts 150 to 300ms, and sits inside "no-preference": a visitor
+   who asked for less motion gets none of them. (What moves on the landing page
+   alone, the playing preview and the rest, is in motion.css.) */
+
+/* The line under the chosen serif tab is ONE element that slides from tab to
+   tab (tabs.js puts it there and tells it where to be). It is 1px wide and
+   stretched with scaleX, so only its transform ever changes. Until tabs.js has
+   measured the row (class has-slider), each tab keeps its own line as before. */
+.tabs-list {
+  position: relative;
+}
+
+.tabs-slider {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(var(--slider-x, 0px)) scaleX(var(--slider-w, 0));
+  transform-origin: 0 50%;
+}
+
+@media (forced-colors: none) {
+  .tabs-list.has-slider .tabs-slider {
+    opacity: 1;
+  }
+
+  .tabs-list.has-slider .tab[aria-selected="true"] {
+    border-bottom-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tabs-list.slider-moves .tabs-slider {
+    transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* A panel that was just chosen fades in. The one it replaces is simply gone,
+     so the two never overlap and nothing below them shifts. */
+  .panel-enter {
+    animation: panel-enter 150ms ease-out;
+  }
+
+  @keyframes panel-enter {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Pills lift a pixel under the mouse and press down when pushed. */
+  .btn {
+    transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 150ms ease-out;
+  }
+
+  .btn:active:not([disabled]) {
+    transform: translateY(1px);
+    transition-duration: 120ms, 120ms, 120ms, 90ms;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .btn:hover:not([disabled]):not(:active) {
+    transform: translateY(-1px);
+  }
+}
+
+/* ───────────────────────── 7. Less motion, and forced colors ───────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .step-tab,
+  .step-tab-num,
+  .trust-card,
+  .page-toc a,
+  .masthead-menu-button {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .steps-list {
+    border-bottom: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .step-tab {
+    border-bottom-color: Canvas;
+  }
+
+  .step-tab[aria-selected="true"] {
+    border-bottom: 4px solid Highlight;
+  }
+
+  .step-tab[aria-selected="true"] .step-tab-num {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .step-tab.has-error .step-tab-num::after {
+    border-color: Canvas;
+    background: CanvasText;
+  }
+
+  .masthead-link[aria-current="page"] {
+    box-shadow: none;
+    border-bottom: 3px solid Highlight;
+  }
+
+  .masthead-menu-list a[aria-current="page"] {
+    box-shadow: none;
+    border-left: 4px solid Highlight;
+  }
+
+  .trust-card,
+  .tool-card,
+  .masthead-menu-list {
+    border: 1px solid CanvasText;
+  }
+
+  .hero-backdrop,
+  .tabs-slider {
+    display: none;
+  }
+
+  .figures :focus-visible {
+    outline-color: Highlight;
+  }
+
+  .request-dot {
+    background: CanvasText;
+  }
+}
+
+/* ───────────────────────── 8. Print: the six tabs go back onto one page ───────────────────────── */
+
+/* "Print this report" must give the same one page whichever tab is showing. So
+   on paper the tabs themselves are hidden and EVERY panel is laid out, as if
+   the result had never been split up. styles.css then picks what to keep (the
+   verdict, the three numbers, the flag sentences, the comparison rows, the
+   month table next to the math steps, the limits) exactly as before. */
+@media print {
+  .tool-head,
+  .figures,
+  .steps3,
+  .trust,
+  .page-head,
+  .glossary-section,
+  .result-tabs-list,
+  .limits-brief-line,
+  .limits-more > summary,
+  .request-line,
+  .form-aside,
+  .hero-backdrop {
+    display: none !important;
+  }
+
+  /* A hidden panel has the `hidden` attribute, which styles.css turns into
+     display: none with !important. On paper every panel dissolves into its
+     parent instead, so its blocks take their place in the print grid.
+     (Not while printing the letter: that mode wants one block only.) */
+  body:not(.print-letter-mode) .results .result-panel,
+  body:not(.print-letter-mode) .results .result-panel[hidden] {
+    display: contents !important;
+  }
+
+  .result-panel {
+    padding-top: 0;
+  }
+
+  .results .result-panel > * {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .results .result-panel > #sec-chart {
+    grid-column: 1;
+  }
+
+  .results .result-panel > #sec-steps {
+    grid-column: 2;
+  }
+
+  .result-panel > .result-block:first-child,
+  .result-panel > .result-block + .result-block {
+    margin-top: 8pt;
+  }
+
+  .result-panel > .result-block:first-child > h3 {
+    padding-top: 3pt;
+    border-top: 1pt solid #000000;
+  }
+
+  .flags-body .flag-list {
+    margin-top: 6pt;
+  }
+
+  /* Two-class rules above set these paddings for the screen; a two-class rule
+     is needed to take them off again on paper. */
+  .page-check .results,
+  .limits--brief {
+    padding-block: 0;
+  }
+
+  /* On screen this title is sized by a two-class rule, which would beat the
+     plain ".limits h2" that styles.css uses on paper. Say the paper size again,
+     or the big title pushes the limits onto a second page. */
+  .limits .limits-brief-title {
+    margin-top: 8pt;
+    padding-top: 3pt;
+    border-top: 1pt solid #000000;
+    font-size: 10pt;
+  }
+
+  .limits-more {
+    margin-top: 0;
+    border: 0;
+  }
+
+  .limits-more .limits-list {
+    padding-bottom: 0;
+  }
+
+  /* "Print the letter": only the letter. It lives in the last tab. */
+  .print-letter-mode .results > .wrap > #result-panel-6 {
+    display: block !important;
+    padding: 0;
+  }
+
+  .print-letter-mode #result-panel-6 > * {
+    display: none !important;
+  }
+
+  .print-letter-mode #result-panel-6 > #sec-letter {
+    display: block !important;
+    margin: 0;
+  }
+}

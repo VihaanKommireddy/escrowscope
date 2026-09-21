@@ -1,0 +1,414 @@
+/* motion.css — what moves on the landing page (index.html only).
+
+   The page is complete and readable with this file missing. It adds:
+     1. the framed sample result PLAYING through the three examples;
+     2. chips that float, and three depth layers (the big circle behind, the
+        frame, the chips in front) that drift apart as the page scrolls and
+        lean a few pixels toward the mouse;
+     3. sections that rise into place once;
+     4. the Pause button that stops the looping parts (WCAG 2.2.2).
+   motion.js adds and removes the classes; the numbers that count up are its
+   work too. The small touches shared by all four pages are in site.css (6b).
+
+   Three rules hold for every line below:
+     - Movement sits inside "prefers-reduced-motion: no-preference". A visitor
+       who asked for less motion gets the page standing still, showing example 2
+       finished. Nothing outside those blocks hides or moves anything.
+     - Only transform (and its single-purpose forms translate and scale) and
+       opacity are animated, plus ONE stroke-dashoffset: the balance line
+       drawing itself, which repaints only the small chart.
+     - No state that hides content exists without a script class. The classes
+       reveal-pending, is-playing and is-leaving are only ever set by motion.js. */
+
+/* How far the hero has travelled through the screen: -1 as it comes in at the
+   bottom, 0 when it is centered, 1 as it leaves at the top. Registered as a
+   number so the browser can animate it. Where scroll-driven animation is not
+   supported, motion.js writes the same number instead. */
+@property --par {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* ───────────────────────── The Pause button ─────────────────────────
+   Only motion.js ever puts it on the page, so with no script, or with less
+   motion asked for, there is no button (and nothing to pause). It sits on the
+   corner of the frame, OUTSIDE the picture, which is hidden from screen
+   readers. The button itself is a full 44px target; the pill inside is smaller. */
+.motion-toggle {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 620px) {
+  .motion-toggle {
+    right: 38px;
+    bottom: 12px;
+  }
+}
+
+.motion-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 13px 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-chip);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.motion-toggle:hover .motion-toggle-pill {
+  border-color: var(--ink);
+  background: var(--sunken);
+}
+
+/* Pressed = paused: the pill turns into the dark pill, and the icon into "play". */
+.motion-toggle[aria-pressed="true"] .motion-toggle-pill,
+.motion-toggle[aria-pressed="true"]:hover .motion-toggle-pill {
+  border-color: transparent;
+  background: var(--pill-bg);
+  color: var(--pill-ink);
+}
+
+.motion-toggle:focus-visible {
+  outline: none;
+}
+
+.motion-toggle:focus-visible .motion-toggle-pill {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Two bars, drawn with one gradient; a triangle, cut with clip-path. */
+.motion-toggle-icon {
+  flex: none;
+  width: 8px;
+  height: 10px;
+  background: linear-gradient(to right, currentColor 0 3px, transparent 3px 5px, currentColor 5px 8px);
+}
+
+.motion-toggle[aria-pressed="true"] .motion-toggle-icon {
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+@media (forced-colors: active) {
+  .motion-toggle-pill {
+    border: 1px solid ButtonText;
+  }
+
+  .motion-toggle-icon {
+    forced-color-adjust: none;
+    color: ButtonText;
+  }
+}
+
+@media print {
+  .motion-toggle {
+    display: none !important;
+  }
+}
+
+/* ───────────────────────── Everything that moves ───────────────────────── */
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* ── Three depth layers ──
+     --par comes from the scroll (below). --lean-x and --lean-y (-1 to 1) come
+     from the mouse, through motion.js, on fine pointers only. With neither,
+     every calc() here is 0 and each layer sits exactly where it was drawn. */
+  .hero-stage {
+    --par-back: 90px;
+    --par-front: -30px;
+    --lean-back: -10px;
+    --lean-mid: 4px;
+    --lean-front: 9px;
+  }
+
+  @media (max-width: 959px) {
+    .hero-stage {
+      --par-back: 56px;
+      --par-front: -18px;
+    }
+  }
+
+  /* Behind: slower than the page, and away from the mouse. */
+  .hero-backdrop {
+    transform: translate3d(
+      calc(var(--lean-x, 0) * var(--lean-back)),
+      calc(var(--par, 0) * var(--par-back) + var(--lean-y, 0) * var(--lean-back)),
+      0
+    );
+    will-change: transform;
+  }
+
+  /* The frame: the page's own speed. It only leans, a little. ("translate", not
+     "transform": the frame's entrance in styles.css owns its transform.) */
+  .preview {
+    translate: calc(var(--lean-x, 0) * var(--lean-mid)) calc(var(--lean-y, 0) * var(--lean-mid));
+  }
+
+  /* In front: a little faster than the page, and toward the mouse. */
+  .preview-chip {
+    transform: translate3d(
+      calc(var(--lean-x, 0) * var(--lean-front)),
+      calc(var(--par, 0) * var(--par-front) + var(--lean-y, 0) * var(--lean-front)),
+      0
+    );
+  }
+
+  /* The scroll half, in pure CSS: the hero's own trip through the screen runs
+     --par from -1 to 1. No script, no scroll listener, nothing to pause (it
+     only moves when the visitor scrolls). */
+  @supports (animation-timeline: view()) {
+    .hero-stage {
+      animation: hero-par linear both;
+      animation-timeline: view(block);
+      animation-range: cover 0% cover 100%;
+    }
+  }
+
+  @keyframes hero-par {
+    from {
+      --par: -1;
+    }
+
+    to {
+      --par: 1;
+    }
+  }
+
+  /* ── The chips float ──
+     Slow, a few pixels, each on its own beat (a negative delay starts a chip
+     part-way through its loop). "translate" again, so the float adds to the
+     layer's transform above instead of replacing it. Only while motion.js is
+     running (has-motion), because only then is there a Pause button. */
+  .chip--cushion {
+    --float-time: 7s;
+    --float-from: 0s;
+    --callout-at: 2400ms;
+  }
+
+  .chip--low {
+    --float-time: 8.5s;
+    --float-from: -3s;
+    --callout-at: 2700ms;
+  }
+
+  .chip--checks {
+    --float-time: 6.2s;
+    --float-from: -1.5s;
+  }
+
+  .chip--example {
+    --float-time: 9s;
+    --float-from: -5s;
+  }
+
+  .has-motion .preview-chip {
+    animation: chip-float var(--float-time, 7s) ease-in-out var(--float-from, 0s) infinite;
+  }
+
+  .has-motion.motion-paused .preview-chip,
+  .has-motion.is-offscreen .preview-chip {
+    animation-play-state: paused;
+  }
+
+  @keyframes chip-float {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+
+    50% {
+      translate: 0 -6px;
+    }
+  }
+
+  /* ── The sample result plays ──
+     motion.js sets is-playing when an example starts and takes it off 3500ms
+     later (CYCLE_TIMING.playMs; tests/motion.test.js checks that nothing below
+     runs past it). Each part waits its turn with a delay and, because of
+     "both", stays hidden until then. With the class gone every part is simply
+     in its finished state, which is how the page looks standing still.
+
+       0ms     the frame's content fades in, figures at $0.00
+       200ms   the three figures count up (motion.js)
+       1000ms  the balance line draws itself, left to right; its area follows
+       2400ms  the cushion line fades in, and its chip arrives with it
+       2700ms  the low point pops, and its chip arrives with it
+       3100ms  the verdict settles into its place                         */
+  .preview.is-playing .preview-body,
+  .preview.is-playing .preview-bar-title {
+    animation: pv-fade 250ms ease-out both;
+  }
+
+  .preview.is-playing .preview-working {
+    visibility: visible;
+    animation: pv-working 3400ms linear both;
+  }
+
+  .preview.is-playing .preview-verdict.is-current {
+    animation: pv-settle 400ms cubic-bezier(0.2, 0.8, 0.2, 1) 3100ms both;
+  }
+
+  .preview.is-playing .is-current .pc-line {
+    stroke-dasharray: var(--pc-len, 1200);
+    animation: pv-draw 1400ms cubic-bezier(0.4, 0, 0.2, 1) 1000ms both;
+  }
+
+  .preview.is-playing .is-current .pc-area {
+    animation: pv-fade 800ms ease-out 1600ms both;
+  }
+
+  .preview.is-playing .is-current .pc-limit {
+    animation: pv-fade 400ms ease-out 2400ms both;
+  }
+
+  .preview.is-playing .is-current .pc-low {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    animation: pv-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) 2700ms both;
+  }
+
+  /* The two chips that point at the chart arrive with the thing they name. The
+     float is listed first, unchanged, so it carries on without a jump. */
+  .has-motion .preview.is-playing .chip--cushion,
+  .has-motion .preview.is-playing .chip--low {
+    animation:
+      chip-float var(--float-time, 7s) ease-in-out var(--float-from, 0s) infinite,
+      chip-callout 300ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--callout-at, 2400ms) both;
+  }
+
+  /* Leaving is quicker than arriving. */
+  .preview.is-leaving .preview-body,
+  .preview.is-leaving .preview-bar-title,
+  .preview.is-leaving .chip--cushion,
+  .preview.is-leaving .chip--low {
+    opacity: 0;
+    transition: opacity 250ms ease-in;
+  }
+
+  @keyframes pv-fade {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pv-working {
+    0% {
+      opacity: 0;
+    }
+
+    8%,
+    90% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes pv-settle {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes pv-draw {
+    0% {
+      opacity: 0;
+      stroke-dashoffset: var(--pc-len, 1200);
+    }
+
+    4% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 1;
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes pv-pop {
+    from {
+      opacity: 0;
+      transform: scale(0);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes chip-callout {
+    from {
+      opacity: 0;
+      scale: 0.9;
+    }
+
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+
+  /* ── Sections rise into place, once ──
+     reveal-pending is put on by motion.js, only on pieces that are wholly below
+     the screen, and only once the watcher that removes it exists. reveal-go
+     carries the transition and is taken off again when it has run, so a card's
+     own hover transition is never replaced for longer than that. */
+  [data-reveal] .reveal-pending {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  [data-reveal] .reveal-go {
+    transition: opacity 400ms ease-out, transform 400ms ease-out;
+    transition-delay: calc(var(--reveal-i, 0) * 40ms);
+  }
+
+  /* The Pause pill presses down like every other pill. */
+  .motion-toggle-pill {
+    transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 150ms ease-out;
+  }
+
+  .motion-toggle:active .motion-toggle-pill {
+    transform: translateY(1px);
+  }
+}

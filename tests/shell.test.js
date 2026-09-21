@@ -13,9 +13,15 @@
 // word is absent; it cannot prove how code behaves. The one place behaviour
 // matters most, the service worker, has its own executable test: tests/sw.test.js.
 //
+// The site is FOUR pages (index.html, check.html, proof.html, privacy.html).
+// Every rule in this file that was once checked on index.html alone is checked
+// on all four: the policy line, no inline code, every path real and relative,
+// the import graph from EVERY page's scripts fully saved for offline use.
+// Section 13 at the end holds the rules that only exist because there are four.
+//
 // Run it from the project folder:   node --test tests/shell.test.js
 //
-// If index.html (or any other file) is missing, the tests FAIL with a plain
+// If a page (or any other file) is missing, the tests FAIL with a plain
 // message. They never crash.
 
 import { test } from "node:test";
@@ -28,7 +34,9 @@ import { currentCacheName, expectedCacheName } from "../tools/stamp-sw.mjs";
 import { caseGroups, caseOriginSentences } from "../selfcheck-ui.js";
 import { describeRequest, offlineCopySentence, offlineCopyState } from "../proof.js";
 import { addressSaysNoServiceWorker } from "../sw-register.js";
-import { VECTORS } from "../engine/index.js";
+import { VECTORS, runSelfCheck } from "../engine/index.js";
+import { EXAMPLES } from "../examples.js";
+import { exampleNumberFromHash, EXAMPLE_HASH_PREFIX } from "../example-link.js";
 
 // The project folder (one level up from tests/).
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -273,53 +281,78 @@ function resolveInsideProject(url, fromFile) {
   return relativePath;
 }
 
-// ───────────────────────── reading index.html ─────────────────────────
+// ───────────────────────── reading the four pages ─────────────────────────
 
-const indexHtmlRaw = readText("index.html");
-const indexHtml = indexHtmlRaw === null ? null : blankOutHtmlComments(indexHtmlRaw);
-const indexTags = indexHtml === null ? [] : findTags(indexHtml);
+const PAGE_FILES = ["index.html", "check.html", "proof.html", "privacy.html"];
 
-function requireIndexHtml() {
-  assert.ok(indexHtml !== null, "index.html is missing from the project folder, so this check cannot run.");
+// One page, read once: its text, the same text with comments blanked out, and
+// every opening tag in it.
+function readPage(file) {
+  const raw = readText(file);
+  const html = raw === null ? null : blankOutHtmlComments(raw);
+  return { file: file, raw: raw, html: html, tags: html === null ? [] : findTags(html) };
 }
 
-// Every file index.html asks the browser to load: scripts, stylesheets, icons,
-// the manifest, images. (Links the visitor clicks, <a href>, are checked apart.)
-function findResourceReferences() {
+const pages = PAGE_FILES.map(readPage);
+
+function pageNamed(file) {
+  return pages.find((page) => page.file === file);
+}
+
+function requirePages() {
+  for (const page of pages) {
+    assert.ok(page.html !== null, page.file + " is missing from the project folder, so this check cannot run.");
+  }
+}
+
+// Every file a page asks the browser to load: scripts, stylesheets, icons, the
+// manifest, images. (Links the visitor clicks, <a href>, are checked apart.)
+// Each entry remembers which page it came from.
+function findResourceReferences(page) {
   const references = [];
-  for (const tag of indexTags) {
+  for (const tag of page.tags) {
     if (tag.name === "a") continue;
     if (tag.attrs.src !== undefined) {
-      references.push({ tag: tag.name, attribute: "src", url: tag.attrs.src });
+      references.push({ page: page.file, tag: tag.name, attribute: "src", url: tag.attrs.src });
     }
     if (tag.name === "link" && tag.attrs.href !== undefined) {
-      references.push({ tag: tag.name, attribute: "href", url: tag.attrs.href, rel: (tag.attrs.rel || "").toLowerCase() });
+      references.push({ page: page.file, tag: tag.name, attribute: "href", url: tag.attrs.href, rel: (tag.attrs.rel || "").toLowerCase() });
     }
     // <use href="./icons.svg#x"> loads a file; <use href="#x"> does not.
     if (tag.name === "use" && tag.attrs.href !== undefined && !tag.attrs.href.startsWith("#")) {
-      references.push({ tag: tag.name, attribute: "href", url: tag.attrs.href });
+      references.push({ page: page.file, tag: tag.name, attribute: "href", url: tag.attrs.href });
     }
   }
   return references;
 }
 
-const resourceReferences = findResourceReferences();
+// All four pages' references, in one list.
+const resourceReferences = [];
+for (const page of pages) {
+  for (const reference of findResourceReferences(page)) resourceReferences.push(reference);
+}
 
-// The stylesheets index.html links, as project-relative paths.
-function findLinkedStylesheets() {
+// The stylesheets one page links, as project-relative paths.
+function findLinkedStylesheets(page) {
   const sheets = [];
-  for (const tag of indexTags) {
+  for (const tag of page.tags) {
     if (tag.name !== "link" || tag.attrs.href === undefined) continue;
     const rel = (tag.attrs.rel || "").toLowerCase().split(/\s+/);
     if (!rel.includes("stylesheet")) continue;
     if (relativeUrlProblem(tag.attrs.href) !== null) continue;
-    const resolved = resolveInsideProject(tag.attrs.href, "index.html");
+    const resolved = resolveInsideProject(tag.attrs.href, page.file);
     if (resolved !== null) sheets.push(resolved);
   }
   return sheets;
 }
 
-const linkedStylesheets = findLinkedStylesheets();
+// Every stylesheet any page links, each one once.
+const linkedStylesheets = [];
+for (const page of pages) {
+  for (const sheet of findLinkedStylesheets(page)) {
+    if (!linkedStylesheets.includes(sheet)) linkedStylesheets.push(sheet);
+  }
+}
 
 // ───────────────────────── the static import graph ─────────────────────────
 
@@ -347,18 +380,20 @@ function findImportSpecifiers(source) {
   return specifiers;
 }
 
-// Start at the module scripts in index.html and follow every import.
+// Start at the module scripts of the given pages and follow every import.
 // Returns { files: [project-relative paths], problems: [plain sentences] }.
-function walkImportGraph() {
+function walkImportGraph(fromPages) {
   const files = [];
   const problems = [];
   const queue = [];
 
-  for (const tag of indexTags) {
-    if (tag.name !== "script" || tag.attrs.src === undefined) continue;
-    if (relativeUrlProblem(tag.attrs.src) !== null) continue; // reported by another test
-    const resolved = resolveInsideProject(tag.attrs.src, "index.html");
-    if (resolved !== null) queue.push({ file: resolved, importedBy: "index.html" });
+  for (const page of fromPages) {
+    for (const tag of page.tags) {
+      if (tag.name !== "script" || tag.attrs.src === undefined) continue;
+      if (relativeUrlProblem(tag.attrs.src) !== null) continue; // reported by another test
+      const resolved = resolveInsideProject(tag.attrs.src, page.file);
+      if (resolved !== null) queue.push({ file: resolved, importedBy: page.file });
+    }
   }
 
   while (queue.length > 0) {
@@ -388,12 +423,18 @@ function walkImportGraph() {
   return { files: files, problems: problems };
 }
 
-const importGraph = walkImportGraph();
+// The whole site's graph: everything ANY of the four pages imports.
+const importGraph = walkImportGraph(pages);
 
-// The app shell = index.html + every script it (directly or indirectly) imports
-// + every stylesheet it links.
+// One page's own graph: what that page alone loads.
+function importGraphOf(file) {
+  return walkImportGraph([pageNamed(file)]);
+}
+
+// The app shell = the four pages + every script any of them (directly or
+// indirectly) imports + every stylesheet any of them links.
 function shellFiles() {
-  const files = ["index.html"];
+  const files = PAGE_FILES.slice();
   for (const file of importGraph.files) files.push(file);
   for (const file of linkedStylesheets) {
     if (!files.includes(file)) files.push(file);
@@ -478,8 +519,8 @@ function manifestIconPaths() {
 
 // ═════════════════════════ 1. The Content-Security-Policy ═════════════════════════
 
-function findCspTag() {
-  for (const tag of indexTags) {
+function findCspTag(page) {
+  for (const tag of page.tags) {
     if (tag.name !== "meta") continue;
     if ((tag.attrs["http-equiv"] || "").toLowerCase() === "content-security-policy") return tag;
   }
@@ -496,21 +537,49 @@ function parseCspDirectives(policy) {
   return directives.sort();
 }
 
-test("index.html carries the Content-Security-Policy: EXACTLY the ten directives of the spec, no more and no fewer", () => {
-  requireIndexHtml();
-  const cspTag = findCspTag();
-  assert.ok(cspTag !== null, 'index.html has no <meta http-equiv="Content-Security-Policy"> tag.');
-
+test("every page carries the Content-Security-Policy: EXACTLY the ten directives of the spec, no more and no fewer", () => {
+  requirePages();
   const required = REQUIRED_CSP_DIRECTIVES.slice().sort();
-  assert.deepEqual(
-    parseCspDirectives(cspTag.attrs.content || ""),
-    required,
-    "The Content-Security-Policy must be exactly the ten directives in SPEC A4. An extra directive fails too: a later, more specific one can undo an earlier one."
-  );
-  assert.ok(
-    !(cspTag.attrs.content || "").includes("unsafe"),
-    "The Content-Security-Policy must not contain any 'unsafe-…' keyword."
-  );
+  for (const page of pages) {
+    const cspTag = findCspTag(page);
+    assert.ok(cspTag !== null, page.file + ' has no <meta http-equiv="Content-Security-Policy"> tag.');
+    assert.deepEqual(
+      parseCspDirectives(cspTag.attrs.content || ""),
+      required,
+      page.file + ": the Content-Security-Policy must be exactly the ten directives in SPEC A4. An extra directive fails too: a later, more specific one can undo an earlier one."
+    );
+    assert.ok(
+      !(cspTag.attrs.content || "").includes("unsafe"),
+      page.file + ": the Content-Security-Policy must not contain any 'unsafe-…' keyword."
+    );
+  }
+});
+
+// A page with a looser policy would be a hole in the whole site: the pages share
+// one origin, so they share one service worker and one set of saved files. The
+// line must be the SAME BYTES everywhere, and nothing may come before it in
+// <head> except the charset line, so nothing can load ahead of it.
+test("the Content-Security-Policy <meta> is byte-for-byte the same on all four pages, and is the first thing in <head> after the charset", () => {
+  requirePages();
+  const lines = [];
+  for (const page of pages) {
+    const found = page.raw.match(/<meta http-equiv="Content-Security-Policy"[^>]*>/g) || [];
+    assert.equal(found.length, 1, page.file + " must carry the policy <meta> exactly once.");
+    lines.push(found[0]);
+
+    const headIndex = page.tags.findIndex((tag) => tag.name === "head");
+    assert.ok(headIndex !== -1, page.file + " has no <head>.");
+    const first = page.tags[headIndex + 1];
+    const second = page.tags[headIndex + 2];
+    assert.ok(first && first.name === "meta" && (first.attrs.charset || "").toLowerCase() === "utf-8", page.file + ': the first thing in <head> must be <meta charset="utf-8">.');
+    assert.ok(
+      second && second.name === "meta" && (second.attrs["http-equiv"] || "").toLowerCase() === "content-security-policy",
+      page.file + ": the policy <meta> must come straight after the charset line, before anything else in <head>."
+    );
+  }
+  for (let index = 1; index < lines.length; index += 1) {
+    assert.equal(lines[index], lines[0], PAGE_FILES[index] + " carries a policy line that is not byte-for-byte the one in " + PAGE_FILES[0] + ".");
+  }
 });
 
 // Proof that the check above really is exact. The independent audit showed that
@@ -537,98 +606,114 @@ test("the exact-match policy check rejects a policy with anything added, removed
   }
 });
 
-test("the Content-Security-Policy sits in <head>, before any <script> or <link>", () => {
-  requireIndexHtml();
-  const cspTag = findCspTag();
-  assert.ok(cspTag !== null, "index.html has no Content-Security-Policy <meta> tag.");
+test("the Content-Security-Policy sits in <head>, before any <script> or <link>, on every page", () => {
+  requirePages();
+  for (const page of pages) {
+    const cspTag = findCspTag(page);
+    assert.ok(cspTag !== null, page.file + " has no Content-Security-Policy <meta> tag.");
 
-  const headStart = indexHtml.search(/<head[\s>]/i);
-  const headEnd = indexHtml.search(/<\/head>/i);
-  assert.ok(headStart !== -1 && headEnd !== -1, "index.html needs a <head> … </head>.");
-  assert.ok(
-    cspTag.index > headStart && cspTag.index < headEnd,
-    "The Content-Security-Policy <meta> must be inside <head>."
-  );
-  for (const tag of indexTags) {
-    if (tag.name !== "script" && tag.name !== "link") continue;
+    const headStart = page.html.search(/<head[\s>]/i);
+    const headEnd = page.html.search(/<\/head>/i);
+    assert.ok(headStart !== -1 && headEnd !== -1, page.file + " needs a <head> … </head>.");
     assert.ok(
-      tag.index > cspTag.index,
-      "A <" + tag.name + "> comes before the Content-Security-Policy <meta>. The policy only protects what comes after it, so it must come first."
+      cspTag.index > headStart && cspTag.index < headEnd,
+      page.file + ": the Content-Security-Policy <meta> must be inside <head>."
     );
-  }
-});
-
-// ═════════════════════════ 2. No inline code in index.html ═════════════════════════
-
-test('index.html starts with <html lang="en">', () => {
-  requireIndexHtml();
-  const htmlTag = indexTags.find((tag) => tag.name === "html");
-  assert.ok(htmlTag !== undefined, "index.html has no <html> tag.");
-  assert.equal(htmlTag.attrs.lang, "en", 'The <html> tag must say lang="en" (screen readers use it to pick a voice).');
-});
-
-test("index.html has no inline scripts: every <script> has a src and an empty body", () => {
-  requireIndexHtml();
-  for (const tag of indexTags) {
-    if (tag.name !== "script") continue;
-    assert.ok(
-      tag.attrs.src !== undefined && tag.attrs.src !== "",
-      "A <script> in index.html has no src. Inline scripts are blocked by the Content-Security-Policy."
-    );
-  }
-  const scriptBodies = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-  let match = scriptBodies.exec(indexHtml);
-  while (match !== null) {
-    assert.equal(
-      match[1].trim(),
-      "",
-      "A <script> in index.html has code between its tags. Move it into a .js file: " + match[1].trim().slice(0, 60)
-    );
-    match = scriptBodies.exec(indexHtml);
-  }
-});
-
-test("index.html has no <style>, no style= attributes and no on…= handler attributes", () => {
-  requireIndexHtml();
-  for (const tag of indexTags) {
-    assert.notEqual(tag.name, "style", "index.html has a <style> block. All CSS belongs in .css files.");
-    for (const attributeName of Object.keys(tag.attrs)) {
-      assert.notEqual(
-        attributeName,
-        "style",
-        "A <" + tag.name + "> in index.html has a style= attribute. The Content-Security-Policy blocks inline styles; use a class."
-      );
+    for (const tag of page.tags) {
+      if (tag.name !== "script" && tag.name !== "link") continue;
       assert.ok(
-        !attributeName.startsWith("on"),
-        "A <" + tag.name + "> in index.html has the inline handler " + attributeName + "=. Use addEventListener in a .js file."
+        tag.index > cspTag.index,
+        page.file + ": a <" + tag.name + "> comes before the Content-Security-Policy <meta>. The policy only protects what comes after it, so it must come first."
       );
     }
   }
 });
 
-test("index.html never submits anywhere: no <form action>, no formaction, no javascript: URLs", () => {
-  requireIndexHtml();
-  for (const tag of indexTags) {
-    if (tag.name === "form") {
-      assert.ok(tag.attrs.action === undefined, "A <form> in index.html has an action= attribute. The form must never submit anywhere.");
-    }
-    assert.ok(tag.attrs.formaction === undefined, "A <" + tag.name + "> in index.html has a formaction= attribute.");
-    for (const attributeName of Object.keys(tag.attrs)) {
+// ═════════════════════════ 2. No inline code on any page ═════════════════════════
+
+test('every page starts with <html lang="en">', () => {
+  requirePages();
+  for (const page of pages) {
+    const htmlTag = page.tags.find((tag) => tag.name === "html");
+    assert.ok(htmlTag !== undefined, page.file + " has no <html> tag.");
+    assert.equal(htmlTag.attrs.lang, "en", page.file + ': the <html> tag must say lang="en" (screen readers use it to pick a voice).');
+  }
+});
+
+test("no page has an inline script: every <script> has a src and an empty body, and every page has exactly one", () => {
+  requirePages();
+  for (const page of pages) {
+    let scripts = 0;
+    for (const tag of page.tags) {
+      if (tag.name !== "script") continue;
+      scripts += 1;
       assert.ok(
-        !/^\s*javascript:/i.test(tag.attrs[attributeName]),
-        "A <" + tag.name + "> in index.html uses a javascript: URL in " + attributeName + "=."
+        tag.attrs.src !== undefined && tag.attrs.src !== "",
+        "A <script> in " + page.file + " has no src. Inline scripts are blocked by the Content-Security-Policy."
       );
+      assert.equal(tag.attrs.type, "module", "The <script> in " + page.file + ' must be type="module".');
+    }
+    assert.equal(scripts, 1, page.file + " must load exactly one script: its own small entry module, which imports the rest.");
+    const scriptBodies = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    let match = scriptBodies.exec(page.html);
+    while (match !== null) {
+      assert.equal(
+        match[1].trim(),
+        "",
+        "A <script> in " + page.file + " has code between its tags. Move it into a .js file: " + match[1].trim().slice(0, 60)
+      );
+      match = scriptBodies.exec(page.html);
+    }
+  }
+});
+
+test("no page has a <style>, a style= attribute or an on…= handler attribute", () => {
+  requirePages();
+  for (const page of pages) {
+    for (const tag of page.tags) {
+      assert.notEqual(tag.name, "style", page.file + " has a <style> block. All CSS belongs in .css files.");
+      for (const attributeName of Object.keys(tag.attrs)) {
+        assert.notEqual(
+          attributeName,
+          "style",
+          "A <" + tag.name + "> in " + page.file + " has a style= attribute. The Content-Security-Policy blocks inline styles; use a class."
+        );
+        assert.ok(
+          !attributeName.startsWith("on"),
+          "A <" + tag.name + "> in " + page.file + " has the inline handler " + attributeName + "=. Use addEventListener in a .js file."
+        );
+      }
+    }
+  }
+});
+
+test("no page ever submits anywhere: no <form action>, no formaction, no javascript: URLs", () => {
+  requirePages();
+  for (const page of pages) {
+    for (const tag of page.tags) {
+      if (tag.name === "form") {
+        assert.ok(tag.attrs.action === undefined, "A <form> in " + page.file + " has an action= attribute. The form must never submit anywhere.");
+      }
+      assert.ok(tag.attrs.formaction === undefined, "A <" + tag.name + "> in " + page.file + " has a formaction= attribute.");
+      for (const attributeName of Object.keys(tag.attrs)) {
+        assert.ok(
+          !/^\s*javascript:/i.test(tag.attrs[attributeName]),
+          "A <" + tag.name + "> in " + page.file + " uses a javascript: URL in " + attributeName + "=."
+        );
+      }
     }
   }
 });
 
 // ═════════════════════════ 3. Every path is relative and real ═════════════════════════
 
-test("every file index.html loads is a relative path and exists on disk", () => {
-  requireIndexHtml();
-  assert.ok(resourceReferences.length > 0, "index.html loads no scripts or stylesheets at all. That cannot be right.");
+test("every file any page loads is a relative path and exists on disk", () => {
+  requirePages();
+  for (const page of pages) {
+    assert.ok(findResourceReferences(page).length > 0, page.file + " loads no scripts or stylesheets at all. That cannot be right.");
+  }
   for (const reference of resourceReferences) {
-    const where = "<" + reference.tag + " " + reference.attribute + '="' + reference.url + '">';
+    const where = reference.page + ": <" + reference.tag + " " + reference.attribute + '="' + reference.url + '">';
     // The policy allows data: images, and a data: image loads nothing from
     // anywhere. That is allowed for an <img> and for the tab icon (a data: tab
     // icon is what keeps the privacy counter at an honest 0: browsers fetch a
@@ -637,47 +722,53 @@ test("every file index.html loads is a relative path and exists on disk", () => 
     if ((reference.tag === "img" || isTabIcon) && reference.url.startsWith("data:")) continue;
     const problem = relativeUrlProblem(reference.url);
     assert.equal(problem, null, where + " " + problem + ". Every file the page loads must be a relative path.");
-    const resolved = resolveInsideProject(reference.url, "index.html");
+    const resolved = resolveInsideProject(reference.url, reference.page);
     assert.ok(resolved !== null, where + " points outside the project folder.");
     assert.ok(fileExists(resolved), where + " points to a file that does not exist: " + resolved);
   }
 });
 
-test("links the visitor can click: outside links carry rel=noopener noreferrer, local links exist", () => {
-  requireIndexHtml();
-  for (const tag of indexTags) {
-    if (tag.name !== "a" || tag.attrs.href === undefined) continue;
-    const href = tag.attrs.href;
-    assert.ok(!href.startsWith("//"), '<a href="' + href + '"> is protocol-relative. Write the full https:// address.');
-    if (/^https?:/i.test(href)) {
-      const rel = (tag.attrs.rel || "").toLowerCase().split(/\s+/);
-      assert.ok(
-        rel.includes("noopener") && rel.includes("noreferrer"),
-        '<a href="' + href + '"> leaves the site, so it needs rel="noopener noreferrer".'
-      );
-      continue;
+test("links the visitor can click, on every page: outside links carry rel=noopener noreferrer, local links exist", () => {
+  requirePages();
+  for (const page of pages) {
+    for (const tag of page.tags) {
+      if (tag.name !== "a" || tag.attrs.href === undefined) continue;
+      const href = tag.attrs.href;
+      const where = page.file + ': <a href="' + href + '">';
+      assert.ok(!href.startsWith("//"), where + " is protocol-relative. Write the full https:// address.");
+      if (/^https?:/i.test(href)) {
+        const rel = (tag.attrs.rel || "").toLowerCase().split(/\s+/);
+        assert.ok(
+          rel.includes("noopener") && rel.includes("noreferrer"),
+          where + ' leaves the site, so it needs rel="noopener noreferrer".'
+        );
+        continue;
+      }
+      // In-page jumps (#results) and phone links need no file. (Mail links are
+      // banned outright further down: they can carry text out in their address.)
+      // Section 13 checks that every "#…" points at something real.
+      if (href.startsWith("#") || /^tel:/i.test(href)) continue;
+      const problem = relativeUrlProblem(href);
+      assert.equal(problem, null, where + " " + problem + ".");
+      const resolved = resolveInsideProject(href, page.file);
+      assert.ok(resolved !== null && fileExists(resolved), where + " points to a file that does not exist.");
     }
-    // In-page jumps (#results) and phone links need no file. (Mail links are
-    // banned outright further down: they can carry text out in their address.)
-    if (href.startsWith("#") || /^tel:/i.test(href)) continue;
-    const problem = relativeUrlProblem(href);
-    assert.equal(problem, null, '<a href="' + href + '"> ' + problem + ".");
-    const resolved = resolveInsideProject(href, "index.html");
-    assert.ok(resolved !== null && fileExists(resolved), '<a href="' + href + '"> points to a file that does not exist.');
   }
 });
 
-test("index.html and its stylesheets load nothing from another website", () => {
-  requireIndexHtml();
+test("the pages and their stylesheets load nothing from another website", () => {
+  requirePages();
   const outsideInHtml = /<(?:link|script|img)\b[^>]*\s(?:src|href)\s*=\s*["']?\s*(?:https?:|\/\/)/i;
-  assert.ok(
-    !outsideInHtml.test(indexHtml),
-    "index.html has a <link>, <script> or <img> that points at another website (http…, https… or //…)."
-  );
+  for (const page of pages) {
+    assert.ok(
+      !outsideInHtml.test(page.html),
+      page.file + " has a <link>, <script> or <img> that points at another website (http…, https… or //…)."
+    );
+  }
   for (const sheet of linkedStylesheets) {
     const css = readText(sheet);
-    assert.ok(css !== null, "index.html links " + sheet + ", but that file does not exist.");
-    assert.deepEqual(linesMatching(css, /@import/), [], sheet + " uses @import. Link every stylesheet from index.html instead. Lines:");
+    assert.ok(css !== null, "A page links " + sheet + ", but that file does not exist.");
+    assert.deepEqual(linesMatching(css, /@import/), [], sheet + " uses @import. Link every stylesheet from the page instead. Lines:");
     assert.deepEqual(
       linesMatching(css, /url\(\s*["']?\s*(?:https?:|\/\/)/i),
       [],
@@ -697,14 +788,14 @@ test("index.html and its stylesheets load nothing from another website", () => {
 // font-src 'self' opened one door on 2026-09-21: the serif heading font. These
 // checks keep that door exactly one file wide.
 //  - One @font-face, one font file, and it lives in this site's own folder.
-//  - index.html preloads that same file, so it is downloaded WHILE the page
+//  - EVERY page preloads that same file, so it is downloaded WHILE the page
 //    loads. A font first downloaded later (when a result paints a heading)
 //    would make the privacy panel's "requests since load" counter read 1.
 //  - The font's license notice travels with the file.
 const THE_ONE_FONT = "assets/fonts/Fraunces-Variable.woff2";
 
-test("the page uses exactly one font file, from its own folder, and preloads it so the privacy counter stays at 0", () => {
-  requireIndexHtml();
+test("the site uses exactly one font file, from its own folder, and EVERY page preloads it so the request counter stays at 0", () => {
+  requirePages();
   let fontFaceRules = 0;
   const fontUrls = [];
   for (const sheet of linkedStylesheets) {
@@ -721,31 +812,61 @@ test("the page uses exactly one font file, from its own folder, and preloads it 
   assert.ok(fileExists(THE_ONE_FONT), THE_ONE_FONT + " is missing.");
   assert.ok(fileExists("assets/fonts/FRAUNCES-LICENSE.txt"), "The font's license notice (assets/fonts/FRAUNCES-LICENSE.txt) must sit next to the font file.");
 
-  const preloads = indexTags.filter((tag) => tag.name === "link" && (tag.attrs.rel || "").toLowerCase().split(/\s+/).includes("preload"));
-  assert.equal(preloads.length, 1, "index.html must have exactly one <link rel=\"preload\">: the font.");
-  const preload = preloads[0];
-  assert.equal(preload.attrs.as, "font", 'The preload must say as="font".');
-  assert.equal(preload.attrs.type, "font/woff2", 'The preload must say type="font/woff2".');
-  assert.ok(preload.attrs.crossorigin !== undefined, "A font preload needs the crossorigin attribute, or the browser downloads the font twice.");
-  assert.equal(resolveInsideProject(preload.attrs.href || "", "index.html"), THE_ONE_FONT, "The preload must point at the same file the stylesheet uses.");
+  // Every page has serif headings, so every page would fetch the font late
+  // without its own preload, and its counter would read 1.
+  for (const page of pages) {
+    const preloads = page.tags.filter((tag) => tag.name === "link" && (tag.attrs.rel || "").toLowerCase().split(/\s+/).includes("preload"));
+    assert.equal(preloads.length, 1, page.file + " must have exactly one <link rel=\"preload\">: the font.");
+    const preload = preloads[0];
+    assert.equal(preload.attrs.as, "font", page.file + ': the preload must say as="font".');
+    assert.equal(preload.attrs.type, "font/woff2", page.file + ': the preload must say type="font/woff2".');
+    assert.ok(preload.attrs.crossorigin !== undefined, page.file + ": a font preload needs the crossorigin attribute, or the browser downloads the font twice.");
+    assert.equal(resolveInsideProject(preload.attrs.href || "", page.file), THE_ONE_FONT, page.file + ": the preload must point at the same file the stylesheet uses.");
+    assert.ok(findLinkedStylesheets(page).includes("styles.css"), page.file + " must link styles.css, which declares the font it preloads.");
+  }
   assert.ok(precache.urls.includes("./" + THE_ONE_FONT), "sw.js must save the font, or headings lose their typeface offline.");
 });
 
 // ═════════════════════════ 4. The static import graph ═════════════════════════
 
-test("every static import is a relative path to a file that exists", () => {
-  requireIndexHtml();
-  assert.ok(importGraph.files.length > 0, "index.html has no <script src> to start from, so there is no app to check.");
+test("every static import, from every page's script, is a relative path to a file that exists", () => {
+  requirePages();
+  for (const page of pages) {
+    assert.ok(importGraphOf(page.file).files.length > 0, page.file + " has no <script src> to start from, so there is nothing to check.");
+  }
   assert.deepEqual(importGraph.problems, [], "Problems found while following the imports:\n" + importGraph.problems.join("\n"));
 });
 
-test("the trust pieces are wired into the page (sw-register.js, proof.js, selfcheck-ui.js are imported)", () => {
-  requireIndexHtml();
-  for (const needed of ["sw-register.js", "proof.js", "selfcheck-ui.js"]) {
-    assert.ok(
-      importGraph.files.includes(needed),
-      needed + " is not imported by anything the page loads, so that feature never runs. (app.js should import it.)"
-    );
+// Which page's script is which, and what each page must (and must not) load.
+const PAGE_SCRIPTS = { "index.html": "landing.js", "check.html": "check.js", "proof.html": "proof-page.js", "privacy.html": "privacy-page.js" };
+
+test("the trust pieces are wired into the right pages (the offline copy on all four, the request counter, the self-check)", () => {
+  requirePages();
+  for (const page of pages) {
+    const graph = importGraphOf(page.file).files;
+    assert.equal(graph[0], PAGE_SCRIPTS[page.file], page.file + " must load its own entry script, " + PAGE_SCRIPTS[page.file] + ".");
+    // Whichever page a visitor opens first has to be able to save the site.
+    assert.ok(graph.includes("sw-register.js"), page.file + " never registers the service worker, so a visitor who lands there gets no offline copy.");
+    // Every page shows a live count of its own requests (proof.js reads it).
+    assert.ok(graph.includes("proof.js"), page.file + " does not load proof.js, so it cannot show its request count.");
+  }
+  assert.ok(importGraphOf("proof.html").files.includes("selfcheck-ui.js"), "proof.html must load selfcheck-ui.js: the self-check is that page.");
+  assert.ok(importGraphOf("check.html").files.includes("render.js") && importGraphOf("check.html").files.includes("guide.js"), "check.html must load the results drawer and the statement guide.");
+});
+
+test("each page loads only what it needs: the landing page never loads the results drawer, the chart or the guide", () => {
+  requirePages();
+  const mustNotLoad = {
+    "index.html": ["render.js", "chart.js", "guide.js", "selfcheck-ui.js", "check.js"],
+    "check.html": ["selfcheck-ui.js", "preview.js", "landing.js", "motion.js"],
+    "proof.html": ["render.js", "chart.js", "guide.js", "pipeline.js", "preview.js", "examples.js", "motion.js"],
+    "privacy.html": ["render.js", "chart.js", "guide.js", "pipeline.js", "preview.js", "examples.js", "selfcheck-ui.js", "engine/index.js", "motion.js"],
+  };
+  for (const page of pages) {
+    const graph = importGraphOf(page.file).files.map((file) => file.split(path.sep).join("/"));
+    for (const unwanted of mustNotLoad[page.file]) {
+      assert.ok(!graph.includes(unwanted), page.file + " loads " + unwanted + ", which it has no use for.");
+    }
   }
 });
 
@@ -825,7 +946,7 @@ function isException(file, bannedName) {
 }
 
 test("no file in the app shell contains banned text (network, storage, HTML injection, leaving the page, dynamic import)", () => {
-  requireIndexHtml();
+  requirePages();
   const problems = [];
   for (const file of shellFiles()) {
     const source = readText(file);
@@ -842,7 +963,7 @@ test("no file in the app shell contains banned text (network, storage, HTML inje
 });
 
 test('no file in the app shell sets a style attribute from script (setAttribute("style", …))', () => {
-  requireIndexHtml();
+  requirePages();
   const problems = [];
   for (const file of shellFiles()) {
     const source = readText(file);
@@ -862,8 +983,11 @@ test('no file in the app shell sets a style attribute from script (setAttribute(
 //
 // Rule: an href that could leave the site must sit in an object that also has
 //       rel: "noopener noreferrer".
-// Known-local forms need no rel:  href: "#…"  (a jump inside the page) and
-//                                 href: "tel:…" (a phone number).
+// Known-local forms need no rel:  href: "#…"  (a jump inside the page),
+//                                 href: "tel:…" (a phone number), and
+//                                 href: "./…"  (another page of THIS site: an
+//                                 address that starts with ./ cannot name
+//                                 another website, whatever is added after it).
 // One more form is allowed and listed by name: a link with a `download:` key is
 // a file the page made itself (the visitor's own numbers, saved to their disk).
 
@@ -904,7 +1028,7 @@ function scanScriptLinks(file, source) {
     const lineNumber = source.slice(0, match.index).split("\n").length;
     const afterColon = source.slice(match.index + match[0].length, match.index + match[0].length + 12);
     const objectText = enclosingObjectText(source, match.index);
-    if (/^["'`](?:#|tel:)/.test(afterColon)) {
+    if (/^["'`](?:#|tel:|\.\/)/.test(afterColon)) {
       result.local += 1;
     } else if (/\bdownload\s*:/.test(objectText)) {
       result.downloads += 1;
@@ -933,10 +1057,16 @@ test("the link scan is proven: it flags a link without rel and accepts the safe 
   assert.deepEqual(jump, { external: 0, downloads: 0, local: 2, problems: [] });
   const download = scanScriptLinks("probe.js", 'el("a", { attrs: { href: url, download: "numbers.json" } });');
   assert.deepEqual(download, { external: 0, downloads: 1, local: 0, problems: [] });
+  // Another page of this site: "./" first, so it cannot leave the site.
+  const ownPage = scanScriptLinks("probe.js", 'el("a", { attrs: { href: "./check.html#example-" + number } });');
+  assert.deepEqual(ownPage, { external: 0, downloads: 0, local: 1, problems: [] });
+  // But "." alone, or a bare name, is not the known-local form.
+  const notOwnPage = scanScriptLinks("probe.js", 'el("a", { attrs: { href: ".." + somewhere } }); el("a", { attrs: { href: "check.html" } });');
+  assert.equal(notOwnPage.problems.length, 2);
 });
 
 test('links built in JavaScript: every href that can leave the site carries rel="noopener noreferrer" (a source scan)', () => {
-  requireIndexHtml();
+  requirePages();
   const problems = [];
   const externalByFile = {};
   const downloadFiles = [];
@@ -952,8 +1082,9 @@ test('links built in JavaScript: every href that can leave the site carries rel=
   // render.js builds the two links to official pages. If the scan stops seeing
   // them, the scan is broken (or the links moved and this line needs updating).
   assert.ok((externalByFile["render.js"] || 0) >= 2, "The scan should find at least two outside links in render.js. It found: " + JSON.stringify(externalByFile));
-  // The one allowed link without rel: the "download your numbers" file in app.js.
-  assert.deepEqual(downloadFiles, ["app.js"], "Only app.js may build a download link. Found in: " + downloadFiles.join(", "));
+  // The one allowed link without rel: the "download your numbers" file in
+  // check.js (the tool's script; it was called app.js while the site was one page).
+  assert.deepEqual(downloadFiles, ["check.js"], "Only check.js may build a download link. Found in: " + downloadFiles.join(", "));
 });
 
 // ───────── scrolling table boxes ─────────
@@ -973,7 +1104,7 @@ function sourceOfFunction(source, name) {
 }
 
 test('scrolling table boxes: the class "table-scroll" is written in exactly one place, scrollRegion() in dom.js, which sets tabindex, role and aria-label (a source scan)', () => {
-  requireIndexHtml();
+  requirePages();
   const domSource = readText("dom.js");
   assert.ok(domSource !== null, "dom.js is missing.");
   const scrollRegion = sourceOfFunction(domSource, "scrollRegion");
@@ -1004,13 +1135,15 @@ test('scrolling table boxes: the class "table-scroll" is written in exactly one 
     'Only scrollRegion() in dom.js may write "table-scroll". Call scrollRegion("what the table is", [table]) instead:\n' + problems.join("\n")
   );
 
-  // The same box written straight into index.html needs the same three things.
-  for (const tag of indexTags) {
-    const classes = (tag.attrs.class || "").split(/\s+/);
-    if (!classes.includes("table-scroll")) continue;
-    assert.equal(tag.attrs.tabindex, "0", 'A class="table-scroll" box in index.html needs tabindex="0".');
-    assert.equal(tag.attrs.role, "region", 'A class="table-scroll" box in index.html needs role="region".');
-    assert.ok((tag.attrs["aria-label"] || tag.attrs["aria-labelledby"] || "") !== "", 'A class="table-scroll" box in index.html needs an aria-label.');
+  // The same box written straight into a page needs the same three things.
+  for (const page of pages) {
+    for (const tag of page.tags) {
+      const classes = (tag.attrs.class || "").split(/\s+/);
+      if (!classes.includes("table-scroll")) continue;
+      assert.equal(tag.attrs.tabindex, "0", 'A class="table-scroll" box in ' + page.file + ' needs tabindex="0".');
+      assert.equal(tag.attrs.role, "region", 'A class="table-scroll" box in ' + page.file + ' needs role="region".');
+      assert.ok((tag.attrs["aria-label"] || tag.attrs["aria-labelledby"] || "") !== "", 'A class="table-scroll" box in ' + page.file + " needs an aria-label.");
+    }
   }
 });
 
@@ -1047,7 +1180,7 @@ test("sw.js CACHE_NAME is up to date with the files it saves (if this fails, run
 });
 
 test("the stamp tool is a build tool, not part of the site: sw.js does not save it and the page does not load it", () => {
-  requireIndexHtml();
+  requirePages();
   requireServiceWorker();
   assert.ok(fileExists("tools/stamp-sw.mjs"), "tools/stamp-sw.mjs is missing.");
   for (const url of precache.urls) {
@@ -1057,7 +1190,7 @@ test("the stamp tool is a build tool, not part of the site: sw.js does not save 
     assert.ok(!file.startsWith("tools" + path.sep) && !file.includes("stamp-sw"), "The page imports a build tool: " + file);
   }
   for (const reference of resourceReferences) {
-    assert.ok(!reference.url.includes("tools/"), "index.html loads something from tools/: " + reference.url);
+    assert.ok(!reference.url.includes("tools/"), reference.page + " loads something from tools/: " + reference.url);
   }
   const toolSource = readText("tools/stamp-sw.mjs");
   const allowedImports = ["node:crypto", "node:fs", "node:path", "node:url"];
@@ -1097,21 +1230,22 @@ test("sw.js PRECACHE_URLS: every entry exists on disk", () => {
   );
 });
 
-// Everything the page needs to open offline, as "./path" URLs with a reason each.
+// Everything the four pages need to open offline, as "./path" URLs with a reason each.
 function filesThePageNeeds() {
-  const needed = ["./index.html"];
-  const reasons = { "./index.html": "the page itself" };
+  const needed = [];
+  const reasons = {};
   function need(relativePath, why) {
     const url = toDotSlash(relativePath);
     if (needed.includes(url)) return;
     needed.push(url);
     reasons[url] = why;
   }
-  for (const file of importGraph.files) need(file, "imported by the page's scripts");
+  for (const page of pages) need(page.file, "one of the site's four pages");
+  for (const file of importGraph.files) need(file, "imported by a page's script");
   for (const reference of resourceReferences) {
     if (relativeUrlProblem(reference.url) !== null) continue;
-    const resolved = resolveInsideProject(reference.url, "index.html");
-    if (resolved !== null) need(resolved, "loaded by index.html");
+    const resolved = resolveInsideProject(reference.url, reference.page);
+    if (resolved !== null) need(resolved, "loaded by " + reference.page);
   }
   for (const sheet of linkedStylesheets) {
     const css = readText(sheet);
@@ -1127,9 +1261,9 @@ function filesThePageNeeds() {
   return { needed: needed, reasons: reasons };
 }
 
-test("sw.js PRECACHE_URLS covers the whole app: the import graph, everything index.html loads, the manifest and its icons", () => {
+test("sw.js PRECACHE_URLS covers the whole site: all four pages, the import graph from EVERY page's script, everything the pages load, the manifest and its icons", () => {
   requireServiceWorker();
-  requireIndexHtml();
+  requirePages();
   assert.ok(precache.found, "sw.js has no PRECACHE_URLS list.");
 
   const page = filesThePageNeeds();
@@ -1140,19 +1274,28 @@ test("sw.js PRECACHE_URLS covers the whole app: the import graph, everything ind
   assert.deepEqual(
     missing,
     [],
-    "The page needs these files, but sw.js PRECACHE_URLS does not list them, so the page would break offline:\n" + missing.join("\n")
+    "The site needs these files, but sw.js PRECACHE_URLS does not list them, so a page would break offline:\n" + missing.join("\n")
   );
+  // Said out loud, because it is the whole point: each page and each page's
+  // own script is on the list.
+  for (const page of pages) {
+    assert.ok(precache.urls.includes("./" + page.file), "sw.js does not save " + page.file + ".");
+    assert.ok(precache.urls.includes("./" + PAGE_SCRIPTS[page.file]), "sw.js does not save " + PAGE_SCRIPTS[page.file] + ".");
+    for (const file of importGraphOf(page.file).files) {
+      assert.ok(precache.urls.includes(toDotSlash(file)), page.file + " imports " + file + ", which sw.js does not save.");
+    }
+  }
 });
 
 test("sw.js PRECACHE_URLS saves nothing the page never reads (every extra file is one more way for the offline install to fail)", () => {
   requireServiceWorker();
-  requireIndexHtml();
+  requirePages();
   const page = filesThePageNeeds();
   const extra = [];
   for (const url of precache.urls) {
     if (!page.needed.includes(url)) extra.push(url);
   }
-  assert.deepEqual(extra, [], "sw.js saves these, but nothing the page loads ever asks for them:\n" + extra.join("\n"));
+  assert.deepEqual(extra, [], "sw.js saves these, but no page ever asks for them:\n" + extra.join("\n"));
   // The site's folder address ("./") is answered with the saved index.html by
   // the fetch handler. tests/sw.test.js RUNS sw.js and proves that; this only
   // checks the two addresses it needs are still worked out.
@@ -1284,20 +1427,27 @@ test("manifest.webmanifest description claims only what is true: a web host exis
 // "0" on every visit. A data: icon is part of the page, so nothing is fetched
 // and the counter stays at an honest 0. Do not "tidy" these back into files.
 test("the tab icon and the manifest icons are data: URIs, so the privacy counter can honestly read 0", () => {
-  requireIndexHtml();
+  requirePages();
   assert.equal(manifest.error, null, manifest.error || "");
-  let tabIcons = 0;
-  for (const tag of indexTags) {
-    if (tag.name !== "link") continue;
-    const rel = (tag.attrs.rel || "").toLowerCase().split(/\s+/);
-    if (!rel.includes("icon") && !rel.includes("apple-touch-icon") && !rel.includes("mask-icon")) continue;
-    tabIcons += 1;
-    assert.ok(
-      (tag.attrs.href || "").startsWith("data:image/"),
-      '<link rel="' + tag.attrs.rel + '"> points at a file. Browsers fetch a file-based tab icon after the page loads, which makes the privacy counter read 1. Use a data:image/svg+xml,… URI.'
-    );
+  const iconAddresses = [];
+  for (const page of pages) {
+    let tabIcons = 0;
+    for (const tag of page.tags) {
+      if (tag.name !== "link") continue;
+      const rel = (tag.attrs.rel || "").toLowerCase().split(/\s+/);
+      if (!rel.includes("icon") && !rel.includes("apple-touch-icon") && !rel.includes("mask-icon")) continue;
+      tabIcons += 1;
+      iconAddresses.push(tag.attrs.href || "");
+      assert.ok(
+        (tag.attrs.href || "").startsWith("data:image/"),
+        page.file + ': <link rel="' + tag.attrs.rel + '"> points at a file. Browsers fetch a file-based tab icon after the page loads, which makes the request counter read 1. Use a data:image/svg+xml,… URI.'
+      );
+    }
+    assert.ok(tabIcons > 0, page.file + ' needs a <link rel="icon"> with a data: URI. Without one, browsers go looking for /favicon.ico after the page loads.');
   }
-  assert.ok(tabIcons > 0, 'index.html needs a <link rel="icon"> with a data: URI. Without one, browsers go looking for /favicon.ico after the page loads.');
+  for (const address of iconAddresses) {
+    assert.equal(address, iconAddresses[0], "Every page must carry the same tab icon.");
+  }
   for (const iconEntry of manifest.json.icons || []) {
     assert.ok(
       typeof iconEntry.src === "string" && iconEntry.src.startsWith("data:image/"),
@@ -1359,7 +1509,7 @@ test("the phrase search is proven: it sees through curly quotes, capital letters
 });
 
 test("no file a visitor receives contains a phrase that was removed on purpose (stale counts, over-claims, a promised refund)", () => {
-  requireIndexHtml();
+  requirePages();
   const problems = [];
   for (const file of filesAVisitorReceives()) {
     const source = readText(file);
@@ -1493,8 +1643,8 @@ test("selfcheck-ui.js prints each count from the lists, mentions a bucket only w
 // thing gets one name: "escrow payment" and "the next 12 months" (QA audit,
 // defect 14).
 //
-// What is scanned: the words a visitor can see or hear in index.html, and every
-// STRING LITERAL in the page's own scripts. Not comments, not variable names.
+// What is scanned: the words a visitor can see or hear in each of the four
+// pages, and every STRING LITERAL in the pages' own scripts. Not comments, not variable names.
 // Not engine/: the Engine Builder's tests run the same scan there.
 // Whole words only, any capital letters.
 const VOICE_WORDS = [
@@ -1514,10 +1664,13 @@ const VOICE_WORDS = [
 // names that SERVICERS print on their statements, quoted so the visitor can find
 // the right box. (One servicer's heading really is "What We Expect to Pay".)
 // A test below asserts this list is exactly what is written here.
+// (Until the site became four pages the last two named index.html. The form's
+// hints are on check.html now and the glossary is on privacy.html. The same two
+// narrow exemptions apply on whichever page the words sit.)
 const VOICE_EXEMPTIONS = [
   "guide.js: the lookFor lists of servicer names inside GUIDE_REGIONS",
-  'index.html: the glossary term "Computation year"',
-  'index.html: the quoted servicer names after "Also called"',
+  'any page: the glossary term "Computation year" (it is on privacy.html)',
+  'any page: the quoted servicer names after "Also called" (they are on check.html)',
 ];
 
 function voicePatternFor(words) {
@@ -1759,18 +1912,20 @@ test("the voice scan is proven: it reads strings and not comments, whole words o
 test("the list of voice-scan exemptions is exactly the three lists of servicer names", () => {
   assert.deepEqual(VOICE_EXEMPTIONS, [
     "guide.js: the lookFor lists of servicer names inside GUIDE_REGIONS",
-    'index.html: the glossary term "Computation year"',
-    'index.html: the quoted servicer names after "Also called"',
+    'any page: the glossary term "Computation year" (it is on privacy.html)',
+    'any page: the quoted servicer names after "Also called" (they are on check.html)',
   ]);
 });
 
 test('one voice, one name for each thing: no "we / us / our", no "escrow year", "computation year", "12-month period" or "lawful payment" in anything a visitor reads', () => {
-  requireIndexHtml();
+  requirePages();
   const problems = [];
 
-  for (const piece of visiblePiecesOfHtml(indexHtml)) {
-    const hits = voiceHitsIn(blankAlsoCalledNames(piece));
-    if (hits.length > 0) problems.push('index.html says "' + hits.join('", "') + '" in: ' + piece.slice(0, 110));
+  for (const page of pages) {
+    for (const piece of visiblePiecesOfHtml(page.html)) {
+      const hits = voiceHitsIn(blankAlsoCalledNames(piece));
+      if (hits.length > 0) problems.push(page.file + ' says "' + hits.join('", "') + '" in: ' + piece.slice(0, 110));
+    }
   }
 
   for (const file of uiModules()) {
@@ -1807,8 +1962,8 @@ test(".nojekyll exists at the top of the project, so GitHub Pages serves the fil
   assert.ok(fileExists(".nojekyll"), "Add an empty file named .nojekyll to the project folder (next to index.html).");
 });
 
-test('no scratch file (a name that starts with "_") is loaded by index.html or saved by sw.js', () => {
-  requireIndexHtml();
+test('no scratch file (a name that starts with "_") is loaded by any page or saved by sw.js', () => {
+  requirePages();
   requireServiceWorker();
   const problems = [];
   function isScratchPath(url) {
@@ -1820,10 +1975,10 @@ test('no scratch file (a name that starts with "_") is loaded by index.html or s
   }
   for (const reference of resourceReferences) {
     if (reference.url.startsWith("data:")) continue;
-    if (isScratchPath(reference.url)) problems.push("index.html loads " + reference.url);
+    if (isScratchPath(reference.url)) problems.push(reference.page + " loads " + reference.url);
   }
   for (const file of importGraph.files) {
-    if (isScratchPath(file)) problems.push("the page imports " + file);
+    if (isScratchPath(file)) problems.push("a page imports " + file);
   }
   for (const url of precache.urls) {
     if (isScratchPath(url)) problems.push("sw.js PRECACHE_URLS lists " + url);
@@ -1863,4 +2018,515 @@ test("phone: no box people type in has a font size under 16px (iPhone Safari wou
     }
   }
   assert.deepEqual(tooSmall, []);
+});
+
+// ═════════════════════════ 13. Four pages, one site ═════════════════════════
+
+// Until 2026-09-21 the whole site was one long page. It is four pages now: a
+// short landing page, the tool, the self-check and the privacy page. These are
+// the rules that only exist because there are four.
+
+// ───────── the shared top bar and footer ─────────
+
+const CURRENT_PAGE_MARK = ' aria-current="page"';
+
+// The text of one shared block, exactly as written in the page.
+function sharedBlock(page, open, close) {
+  const start = page.raw.indexOf(open);
+  const end = start === -1 ? -1 : page.raw.indexOf(close, start);
+  assert.ok(start !== -1 && end !== -1, page.file + " has no " + open + " … " + close);
+  return page.raw.slice(start, end + close.length);
+}
+
+const SHARED_BLOCKS = [
+  ['<header class="masthead">', "</header>"],
+  ['<footer class="site-footer">', "</footer>"],
+];
+
+test("the top bar and the footer are the same markup on all four pages, byte for byte, except for aria-current", () => {
+  requirePages();
+  for (const [open, close] of SHARED_BLOCKS) {
+    const blocks = pages.map((page) => sharedBlock(page, open, close).split(CURRENT_PAGE_MARK).join(""));
+    for (let index = 1; index < blocks.length; index += 1) {
+      assert.equal(blocks[index], blocks[0], open + " in " + PAGE_FILES[index] + " differs from the one in " + PAGE_FILES[0] + ". Copy it across exactly; only aria-current may differ.");
+    }
+  }
+});
+
+test('aria-current="page" marks the links to the page you are on, and nothing else', () => {
+  requirePages();
+  for (const page of pages) {
+    const shared = SHARED_BLOCKS.map(([open, close]) => sharedBlock(page, open, close)).join("\n");
+    let marked = 0;
+    for (const tag of findTags(shared)) {
+      if (tag.name !== "a" || tag.attrs.href === undefined || /^https?:/i.test(tag.attrs.href)) continue;
+      const target = resolveInsideProject(tag.attrs.href, page.file);
+      const isMarked = tag.attrs["aria-current"] === "page";
+      if (isMarked) marked += 1;
+      assert.equal(isMarked, target === page.file, page.file + ': <a href="' + tag.attrs.href + '"> ' + (isMarked ? "is marked as the current page but leads elsewhere." : "leads to this very page, so it needs aria-current=\"page\"."));
+    }
+    assert.ok(marked > 0, page.file + " marks no link as the current page.");
+    assert.equal(page.raw.split(CURRENT_PAGE_MARK).length - 1, marked, page.file + ' uses aria-current="page" outside the top bar and the footer.');
+  }
+});
+
+test("the top bar leads to the three other places: the tool as the one filled pill, the proof page and the privacy page, with a plain <details> menu for narrow screens", () => {
+  requirePages();
+  const header = sharedBlock(pages[0], SHARED_BLOCKS[0][0], SHARED_BLOCKS[0][1]);
+  const tags = findTags(header);
+  const links = tags.filter((tag) => tag.name === "a");
+  const pill = links.filter((tag) => (tag.attrs.class || "").split(/\s+/).includes("btn-primary"));
+  assert.equal(pill.length, 1, "The top bar has exactly one filled pill.");
+  assert.equal(pill[0].attrs.href, "./check.html", "The filled pill opens the tool.");
+  assert.equal(links[0].attrs.href, "./index.html", "The logo leads home.");
+  const menuStart = header.indexOf("<details");
+  assert.ok(menuStart !== -1 && header.includes("<summary"), "The narrow-screen menu must be a <details> with a <summary>: it has to work with no script.");
+  const menuLinks = findTags(header.slice(menuStart)).filter((tag) => tag.name === "a").map((tag) => tag.attrs.href);
+  assert.deepEqual(menuLinks, ["./proof.html", "./privacy.html"], "The menu holds the two text links.");
+  const barLinks = findTags(header.slice(0, menuStart)).filter((tag) => (tag.attrs.class || "").includes("masthead-link")).map((tag) => tag.attrs.href);
+  assert.deepEqual(barLinks, ["./proof.html", "./privacy.html"], "The wide-screen bar holds the same two text links.");
+});
+
+// ───────── every link between the pages is real ─────────
+
+function idsOf(page) {
+  const ids = [];
+  for (const tag of page.tags) {
+    if (tag.attrs.id !== undefined) ids.push(tag.attrs.id);
+  }
+  return ids;
+}
+
+test("no page uses the same id twice", () => {
+  requirePages();
+  for (const page of pages) {
+    const seen = [];
+    for (const id of idsOf(page)) {
+      assert.ok(!seen.includes(id), page.file + ' uses id="' + id + '" twice.');
+      seen.push(id);
+    }
+  }
+});
+
+test("every internal link lands on one of the four pages, and every #place in it is a real id there", () => {
+  requirePages();
+  let checked = 0;
+  for (const page of pages) {
+    for (const tag of page.tags) {
+      if (tag.name !== "a" || tag.attrs.href === undefined) continue;
+      const href = tag.attrs.href;
+      if (/^https?:/i.test(href) || /^tel:/i.test(href)) continue;
+      const where = page.file + ': <a href="' + href + '">';
+      const hashAt = href.indexOf("#");
+      const filePart = hashAt === -1 ? href : href.slice(0, hashAt);
+      const place = hashAt === -1 ? "" : href.slice(hashAt + 1);
+      const targetFile = filePart === "" ? page.file : resolveInsideProject(filePart, page.file);
+      assert.ok(PAGE_FILES.includes(targetFile), where + " does not lead to one of the site's four pages.");
+      checked += 1;
+      if (hashAt === -1) continue;
+      assert.notEqual(place, "", where + " ends in a bare #.");
+      // "./check.html#example-2" is not a place on the page: check.js reads the
+      // number and runs that example. It must name an example that exists.
+      if (targetFile === "check.html" && ("#" + place).startsWith(EXAMPLE_HASH_PREFIX)) {
+        assert.notEqual(exampleNumberFromHash("#" + place, EXAMPLES.length), null, where + " names an example that does not exist.");
+        continue;
+      }
+      assert.ok(idsOf(pageNamed(targetFile)).includes(place), where + " points at #" + place + ", but " + targetFile + ' has no id="' + place + '".');
+    }
+  }
+  assert.ok(checked >= 20, "Expected to find the links in four top bars and four footers at the very least.");
+});
+
+test("every page has a skip link as its first link, and it lands on something real", () => {
+  requirePages();
+  for (const page of pages) {
+    const firstLink = page.tags.find((tag) => tag.name === "a");
+    assert.ok(firstLink && (firstLink.attrs.class || "").split(/\s+/).includes("skip-link"), page.file + ": the first link on the page must be the skip link.");
+    assert.ok((firstLink.attrs.href || "").startsWith("#"), page.file + ": the skip link must jump inside the page.");
+    const target = page.tags.find((tag) => tag.attrs.id === firstLink.attrs.href.slice(1));
+    assert.ok(target !== undefined, page.file + ": the skip link points at an id that is not on the page.");
+    assert.equal(target.attrs.tabindex, "-1", page.file + ': the skip link\'s target needs tabindex="-1", so focus really moves there.');
+  }
+});
+
+// ───────── headings ─────────
+
+test("every page has exactly one h1, and its headings never skip a level on the way down", () => {
+  requirePages();
+  for (const page of pages) {
+    const levels = page.tags.filter((tag) => /^h[1-6]$/.test(tag.name)).map((tag) => Number(tag.name[1]));
+    assert.equal(levels.filter((level) => level === 1).length, 1, page.file + " must have exactly one <h1>.");
+    assert.equal(levels[0], 1, page.file + ": the first heading on the page must be the <h1>.");
+    for (let index = 1; index < levels.length; index += 1) {
+      assert.ok(
+        levels[index] <= levels[index - 1] + 1,
+        page.file + ": an <h" + levels[index] + "> follows an <h" + levels[index - 1] + ">. Headings may only go one level deeper at a time."
+      );
+    }
+  }
+  // Headings the scripts build later must fit under the ones written in the
+  // pages: the example panels on the landing page sit under an <h2>, so their
+  // titles are <h3>.
+  assert.ok(/el\("h3", \{ className: "example-title"/.test(readText("landing.js")), "landing.js must build each example's title as an <h3> (it sits under the section's <h2>).");
+});
+
+// ───────── check.html: two rows of real tabs, written in the page ─────────
+
+function tabRowProblems(page, listClass) {
+  const problems = [];
+  const lists = page.tags.filter((tag) => tag.attrs.role === "tablist" && (tag.attrs.class || "").split(/\s+/).includes(listClass));
+  if (lists.length !== 1) return ["expected exactly one tablist with class " + listClass];
+  if (!lists[0].attrs["aria-label"] && !lists[0].attrs["aria-labelledby"]) problems.push("the row of tabs has no name");
+  return problems;
+}
+
+test("check.html writes its steps and its result tabs as real ARIA tabs: every tab controls a panel that names it back, one is chosen, the rest are hidden", () => {
+  requirePages();
+  const page = pageNamed("check.html");
+  const rows = [
+    { listClass: "steps-list", tabClass: "step-tab", count: 4 },
+    { listClass: "result-tabs-list", tabClass: "result-tab", count: 6 },
+  ];
+  for (const row of rows) {
+    assert.deepEqual(tabRowProblems(page, row.listClass), [], row.listClass);
+    const tabs = page.tags.filter((tag) => tag.attrs.role === "tab" && (tag.attrs.class || "").split(/\s+/).includes(row.tabClass));
+    assert.equal(tabs.length, row.count, row.listClass + " should hold " + row.count + " tabs.");
+    let chosen = 0;
+    tabs.forEach((tab, index) => {
+      assert.equal(tab.name, "button", "A tab must be a <button>.");
+      assert.equal(tab.attrs.type, "button", "A tab inside the form must be type=\"button\", or pressing it would submit the form.");
+      const panel = page.tags.find((tag) => tag.attrs.id === tab.attrs["aria-controls"]);
+      assert.ok(panel !== undefined, tab.attrs.id + " controls a panel that is not on the page.");
+      assert.equal(panel.attrs.role, "tabpanel", "#" + panel.attrs.id + ' needs role="tabpanel".');
+      assert.equal(panel.attrs["aria-labelledby"], tab.attrs.id, "#" + panel.attrs.id + " must be named by its own tab.");
+      const isChosen = tab.attrs["aria-selected"] === "true";
+      if (isChosen) chosen += 1;
+      assert.equal(isChosen, index === 0, "The first tab is the chosen one when the page opens.");
+      assert.equal(tab.attrs.tabindex, isChosen ? "0" : "-1", "Only the chosen tab may be a stop for the Tab key (roving tabindex).");
+      assert.equal(panel.attrs.hidden !== undefined, !isChosen, "A panel that is not showing carries the hidden attribute; the chosen one does not.");
+    });
+    assert.equal(chosen, 1);
+  }
+  // The six result tabs, by name, in the order the brief gives.
+  const names = [...page.raw.matchAll(/<span class="result-tab-label">([^<]+)<\/span>/g)].map((match) => match[1]);
+  assert.deepEqual(names, ["Verdict", "Compare", "Chart", "Why it jumped", "The math", "What next"]);
+  // The four steps.
+  const steps = [...page.raw.matchAll(/<span class="step-tab-label">([^<]+)<\/span>/g)].map((match) => match[1]);
+  assert.deepEqual(steps, ["Your payment", "Your balance", "What the statement concluded", "Your bills"]);
+  // Each step has a heading that can take focus (Back / Next move focus there).
+  for (let number = 1; number <= 4; number += 1) {
+    const heading = page.tags.find((tag) => tag.attrs.id === "step-heading-" + number);
+    assert.ok(heading !== undefined && heading.name === "h2" && heading.attrs.tabindex === "-1", "Step " + number + ' needs <h2 id="step-heading-' + number + '" tabindex="-1">.');
+    assert.ok(page.raw.includes("Step " + number + " of 4"), 'Step ' + number + ' must say "Step ' + number + ' of 4".');
+  }
+});
+
+test("check.html: the one line that is read out while editing sits OUTSIDE the result tabs, and check.js wires the tabs with tabs.js", () => {
+  requirePages();
+  const page = pageNamed("check.html");
+  const live = page.tags.find((tag) => tag.attrs.id === "verdict-live");
+  const firstPanel = page.tags.find((tag) => tag.attrs.id === "result-panel-1");
+  assert.ok(live !== undefined && firstPanel !== undefined);
+  assert.ok(live.index < firstPanel.index, "#verdict-live must come before the first result panel. Inside a hidden panel it would never be read out.");
+  assert.equal(live.attrs["aria-live"], "polite");
+  const liveRegions = page.tags.filter((tag) => tag.attrs["aria-live"] !== undefined);
+  assert.equal(liveRegions.length, 1, "Only #verdict-live may be an aria-live region on check.html (SPEC D4).");
+
+  const source = readText("check.js");
+  assert.ok(/import \{ wireTabs \} from "\.\/tabs\.js";/.test(source), "check.js must wire both rows of tabs with wireTabs from tabs.js.");
+  assert.ok(/resultTabs\.select\(0, false\);/.test(source), "A real check must land on the Verdict tab.");
+  assert.ok(/byId\("verdict-heading"\)/.test(source), "…with focus on the verdict heading.");
+  assert.ok(/stepTabs\.select\(firstStep, false\)/.test(source), "A failed check must bring the first step with a mistake forward.");
+  assert.ok(/summary\.focus\(/.test(source), "…and move focus to the error summary.");
+  assert.ok(/revealBox\(target\)/.test(source), "A link in the error summary must switch to the step that holds its box.");
+});
+
+// ───────── ./check.html#example-N ─────────
+
+test("example-link.js: only a small whole number that names a real example is ever read from the address", () => {
+  assert.equal(EXAMPLE_HASH_PREFIX, "#example-");
+  assert.equal(exampleNumberFromHash("#example-1", 3), 1);
+  assert.equal(exampleNumberFromHash("#example-2", 3), 2);
+  assert.equal(exampleNumberFromHash("#example-3", 3), 3);
+  for (const bad of ["", "#", "#example-", "#example-0", "#example-4", "#example--1", "#example-1.5", "#example-2abc", "#example- 2", "#example-02x", "#EXAMPLE-2", "#results", "example-2", "#example-999999999999", "#example-1e1", "#example-<b>"]) {
+    assert.equal(exampleNumberFromHash(bad, 3), null, JSON.stringify(bad) + " must not run an example.");
+  }
+  for (const notText of [undefined, null, 2, {}, ["#example-2"]]) {
+    assert.equal(exampleNumberFromHash(notText, 3), null);
+  }
+  assert.equal(exampleNumberFromHash("#example-1", 0), null, "No examples: nothing to run.");
+  assert.equal(exampleNumberFromHash("#example-1", undefined), null);
+  for (let number = 1; number <= EXAMPLES.length; number += 1) {
+    assert.equal(exampleNumberFromHash(EXAMPLE_HASH_PREFIX + number, EXAMPLES.length), number);
+  }
+});
+
+test("the landing page's example buttons and check.js agree on the address, and check.js reads it on load AND when only the # changes", () => {
+  const landing = readText("landing.js");
+  assert.ok(landing.includes('href: "./check.html' + EXAMPLE_HASH_PREFIX + '" + (index + 1)'), "landing.js must build each example's link as ./check.html#example-N.");
+  const source = readText("check.js");
+  assert.ok(/exampleNumberFromHash\(window\.location\.hash, EXAMPLES\.length\)/.test(source), "check.js must read the address through example-link.js and nothing else.");
+  assert.equal(source.split("location.hash").length - 1, 1, "check.js may read the address in exactly one place.");
+  assert.ok(/runExampleFromAddress\(\);\n/.test(source), "check.js must run the example named in the address when the page opens.");
+  assert.ok(/addEventListener\("hashchange", runExampleFromAddress\)/.test(source), "…and again when only the # part changes on an open page.");
+  // The pages' own scripts never read the address any other way.
+  for (const file of ["landing.js", "proof-page.js", "privacy-page.js", "site.js", "example-link.js"]) {
+    assert.deepEqual(linesMatching(readText(file), /location\s*\.\s*(?:hash|search|href)/), [], file + " must not read the address. Lines:");
+  }
+});
+
+// ───────── the big figures on the landing page are true ─────────
+
+test("the landing page's big figures: the number of worked cases is counted on the device, never written down", () => {
+  requirePages();
+  const page = pageNamed("index.html");
+  const total = VECTORS.length;
+  const report = runSelfCheck(VECTORS);
+  assert.equal(report.total, total);
+  assert.equal(report.passed, total, "Every worked case passes today, so the band reads \"" + total + " of " + total + "\". If this fails the band will honestly show fewer, and the engine needs fixing.");
+
+  const passed = page.tags.find((tag) => tag.attrs.id === "figure-passed");
+  const totalNode = page.tags.find((tag) => tag.attrs.id === "figure-total");
+  assert.ok(passed !== undefined && totalNode !== undefined, "index.html needs #figure-passed and #figure-total.");
+  assert.ok(/<span id="figure-passed">–<\/span>/.test(page.raw) && /<span id="figure-total">–<\/span>/.test(page.raw), "Both must hold a dash in the HTML: landing.js fills in the real count.");
+
+  const landing = readText("landing.js");
+  assert.ok(/const report = runSelfCheck\(VECTORS\);/.test(landing), "landing.js must COUNT the cases by running them.");
+  assert.ok(/passedNode\.textContent = String\(report\.passed\);/.test(landing) && /totalNode\.textContent = String\(report\.total\);/.test(landing), "…and show exactly what it counted.");
+  assert.ok(/setAttribute\("data-count-to", String\(report\.passed\)\)/.test(landing), "…and hand the same number to the motion layer.");
+
+  // No file a visitor receives may carry today's count next to the words it goes with.
+  const stale = [total + " of " + total, total + " cases", total + " worked", total + " checks", "all " + total, total + "-case"];
+  const problems = [];
+  for (const file of filesAVisitorReceives()) {
+    if (file.startsWith("engine")) continue; // the cases themselves live there
+    const tidy = normalizeForPhraseSearch(readText(file) || "");
+    for (const phrase of stale) {
+      if (tidy.includes(phrase)) problems.push(file + ' says "' + phrase + '"');
+    }
+  }
+  assert.deepEqual(problems, [], "The count of worked cases grows. Read it from VECTORS.length; never type it:\n" + problems.join("\n"));
+});
+
+test("the landing page's big figures: 150,000 is what the math audit says, and every page that repeats it is covered", () => {
+  requirePages();
+  const audit = readText("docs/verification/math-audit.md");
+  assert.ok(audit !== null, "docs/verification/math-audit.md is missing.");
+  const tidyAudit = audit.replace(/\*\*/g, "").replace(/\s+/g, " ");
+  assert.ok(tidyAudit.includes("A second implementation, written blind from 12 CFR 1024.17 and Appendix E, agrees with the engine"), "The audit no longer says a second implementation agrees with the engine.");
+  assert.ok(tidyAudit.includes("150,000 random accounts"), "The audit no longer says 150,000 random accounts. The landing page's figure must change with it.");
+  assert.ok(tidyAudit.includes("Zero disagreements"), "The audit no longer says zero disagreements.");
+
+  const page = pageNamed("index.html");
+  assert.ok(/<span data-count-to="150000">150,000<\/span>/.test(page.raw), 'index.html must show the figure as <span data-count-to="150000">150,000</span>.');
+  assert.ok(page.raw.includes("docs/verification/math-audit.md"), "The figure must link to the audit it comes from.");
+  // Any other six-figure claim on any page would be one this test does not know.
+  for (const each of pages) {
+    // (Ten thousand and up. "1,234.56" in the form's hint is an example of how to type an amount.)
+    const claims = each.html.match(/\b\d{2,3}(?:,\d{3})+\b/g) || [];
+    for (const claim of claims) assert.equal(claim, "150,000", each.file + " makes a big-number claim this test does not cover: " + claim);
+  }
+});
+
+test("the landing page's big figures: \"0 requests\" is a live reading, and \"$0, no account\" is backed by the pages themselves", () => {
+  requirePages();
+  const page = pageNamed("index.html");
+  assert.ok(/<span id="figure-requests" data-count-to="0">0<\/span>/.test(page.raw));
+  const landing = readText("landing.js");
+  assert.ok(/import \{ watchRequestCount \} from "\.\/proof\.js";/.test(landing), "The count must come from the same reader the privacy panel uses.");
+  assert.ok(/node\.textContent = String\(count\);/.test(landing), "landing.js must show the number the browser's log gives, whatever it is.");
+  assert.ok(/export function watchRequestCount\(/.test(readText("proof.js")));
+
+  // "$0, no account, no sign-up": no page asks for an email address, a password
+  // or a card, and no page has anywhere to send one (form-action 'none' above).
+  for (const each of pages) {
+    for (const tag of each.tags) {
+      if (tag.name !== "input") continue;
+      const type = (tag.attrs.type || "text").toLowerCase();
+      assert.ok(!["email", "password", "tel"].includes(type), each.file + " has an <input type=\"" + type + "\">.");
+      assert.ok(!/cc-|email|password|username/i.test(tag.attrs.autocomplete || ""), each.file + " has an input that asks the browser for account or card details.");
+    }
+  }
+  // The four figures, and the hooks the motion layer reads.
+  const figures = [...page.raw.matchAll(/data-count-to="(\d+)">([^<]*)</g)];
+  assert.deepEqual(figures.map((match) => match[1]), ["150000", "0", "0"], "Three figures carry their number in the HTML; the fourth (the worked cases) gets it from landing.js.");
+  for (const match of figures) {
+    assert.equal(match[2].replace(/,/g, ""), match[1], "The text inside a data-count-to element is always the final number.");
+  }
+});
+
+// ───────── the honest limits are on both pages, in the same words ─────────
+
+function limitsOf(page) {
+  const start = page.raw.indexOf('<ul class="limits-list">');
+  const end = page.raw.indexOf("</ul>", start);
+  assert.ok(start !== -1 && end !== -1, page.file + " has no list of limits.");
+  return [...page.raw.slice(start, end).matchAll(/<li>([\s\S]*?)<\/li>/g)].map((match) => match[1].replace(/\s+/g, " ").trim());
+}
+
+test("the five limits: in full on privacy.html, and on check.html under the results behind one line that is always showing", () => {
+  requirePages();
+  const onTool = limitsOf(pageNamed("check.html"));
+  const onPrivacy = limitsOf(pageNamed("privacy.html"));
+  assert.equal(onTool.length, 5);
+  assert.equal(onPrivacy.length, 5);
+  for (let index = 0; index < 4; index += 1) {
+    assert.equal(onTool[index], onPrivacy[index], "Limit " + (index + 1) + " is worded differently on the two pages.");
+  }
+  // The fifth ends by pointing at the three quick questions, which are on check.html.
+  const sameStart = "<strong>Not every loan is covered by this rule.</strong> Some loans, like home equity lines of credit and some seller-financed loans, fall outside it.";
+  assert.ok(onTool[4].startsWith(sameStart) && onPrivacy[4].startsWith(sameStart));
+  assert.ok(pageNamed("check.html").raw.includes("Is this the right tool for me? Three quick questions"), "check.html must still hold the three quick questions the fifth limit points at.");
+
+  const tool = pageNamed("check.html");
+  const results = tool.tags.find((tag) => tag.attrs.id === "results");
+  const limits = tool.tags.find((tag) => tag.attrs.id === "limits");
+  assert.ok(limits.index > results.index, "The limits sit under the results.");
+  assert.equal(limits.attrs.hidden, undefined, "The limits are never hidden.");
+  assert.ok(/<p class="limits-brief-line"><strong>This is math, not legal advice\.<\/strong>/.test(tool.raw), "The one line that is always showing must open with: This is math, not legal advice.");
+  assert.ok(/<details class="disclosure limits-more" id="limits-details">/.test(tool.raw), "All five sit in a <details> right under that line.");
+  assert.ok(readText("check.js").includes('"#steps-body details, #limits-details"'), "check.js must open the limits for printing, or the printed report loses them.");
+});
+
+// ───────── printing: one page, whichever tab is showing ─────────
+
+test("site.css: on paper the result tabs disappear and EVERY panel is laid out, so the report is the same whichever tab was showing (a source scan)", () => {
+  const css = (readText("site.css") || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const printStart = css.indexOf("@media print");
+  assert.ok(printStart !== -1, "site.css needs an @media print block.");
+  const print = css.slice(printStart);
+  assert.ok(/\.result-tabs-list,/.test(print) && /display: none !important;/.test(print), "The row of result tabs must be hidden on paper.");
+  assert.ok(
+    /body:not\(\.print-letter-mode\) \.results \.result-panel\[hidden\] \{\s*display: contents !important;/.test(print),
+    "A hidden result panel must be laid out on paper (display: contents), or the report would only hold the tab that was showing."
+  );
+  for (const needed of [".tool-head", ".request-line", ".limits-more > summary"]) {
+    assert.ok(print.includes(needed), "site.css should hide " + needed + " on paper.");
+  }
+  const base = readText("styles.css");
+  for (const needed of [".masthead,", ".workbench,", ".site-footer,"]) {
+    assert.ok(base.slice(base.indexOf("@media print")).includes(needed), "styles.css should still hide " + needed + " on paper.");
+  }
+});
+
+// ───────── hooks for the motion layer ─────────
+
+test("the landing page carries the hooks the motion layer is built on", () => {
+  requirePages();
+  const page = pageNamed("index.html");
+  const sections = page.tags.filter((tag) => tag.name === "section");
+  const reveals = page.tags.filter((tag) => tag.attrs["data-reveal"] !== undefined);
+  assert.equal(reveals.length, sections.length, "Each landing section's inner wrapper carries data-reveal: one per section.");
+  for (const tag of reveals) {
+    assert.ok((tag.attrs.class || "").split(/\s+/).includes("wrap"), "data-reveal belongs on the section's inner .wrap.");
+  }
+  assert.ok(/<div class="hero-backdrop" aria-hidden="true"><\/div>\s*<div id="hero-preview" class="preview" aria-hidden="true"><\/div>/.test(page.raw), "The empty, aria-hidden .hero-backdrop sits right before #hero-preview.");
+  assert.ok(readText("preview.js").includes('"chip preview-chip "'), "preview.js must give every chip the class preview-chip.");
+  for (const other of pages) {
+    if (other.file === "index.html") continue;
+    assert.ok(!other.raw.includes("data-reveal") && !other.raw.includes("data-count-to"), other.file + " should not carry the landing page's motion hooks.");
+  }
+});
+
+// ───────── the motion layer itself (added 2026-09-21) ─────────
+
+// motion.js and motion.css are ordinary shell files: because landing.js imports
+// one and index.html links the other, EVERY scan above already reads them (the
+// banned list, no style attribute from script, relative paths, the offline
+// list, the voice rules). These tests add what only the motion layer needs.
+test("the motion layer is part of the shell: index.html alone links motion.css, landing.js imports motion.js, and every scan above covers both", () => {
+  requirePages();
+  const files = shellFiles().map((file) => file.split(path.sep).join("/"));
+  assert.ok(files.includes("motion.js"), "motion.js is not in the import graph, so the scans above do not read it.");
+  assert.ok(files.includes("motion.css"), "motion.css is not linked from a page, so the scans above do not read it.");
+  assert.ok(precache.urls.includes("./motion.js") && precache.urls.includes("./motion.css"), "sw.js must save both for offline use.");
+  for (const page of pages) {
+    const linksIt = page.tags.some((tag) => tag.name === "link" && (tag.attrs.href || "") === "./motion.css");
+    assert.equal(linksIt, page.file === "index.html", page.file + (linksIt ? " links motion.css, which is the landing page's alone." : " must link ./motion.css."));
+  }
+  // After site.css, so its few overrides win without !important.
+  const landingPage = pageNamed("index.html");
+  assert.ok(landingPage.raw.indexOf('href="./site.css"') < landingPage.raw.indexOf('href="./motion.css"'));
+  // A stylesheet that moves things must never reach for a file of its own.
+  assert.deepEqual(findCssUrls(readText("motion.css")), [], "motion.css draws everything with gradients: no url() at all.");
+  assert.ok(!/@import/.test(readText("motion.css")));
+});
+
+// The Content-Security-Policy blocks style ATTRIBUTES. Script may still set a
+// CSS custom property through the style OBJECT (element.style.setProperty),
+// which is how the motion layer hands a number to the stylesheet. That is the
+// only use this site allows: no script sets a real CSS property directly, so
+// how things look stays in the stylesheets, where the contrast tool reads it.
+test("scripts touch an element's style object only to set or remove a CSS custom property (--name), never a real property and never cssText", () => {
+  requirePages();
+  const problems = [];
+  let uses = 0;
+  for (const file of shellFiles()) {
+    if (!file.endsWith(".js")) continue;
+    const source = readText(file);
+    if (source === null) continue;
+    const pattern = /\.style\b\s*(\.\s*[A-Za-z]+|\[|=)?/g;
+    let match = pattern.exec(source);
+    while (match !== null) {
+      const after = source.slice(match.index, match.index + 60);
+      uses += 1;
+      if (!/^\.style\.(?:setProperty|removeProperty)\("--[a-z-]+"/.test(after)) {
+        problems.push(file + " line " + source.slice(0, match.index).split("\n").length + ": " + after.split("\n")[0]);
+      }
+      match = pattern.exec(source);
+    }
+  }
+  assert.ok(uses > 0, "Expected the motion layer's setProperty calls; the scan found none, so it is not looking at the right files.");
+  assert.deepEqual(problems, [], 'Only element.style.setProperty("--name", …) and removeProperty("--name") are allowed:\n' + problems.join("\n"));
+  // The scan is proven: it lets the allowed form through and catches the rest.
+  const allowed = /^\.style\.(?:setProperty|removeProperty)\("--[a-z-]+"/;
+  assert.ok(allowed.test('.style.setProperty("--par", "0.5")'));
+  assert.ok(!allowed.test('.style.setProperty("opacity", "0")'));
+  assert.ok(!allowed.test(".style.opacity = 0"));
+  assert.ok(!allowed.test('.style.cssText = "opacity:0"'));
+});
+
+test("the small movements shared by every page live in site.css, behind no-preference, and animate transform and opacity only", () => {
+  const css = (readText("site.css") || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  // The sliding line under the serif tabs: one element, moved with transform.
+  assert.ok(/\.tabs-slider \{[^}]*transform: translateX\(var\(--slider-x, 0px\)\) scaleX\(var\(--slider-w, 0\)\);/.test(css));
+  assert.ok(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.tabs-list\.slider-moves \.tabs-slider \{\s*transition: transform 260ms/.test(css), "The line only SLIDES for visitors who have not asked for less motion.");
+  // A chosen panel fades in over 150ms.
+  assert.ok(/\.panel-enter \{\s*animation: panel-enter 150ms ease-out;/.test(css));
+  assert.ok(/@keyframes panel-enter \{\s*from \{\s*opacity: 0;\s*\}\s*to \{\s*opacity: 1;\s*\}\s*\}/.test(css));
+  // Pills lift a pixel on hover (only where there IS a hover) and press down.
+  assert.ok(/@media \(prefers-reduced-motion: no-preference\) and \(hover: hover\) \{\s*\.btn:hover:not\(\[disabled\]\):not\(:active\) \{\s*transform: translateY\(-1px\);/.test(css));
+  assert.ok(/\.btn:active:not\(\[disabled\]\) \{\s*transform: translateY\(1px\);/.test(css));
+  // tabs.js is where the two classes come from, and only a real change of tab sets them.
+  const tabs = readText("tabs.js");
+  assert.ok(/classList\.toggle\("panel-enter", isChosen && previous !== index\)/.test(tabs));
+  assert.ok(/placeSlider\(previous !== index\);/.test(tabs));
+  // The verdict eases in with opacity and transform (it used to pulse a box-shadow).
+  const base = (readText("styles.css") || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const verdictFrames = /@keyframes verdict-updated \{([\s\S]*?)\n  \}/.exec(base);
+  assert.ok(verdictFrames !== null);
+  assert.ok(!/box-shadow/.test(verdictFrames[1]) && /opacity/.test(verdictFrames[1]) && /transform/.test(verdictFrames[1]));
+  assert.ok(/flashVerdict\(\);\s*\}\s*\n\s*\/\/ A real press/.test(readText("check.js")), "check.js eases the verdict in once per check, from showResults.");
+});
+
+// ───────── a step that is waiting its turn is still part of the form ─────────
+
+// Found in the browser on 2026-09-21. guide.js numbers the boxes and takes a box
+// off the sample statement when the box is switched off (`hidden`). With the
+// form in four steps, the steps that are not showing are hidden tab panels, and
+// every box in steps 2 to 4 lost its number. THIS IS A SOURCE SCAN.
+test("guide.js: a box inside a step that is not showing keeps its number; only a box that is itself switched off drops out", () => {
+  const source = readText("guide.js");
+  assert.ok(source.includes(`const HIDDEN_BUT_NOT_A_WAITING_STEP = '[hidden]:not([role="tabpanel"])';`), "guide.js must not count a hidden tab panel as a switched-off box.");
+  assert.ok(/wrapper\.closest\(HIDDEN_BUT_NOT_A_WAITING_STEP\)/.test(source));
+  assert.ok(!/closest\("\[hidden\]"\)/.test(source), 'guide.js still asks closest("[hidden]") somewhere: that treats steps 2 to 4 as switched off.');
+  // The boxes that really are switched off carry `hidden` themselves, inside their step.
+  const page = pageNamed("check.html");
+  for (const id of ["claimed-amount-field", "spread-months-field", "lump-sum-field"]) {
+    const box = page.tags.find((tag) => tag.attrs.id === id);
+    assert.ok(box !== undefined && box.attrs.hidden !== undefined && box.attrs.role !== "tabpanel", "#" + id + " starts switched off, with its own hidden attribute.");
+  }
+  // And the sample statement can bring a waiting step forward.
+  assert.ok(/export function initGuide\(\{ panel, form, example, reveal \}\)/.test(source), "initGuide takes a `reveal` function…");
+  assert.ok(/reveal: revealBox/.test(readText("check.js")), "…and check.js hands it the one that switches steps.");
 });

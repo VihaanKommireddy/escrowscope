@@ -24,19 +24,31 @@
 // those files changes, the name changes, the browser sees a different sw.js,
 // builds a fresh box and throws the old one away (see "activate"). Do not edit
 // this line by hand. tests/shell.test.js fails when it is out of date.
-const CACHE_NAME = "escrowscope-v1-edd7946aa9ed";
+const CACHE_NAME = "escrowscope-v1-0b1caa2c5e3d";
 
 // The app shell: site files only. Never docs/, tests/, v0/ or tools/.
 // One relative URL per line (the shell test and the stamp tool parse this list).
+// The site is four pages. All four are saved on the first visit to ANY of them,
+// so every page opens offline afterwards, not just the one that was visited.
 // The site's folder address ("./") is not on the list: the fetch handler below
 // answers it with the saved ./index.html.
 const PRECACHE_URLS = [
   "./index.html",
+  "./check.html",
+  "./proof.html",
+  "./privacy.html",
   "./styles.css",
+  "./site.css",
+  "./motion.css",
   "./chart.css",
   "./guide.css",
   "./selfcheck.css",
-  "./app.js",
+  "./landing.js",
+  "./check.js",
+  "./proof-page.js",
+  "./privacy-page.js",
+  "./site.js",
+  "./example-link.js",
   "./render.js",
   "./pipeline.js",
   "./dom.js",
@@ -47,6 +59,7 @@ const PRECACHE_URLS = [
   "./sw-register.js",
   "./tabs.js",
   "./preview.js",
+  "./motion.js",
   "./examples.js",
   "./engine/index.js",
   "./engine/money.js",
@@ -142,7 +155,8 @@ self.addEventListener("activate", (event) => {
 // Turn a request's address into the address of a saved shell file, or null
 // when the request is not for a shell file.
 function shellUrlFor(requestUrl) {
-  // Drop any "?query" or "#hash": ./index.html?x=1 is still ./index.html.
+  // Drop any "?query" or "#hash": ./check.html?nosw#example-2 is still
+  // ./check.html. (The "#…" part never reaches a service worker at all.)
   let plainUrl = requestUrl.origin + requestUrl.pathname;
   // Opening the site's folder ("…/escrowscope/") means opening index.html.
   if (plainUrl === SITE_ROOT_URL) {
@@ -150,6 +164,12 @@ function shellUrlFor(requestUrl) {
   }
   if (SHELL_URLS.has(plainUrl)) {
     return plainUrl;
+  }
+  // GitHub Pages also answers a page's address without its ending
+  // ("…/escrowscope/check" for check.html). Offline, that address gets the same
+  // saved page. Only for a page on the list: anything else is still left alone.
+  if (SHELL_URLS.has(plainUrl + ".html")) {
+    return plainUrl + ".html";
   }
   return null;
 }

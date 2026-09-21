@@ -109,7 +109,13 @@ of credit) are not covered by that rule at all.
 
 | Path | What it is |
 |---|---|
-| `index.html`, `app.js`, `render.js`, `chart.js`, `guide.js`, `proof.js` | The page |
+| `index.html` + `landing.js` | The landing page: the pitch, a sample result, the three examples |
+| `motion.js`, `motion.css` | What moves on the landing page. The sample result plays the three examples, with a Pause button. None of it runs if your device asks for less motion |
+| `check.html` + `check.js` | The tool: the form in four steps, the result in six tabs (`render.js`, `chart.js`, `guide.js`, `tabs.js` do the drawing) |
+| `proof.html` + `proof-page.js` | The self check, run on your device as the page opens (`selfcheck-ui.js`) |
+| `privacy.html` + `privacy-page.js` | The privacy panel (`proof.js`), what the site can't tell you, how it works, the glossary |
+| `site.js`, `site.css` | The top bar, footer and menu every page shares, and the styles for the four page layout |
+| `sw.js` | The service worker. It saves all four pages, so each one opens offline |
 | `engine/` | The math, with no page code in it, so it runs the same in Node and in the browser |
 | `styles.css`, `assets/fonts/` | The look, and the one font file (Fraunces, for headings) with its license notice |
 | `tests/` | The test suite (`npm test`) |

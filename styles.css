@@ -94,6 +94,17 @@
   /* The dark pill on the hero preview ("EXAMPLE"). */
   --pill-bg: rgba(20, 27, 45, 0.88);
   --pill-ink: #F8F5EE;
+  /* The big-figures band on the landing page: a solid navy block with ivory
+     numerals. It is the same navy in both themes (on the dark page it reads as
+     a raised block), so these five are not repeated in the dark list below. */
+  --band-bg: #1D3A63;
+  --band-ink: #F8F5EE;
+  --band-ink-2: #D3DCEA;
+  --band-ink-3: #A9BAD4;
+  --band-rule: rgba(248, 245, 238, 0.2);
+  /* The big soft circle behind the framed preview (decoration, no text on it). */
+  --backdrop-core: rgba(29, 58, 99, 0.3);
+  --backdrop-mid: rgba(29, 58, 99, 0.15);
 
   /* Type */
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -195,6 +206,8 @@
     --masthead-rule: rgba(42, 52, 78, 0.7);
     --pill-bg: rgba(233, 236, 245, 0.9);
     --pill-ink: #0D1222;
+    --backdrop-core: rgba(130, 175, 237, 0.22);
+    --backdrop-mid: rgba(130, 175, 237, 0.1);
 
     /* Dark elevation reads as an edge, not a glow. */
     --shadow-2: 0 0 0 1px #2A344E;
@@ -856,8 +869,7 @@ code,
 .preview-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: 14px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--paper);
@@ -868,10 +880,66 @@ code,
   text-transform: uppercase;
 }
 
+/* The three dots of a browser window, drawn with one gradient: no image, no
+   icon font. They are quiet on purpose (hairline grey, not traffic lights). */
+.preview-dots {
+  flex: none;
+  width: 42px;
+  height: 10px;
+  background: radial-gradient(circle at 5px 5px, var(--border-strong) 0 4px, transparent 4.6px) 0 0 / 16px 10px repeat-x;
+  opacity: 0.55;
+}
+
+.preview-bar-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preview-body {
   display: grid;
   gap: 16px;
   padding: clamp(14px, 2.4vw, 22px);
+}
+
+/* The verdict cards and the charts of the examples lie on top of each other in
+   ONE grid cell, and only the current one can be seen. So the frame is always
+   as tall as the tallest example and never changes height when the motion
+   layer moves from one example to the next. Standing still there is just one
+   card and one chart in here, and these rules change nothing. */
+.preview-verdicts,
+.preview-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.preview-verdicts > *,
+.preview-charts > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.preview-verdicts > :not(.is-current),
+.preview-charts > :not(.is-current) {
+  visibility: hidden;
+}
+
+/* What the verdict's place says while an example is still playing. Only
+   motion.css ever shows it. */
+.preview-working {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .preview-verdict {
@@ -879,6 +947,9 @@ code,
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px 14px;
   align-items: start;
+  /* A short verdict sits in the middle of a slot kept tall enough for the
+     longest one (see .preview-verdicts below). */
+  align-content: center;
   padding: 14px 16px;
   border: 1px solid var(--warn-mark);
   border-radius: var(--radius-lg);
@@ -1131,15 +1202,44 @@ code,
   }
 }
 
-/* Under 380px two chips is enough; the third would cover the numbers. */
+/* Phones: the dark pill moves toward the corner, clear of the cushion chip. */
+@media (max-width: 479px) {
+  .chip--example {
+    right: 8px;
+  }
+}
+
+/* Under 380px two chips is enough; the third would cover the numbers. While the
+   picture plays, the pill says "1 of 3" without the word, for the same reason.
+   The three small labels shrink a touch so "PROJECTED" stays in one piece. */
 @media (max-width: 379px) {
   .chip--low {
     display: none;
   }
+
+  .chip--example.is-counted .pill-word {
+    display: none;
+  }
+
+  .preview-number {
+    padding-inline: 8px;
+  }
+
+  .preview-number dt {
+    font-size: 10px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Example 3's "$1,200.00" is the widest figure the loop shows. */
+  .preview-number dd {
+    font-size: 13px;
+  }
 }
 
-/* One calm entrance when the page opens, then a slow drift on the chips. None of
-   it runs for people who asked for less motion. */
+/* One calm entrance when the page opens. It is pure CSS and ends on the page as
+   it is, so it needs no script. It does not run for people who asked for less
+   motion. (The chips' float, the playing preview and everything else that keeps
+   moving live in motion.css, behind a Pause button.) */
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -1152,16 +1252,6 @@ code,
   }
 }
 
-@keyframes chip-drift {
-  from {
-    translate: 0 -4px;
-  }
-
-  to {
-    translate: 0 5px;
-  }
-}
-
 @media (prefers-reduced-motion: no-preference) {
   .hero-pitch {
     animation: rise-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -1169,27 +1259,6 @@ code,
 
   .preview {
     animation: rise-in 640ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
-  }
-
-  .chip {
-    animation:
-      rise-in 560ms cubic-bezier(0.2, 0.8, 0.2, 1) 620ms both,
-      chip-drift 7s ease-in-out 1200ms infinite alternate;
-  }
-
-  .chip--low {
-    animation-delay: 760ms, 1340ms;
-    animation-duration: 560ms, 8.5s;
-  }
-
-  .chip--checks {
-    animation-delay: 900ms, 1480ms;
-    animation-duration: 560ms, 6.2s;
-  }
-
-  .chip--example {
-    animation-delay: 1040ms, 1620ms;
-    animation-duration: 560ms, 9s;
   }
 }
 
@@ -1266,12 +1335,14 @@ code,
 }
 
 /* Auto margins on the two ends center the strip when there is room and fall
-   back to the left edge when it has to scroll (nothing is cut off). */
-.tab:first-child {
+   back to the left edge when it has to scroll (nothing is cut off).
+   "of-type", not "child": tabs.js adds one decorative <span> (the sliding
+   line) after the last tab, and the tabs are the row's only buttons. */
+.tab:first-of-type {
   margin-left: auto;
 }
 
-.tab:last-child {
+.tab:last-of-type {
   margin-right: auto;
 }
 
@@ -2383,18 +2454,22 @@ code,
   border-style: dashed;
 }
 
+/* The verdict eases in once each time the math is checked: a short rise and
+   fade, so a sighted visitor notices it changed. Opacity and transform only. */
 @media (prefers-reduced-motion: no-preference) {
   .verdict.just-updated {
-    animation: verdict-updated 700ms ease-out;
+    animation: verdict-updated 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   @keyframes verdict-updated {
     from {
-      box-shadow: 0 0 0 6px var(--tone-mark);
+      opacity: 0.35;
+      transform: translateY(8px);
     }
 
     to {
-      box-shadow: 0 0 0 0 transparent;
+      opacity: 1;
+      transform: none;
     }
   }
 }

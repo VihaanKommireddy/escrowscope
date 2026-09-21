@@ -299,6 +299,38 @@ test("fetch: opening …/escrowscope/index.html is answered with the saved index
   assert.equal(result.response, world.boxes.get(world.cacheName).get(SITE_FOLDER + "index.html"));
 });
 
+// The site is four pages. Each one must open offline, however its address is
+// written: plain, with ?nosw, with a #hash (./check.html#example-2 is how the
+// landing page opens an example), and without its ending, the way GitHub Pages
+// also serves it.
+test("fetch: each of the four pages is answered from its own saved copy, with a query, with a #hash, and without .html", async () => {
+  const world = await startInstalledWorker();
+  const before = world.fetched.length;
+  const saved = world.boxes.get(world.cacheName);
+  for (const page of ["index.html", "check.html", "proof.html", "privacy.html"]) {
+    assert.ok(world.precacheUrls.includes("./" + page), page + " is not on the list sw.js saves.");
+    const wanted = saved.get(SITE_FOLDER + page);
+    assert.ok(wanted, page + " was not saved.");
+    const name = page.replace(/\.html$/, "");
+    for (const address of [page, page + "?nosw", page + "#example-2", page + "?nosw#example-2", name, name + "?nosw"]) {
+      const result = await fire(world, "fetch", getRequest(SITE_FOLDER + address));
+      assert.equal(result.answered, true, address + " was not answered, so that page would not open offline.");
+      assert.equal(result.response, wanted, address + " was answered with the wrong page.");
+    }
+  }
+  assert.equal(world.fetched.length, before, "Answering from the saved copy must not touch the network.");
+});
+
+test("fetch: the address-without-.html rule only ever reaches a page on the list", async () => {
+  const world = await startInstalledWorker();
+  const before = world.fetched.length;
+  for (const address of ["styles", "styles.css.html", "secret", "engine/index", "docs/SPEC", "check.html.html", "check/"]) {
+    const result = await fire(world, "fetch", getRequest(SITE_FOLDER + address));
+    assert.equal(result.answered, false, address + " is not a saved page and must be left to the browser.");
+  }
+  assert.equal(world.fetched.length, before);
+});
+
 test("fetch: a shell file asked for WITH a query string (or a #hash) is still answered from the saved copy", async () => {
   const world = await startInstalledWorker();
   const before = world.fetched.length;
@@ -395,7 +427,9 @@ test("across install, activate and every kind of request, nothing is EVER fetche
   const addresses = [
     SITE_FOLDER,
     SITE_FOLDER + "index.html?nosw",
-    SITE_FOLDER + "app.js?next=https://evil.example/",
+    SITE_FOLDER + "check.js?next=https://evil.example/",
+    SITE_FOLDER + "check.html?nosw#example-2",
+    SITE_FOLDER + "privacy",
     "https://evil.example/collect?site=" + encodeURIComponent(SITE_FOLDER),
     SITE_ORIGIN + "/another-project/",
   ];

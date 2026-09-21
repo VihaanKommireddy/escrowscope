@@ -6,6 +6,7 @@
 import { el, svgEl, clear, scrollRegion } from "./dom.js";
 import { formatCents, MONTH_NAMES } from "./engine/index.js";
 import { renderBalanceChart, renderJumpBar } from "./chart.js";
+import { isTooCloseToCall } from "./pipeline.js";
 
 function byId(id) {
   return document.getElementById(id);
@@ -58,16 +59,9 @@ function icon(name) {
   );
 }
 
-// SPEC E3: when a result sits within $7 of a legal line (the $50 refund line, or
-// one month's payment), the engine sets result.nearLine and softens its words.
-// The page must then stay calm too: teal "info" styling, never the amber
-// "refund required" look, and no refund date. The ONLY test is whether the
-// engine set nearLine. "Near" is never worked out again here.
-export function isTooCloseToCall(check) {
-  if (!check.result) return false;
-  const nearLine = check.result.nearLine;
-  return nearLine !== null && nearLine !== undefined;
-}
+// SPEC E3 ("too close to call") is decided in ONE place, pipeline.js. It is
+// handed on from here so anything that used to ask render.js still can.
+export { isTooCloseToCall };
 
 // The banner's look comes from the verdict the engine wrote (its tone), never
 // from the classification string on its own.
@@ -297,12 +291,18 @@ function renderCompare(check, fieldToId) {
   const comparison = check.comparison;
   const box = byId("compare-body");
   clear(box);
+  // The flag cards say WHAT was found, so check.html shows them on the Verdict
+  // tab (in #flags-body), right under the three numbers. The table that backs
+  // them up stays on the Compare tab. A page without that box gets the cards
+  // under the table, as before.
+  const flagsBox = byId("flags-body") || box;
+  if (flagsBox !== box) clear(flagsBox);
 
   if (!comparison.provided || comparison.rows.length === 0) {
     box.append(
       el("p", {
         className: "block-lede",
-        text: "Nothing from your statement’s summary was typed in, so there is nothing to put side by side yet. Fill in Part 1 and Part 3 of the form and this table will compare your statement with the federal math, line by line.",
+        text: "Nothing from your statement’s summary was typed in, so there is nothing to put side by side yet. Fill in step 1 and step 3 of the form and this table will compare your statement with the federal math, line by line.",
       })
     );
     return;
@@ -360,8 +360,8 @@ function renderCompare(check, fieldToId) {
       }
       list.append(card);
     }
-    box.append(list);
-    box.append(
+    flagsBox.append(list);
+    flagsBox.append(
       el("p", {
         className: "block-note",
         text: "A gap is a question to ask, not proof of a mistake. Your servicer may have a newer tax bill or insurance premium than the numbers typed here.",
@@ -396,7 +396,7 @@ function renderJumpBlock(check) {
     box.append(
       el("p", {
         className: "block-lede",
-        text: "Type both your current and your new escrow payment in Part 1, and this section will split the change into its causes: bills going up, a shortage being repaid, and anything the math can’t explain.",
+        text: "Type both your current and your new escrow payment in step 1 of the form, and this section will split the change into its causes: bills going up, a shortage being repaid, and anything the math can’t explain.",
       })
     );
     section.setAttribute("class", "result-block is-empty");
@@ -683,8 +683,9 @@ export function setStale(isStale) {
   byId("stale-note").hidden = !isStale;
 }
 
-// A short flash on the verdict so sighted users notice it changed. The CSS
-// only animates when the visitor has not asked for reduced motion.
+// The verdict eases in (a short rise and fade) so sighted users notice it
+// changed. The CSS only animates when the visitor has not asked for reduced
+// motion.
 export function flashVerdict() {
   const box = byId("verdict");
   box.classList.remove("just-updated");

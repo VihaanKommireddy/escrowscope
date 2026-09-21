@@ -795,7 +795,11 @@ function buildSkippedNote(skippedKeys) {
   return note;
 }
 
-export function initSelfCheck(container) {
+// options.runAtStart: run the cases once, straight away, without waiting for the
+// button (proof.html does this: the page IS the self-check).
+export function initSelfCheck(container, options) {
+  if (!container) return;
+  const runAtStart = Boolean(options && options.runAtStart === true);
   clear(container);
   const total = VECTORS.length;
 
@@ -867,4 +871,6 @@ export function initSelfCheck(container) {
       output,
     ])
   );
+
+  if (runAtStart) run();
 }

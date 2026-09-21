@@ -116,6 +116,36 @@ function watchForNewRequests(onChange) {
   }
 }
 
+// The same reading, as one number, for the slim status line the other pages
+// carry ("Requests made by this page since it finished loading: 0").
+//   onChange(count)  is called once the page has finished loading, and again
+//                    whenever the browser logs a new request.
+//   onChange(null)   means this browser keeps no log a page can read.
+// It counts exactly what the full panel counts, with the same functions.
+export function watchRequestCount(onChange) {
+  if (!browserHasPerformanceLog()) {
+    onChange(null);
+    return;
+  }
+  whenLoadFinished(() => {
+    let loadFinishedAt = readLoadFinishedTime();
+    if (!(loadFinishedAt > 0)) loadFinishedAt = performance.now();
+    function readNow() {
+      onChange(readRequestsSinceLoad(loadFinishedAt).length);
+    }
+    readNow();
+    watchForNewRequests(readNow);
+  });
+}
+
+// Fill the slim status line. `countNode` is the element that holds the number.
+export function initRequestLine(countNode) {
+  if (!countNode) return;
+  watchRequestCount(function (count) {
+    countNode.textContent = count === null ? "not available in this browser" : String(count);
+  });
+}
+
 // ---------- small drawing helpers ----------
 
 // A 24px line icon. The words next to it always carry the meaning, so the icon
@@ -323,7 +353,8 @@ export function initProofPanel(container) {
         text:
           "Your browser keeps its own log of every file a page asks for. This panel reads that log " +
           "and counts the files this page asked for after it finished loading. Checking your numbers " +
-          "needs nothing from the internet, so the count should stay at 0 whatever you type or press.",
+          "needs nothing from the internet, so the count should stay at 0 whatever you type or press. " +
+          "The Check my statement page shows the same count under its form.",
       }),
     ]),
     explainer("What it cannot see", [
@@ -340,7 +371,7 @@ export function initProofPanel(container) {
     explainer("The stronger protection", [
       el("p", {}, [
         "The stronger protection is a rule near the top of this page’s code, called a " +
-          "Content-Security-Policy. It includes the line ",
+          "Content-Security-Policy. Every page of this site carries the same one. It includes the line ",
         el("code", { className: "proof-code", text: "connect-src 'none'" }),
         ". In plain words: your browser blocks this page from making background connections to any website. " +
           "That is the way pages normally send data out without you noticing. It does not stop a link you " +
@@ -357,8 +388,9 @@ export function initProofPanel(container) {
     explainer("Test it yourself", [
       el("p", {
         text:
-          "With this page open, turn on airplane mode (or switch off wifi). Then type new numbers and press " +
-          "Check the math. It still works, because checking your numbers needs nothing from the internet.",
+          "Open the Check my statement page, then turn on airplane mode (or switch off wifi). Type new " +
+          "numbers and press Check the math. It still works, because checking your numbers needs nothing " +
+          "from the internet.",
       }),
     ]),
   ]);

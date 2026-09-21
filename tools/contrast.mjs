@@ -146,7 +146,11 @@ export const PAIRS = [
   ["--on-warn-mark", "--warn-mark", "ui", "the flag in the amber verdict circle"],
   ["--on-info-mark", "--info-mark", "ui", "the icon in the blue verdict circle"],
   ["--on-danger", "--danger", "text", "the ! in the red error dot"],
-  ["--pill-ink", "--pill-bg over --surface", "text", "the dark EXAMPLE pill"],
+  ["--pill-ink", "--pill-bg over --surface", "text", "the dark EXAMPLE pill, and the Pause pill while it is pressed"],
+  // the landing page's big-figures band: a solid navy block (the same in both themes)
+  ["--band-ink", "--band-bg", "text", "the ivory numerals, links and focus ring on the navy band"],
+  ["--band-ink-2", "--band-bg", "text", "the words under each big figure"],
+  ["--band-ink-3", "--band-bg", "text", "the small \"of\" and the $ sign in the band"],
   ["--ink", "--masthead-bg over --paper", "text", "the name in the sticky bar"],
   ["--ink-2", "--masthead-bg over --paper", "text", "links in the sticky bar"],
 

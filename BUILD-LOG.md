@@ -471,3 +471,237 @@ manifest and the theme-color tags changed. No layout, copy or engine change.
 657 of 657. One test was changed on purpose: the accent is now pinned as navy, and
 as different from both the green and the gold marks. Looked at in Chromium, light
 and dark, hero and a green verdict; request counter still 0; console clean.
+
+### 2026-09-21: four pages instead of one (owner: "everything is on one page I HATE THAT")
+
+The owner's complaint, in his words: "i dont wanna scroll for that long like it way
+too long, make a subsection for the tool". He wanted it to work like his Keepbook
+landing page: a short page that sells, a top bar that goes to separate pages, and
+the product behind one button. A Claude Code agent (model: Claude Fable 5.1) did the
+restructure on the branch `site-v2`, using the `frontend-design` and `ui-ux-pro-max`
+skills for the checklists (touch targets, focus, forms, navigation, reduced motion).
+Nothing was pushed. A second agent adds motion after this; this entry is structure
+and UX only.
+
+**What moved where.**
+
+| Was on the one page | Is now |
+|---|---|
+| Hero, the framed sample result | `index.html` (unchanged words; the two buttons open the tool) |
+| "Your escrow payment went up" intro | `index.html`, as the lede of a three-step "How it works" |
+| The three examples (serif tabs) | `index.html`. Each panel's button opens `./check.html#example-N` |
+| "Is this the right tool for me?" | `check.html`, above the form |
+| The form (Parts 1 to 4) | `check.html`, as four steps in one card, real ARIA tabs, Back / Next, "Check the math" on every step |
+| "Less common situations" and "Keep your numbers" | `check.html`, inside one "More" disclosure in the card |
+| The results (one long column) | `check.html`, as six tabs: Verdict, Compare, Chart, Why it jumped, The math, What next |
+| The flag cards | The Verdict tab (they were under the comparison table) |
+| "What this page can't tell you" | One line under the results on `check.html` with all five behind "Read all five limits", and in full on `privacy.html` |
+| "Check the checker" | `proof.html`, and it runs as the page opens |
+| "Privacy you can check", "How this works", the glossary | `privacy.html` |
+| `app.js` | `check.js` (renamed with `git mv`), plus `landing.js`, `proof-page.js`, `privacy-page.js`, `site.js`, `example-link.js` |
+
+New on the landing page: a band of four figures. The worked-case count is counted
+on the device when the page loads (never typed). "150,000 random accounts" comes
+from `docs/verification/math-audit.md`, and a test fails if the audit stops saying
+it. "0 requests" is a live reading. "$0, no account" is backed by tests that no page
+has an email, password or card box and nowhere to send one.
+
+**How tall things are now** (Chromium, 1280x900, measured, one screen = 900px):
+
+| | Before | After |
+|---|---|---|
+| The first page a visitor lands on | 9,433px, 10.5 screens (19.2 with a result open) | 3,693px, 4.1 screens |
+| The form | 3,555px, 3.95 screens | One card. Blank: 893 / 1,122 / 982 / 1,039px for steps 1 to 4 (at most 1.25 screens). With example 3 loaded: 919 / 1,119 / 1,351 / 1,213px |
+| The results | 7,274px, 8.1 screens (example 3) | Verdict tab: 778px, 848px and 1,320px for examples 1, 2 and 3 (0.86, 0.94, 1.47 screens) |
+| The whole tool page with example 3's result | 17,296px (the one page) | 3,258px, 3.6 screens |
+
+One target was missed and is said plainly: step 3 with a shortage picked shows all
+of its optional boxes and reaches 1,351px (1.5 screens), over the 1.3 aimed for.
+Step 4 with three bills is 1,213px (1.35). Every step is under 1.3 when blank.
+
+**Found in the browser and fixed.**
+
+- `guide.js` dropped every box in steps 2 to 4 from the numbering and from the
+  sample statement, because a step that is not showing is a `hidden` tab panel and
+  it read any `hidden` as "switched off". Now only `hidden` that is not a tab
+  panel counts. A test pins it.
+- The chart measures the box it is drawn into. Inside a closed tab that is 0, so
+  it drew at a stand-in width. `check.js` now lays every panel out while the
+  results are drawn and puts the tabs back before the browser paints.
+- The printed report went to two pages: two screen rules with two classes each
+  beat the print rules with one. Fixed in `site.css`.
+- A new test caught the agent's own comment: `landing.js` said the count of worked
+  cases in a comment. Reworded.
+
+**Tests.** `npm test`: 679 of 679 (was 657). `node tools/contrast.mjs`: 110 checks
+(55 pairs x 2 themes), 0 under the bar. No test was deleted. These were changed on
+purpose, because they pinned the one-page structure:
+
+- `tests/shell.test.js`: every rule it held `index.html` to is now held on all four
+  pages (exact CSP on each and the same bytes on each, no inline anything, every
+  file real and relative, the import graph from every page's script fully saved by
+  `sw.js`, the banned-text scan over every shell file, the font preload and the
+  inline tab icon on each page). 50 tests became 70. The link scan now also accepts
+  `href: "./…"` as local (an address that starts with `./` cannot leave the site).
+  The one allowed download link is in `check.js`, not `app.js`. The voice-scan
+  exemptions name "any page" instead of `index.html`.
+- `tests/pipeline.test.js` B3 reads the box order from `check.html`.
+- `tests/preview.test.js`: the two "Watch an example" links are plain links to
+  `./check.html#example-1` now, not same-page hooks.
+- `tests/sw.test.js`: two new tests (each page answered offline plain, with a
+  query, with a `#hash` and without `.html`; the no-`.html` rule only reaches a
+  page on the list), and the hostile-query probe uses `check.js`.
+
+**Verified, in Chromium** (the app's browser pane, plus headless Chrome driven
+over its debugging port for printing and offline):
+
+- All four pages at 1280, 768, 375 and 320 wide, light and dark: no console
+  messages, no sideways page scroll, one `h1`, no heading level skipped (built
+  headings included), no block-level target under 44px, no typed box under 16px.
+  On `check.html` that includes every step, every result tab and "More" open.
+- The three examples from the landing buttons and from `check.html#example-N`, on
+  load and when only the `#` changes: form filled, Verdict tab, focus on the
+  verdict heading.
+- A blank bill on step 4 while step 1 was showing: the page switched to step 4,
+  marked its tab, focused the summary; the summary link focused the bill's box.
+- Keyboard only through the steps and the result tabs: arrows, Home, End, wrap
+  round, one Tab stop per row, Tab from a tab lands in its panel.
+- Live what-if redrew every tab in place and only `#verdict-live` spoke.
+- The N1 case (bills $3,600 in June and December, balance $1,800, required minimum
+  $1,800): amber, "Cushion above the limit".
+- `proof.html`: 30 of 30, as the page opens.
+- The request counter read 0 on every page, after interaction too.
+- Print: examples 1, 2 and 3 each one page (US Letter). Example 3 printed from each
+  of the six tabs: one page each time, byte-identical. "Print the letter" prints
+  only the letter.
+- Offline, without `?nosw`: the worker saved 38 files; with the server stopped all
+  four pages reloaded, so did `/`, `/proof` (no `.html`), `check.html#example-2`
+  and `privacy.html#glossary`, and clicking through the top bar and an example
+  button worked. No console messages.
+
+**Not verified.** Safari, Firefox, a real phone, a screen reader, real Windows High
+Contrast (the `forced-colors` rules were written, not seen). Printing on A4 paper.
+The app's browser pane could not register a service worker at all (it logs "An
+unknown error occurred when fetching the script" without `?nosw`), so offline was
+checked in headless Chrome only. Screenshots in that pane lag behind scripted
+changes, so layout was judged mostly from measurements plus a smaller number of
+screenshots taken after a wait.
+
+### 2026-09-21: the landing page moves (owner: "i like everything on this site like the moving figures and the parallax")
+
+The owner pointed at modalyst.co: a hero where a product window plays on a loop, a
+card floats in front of it, a big soft shape behind it moves slower than the page,
+and lower down a band of giant numbers. A Claude Code agent (model: Claude Fable
+5.1) built the same kind of movement for EscrowScope on the branch `site-v2`, using
+the `frontend-design` and `ui-ux-pro-max` skills (the second one's animation rules:
+150 to 300ms for small things, transform and opacity only, ease out on the way in
+and quicker on the way out, 30 to 50ms between staggered items, one or two moving
+things per view, anything can be interrupted, reduced motion respected, no layout
+shift). Nothing was pushed. No library, no video (the policy blocks media and
+still does), no image file. The policy line is byte for byte what it was.
+
+**What moves.**
+
+| Thing | How it was built |
+|---|---|
+| The framed sample result PLAYS the three examples, about 6.5 seconds each: three figures count up from $0.00, the balance line draws itself left to right, the cushion line fades in and its chip arrives with it, the low point pops and its chip arrives, the verdict settles into its place (green for example 1, amber for 2 and 3). Then it fades and the next one starts. The dark pill reads "Example 1 of 3". | `preview.js` builds every example's verdict card and chart from `runCheck`, stacked in one grid cell so the frame never changes height. `motion.js` runs a small state machine (play, hold, leave) and counts the figures. `motion.css` does the rest with keyframes and delays, all hanging off one class, `is-playing`. The line is the one `stroke-dashoffset` on the site. |
+| A browser-window top bar on the frame (three dots) | One CSS gradient. Not motion, so it shows standing still too. |
+| Chips float a few pixels, each on its own beat | CSS keyframes on `translate`, only while `motion.js` is running (so there is always a Pause button next to them). |
+| Three depth layers: a huge soft navy circle behind (ruled like a ledger, two gradients and a mask), the frame, the chips in front. As the page scrolls the circle falls behind and the chips run a little ahead. | Pure CSS where the browser can: a `view()` scroll timeline animates one registered number, `--par`, behind `@supports`. Where it cannot, `motion.js` writes the same number on a passive scroll listener, at most once a frame. |
+| The layers lean a few pixels toward the mouse | Fine pointers only. `motion.js` eases two numbers, `--lean-x` and `--lean-y`, and stops asking for frames when they settle. |
+| The big figures count up (30 and 150,000), about 1.2 seconds, ease out | They start when the number itself scrolls onto the screen. Until then, and afterwards, the element is the plain final number. While it counts, screen readers get the final number (visually hidden) and the moving copy is `aria-hidden`. |
+| The big-figures band is a solid navy block with ivory numerals | Five new `--band` tokens, the same in both themes. Three new pairs in `tools/contrast.mjs`: 10.50, 8.27 and 5.80 to 1. The focus ring inside the band is ivory, because the page's navy ring would vanish on navy. |
+| Sections rise 16px and fade in, 400ms, pieces 40ms apart, once | The hiding class is added by `motion.js` only, only to pieces wholly below the screen, and only after the watcher that removes it exists. Nothing in any stylesheet hides content by itself. |
+| Pills lift 1px on hover and press down; the line under the serif tabs slides from tab to tab; a chosen step or result panel fades in over 150ms; the verdict on `check.html` eases in once per check | `site.css` and `tabs.js`, so all four pages share them. The verdict used to pulse a box-shadow; now it is opacity and transform like everything else. Nothing else on the tool page moves. |
+| A Pause / Play button on the corner of the frame | A real `<button>` with `aria-pressed`, placed NEXT to the picture (which is `aria-hidden`), a 44px target. It stops the cycle, the float and the lean. The cycle also stops while the mouse rests on the picture, while focus is inside, while the tab is hidden, while less than 40% of the hero is on screen, and while printing. |
+
+**Three decisions worth writing down.**
+
+- **Pause lands on a finished example.** A picture frozen halfway through a count-up
+  would show a dollar figure the calculator never produced. So pausing (by button,
+  hover, focus, hidden tab or scrolling away) jumps to the finished state of the
+  example that is showing, and Play gives the full reading time before the next.
+- **No number rests at a value that is not true.** The first version set the big
+  figures to 0 at start-up and counted when they came into view. At 1280x900 the
+  band sits at the bottom edge of the screen, so "0 of 30 worked cases" was
+  readable there. Now a figure only leaves its real value for the 1.2 seconds it
+  counts.
+- **Less motion means none.** With `prefers-reduced-motion: reduce` `motion.js`
+  starts nothing: no button, no classes, no watchers. Every moving rule in
+  `motion.css` sits in one `no-preference` block. The page shows example 2,
+  finished, with the plain "Example" pill, as it did before. Switching the setting
+  while the page is open is obeyed both ways.
+
+**No shell-test exception was needed.** `tests/shell.test.js` bans
+`setAttribute("style", …)` and the network, storage and HTML-injection calls; it
+never banned the style OBJECT, timers or animation frames. So nothing was loosened.
+One rule was ADDED instead: scripts may touch `element.style` only to set or
+remove a CSS custom property (`--name`). That is how `motion.js`, `tabs.js` and
+`preview.js` hand a number to the stylesheet, and the test fails on anything else
+(`.style.opacity = …`, `cssText`).
+
+**A side effect, measured.** The preview is built by script, so the page used to
+jump when it arrived: layout shift 0.065 at 1280x900 and 0.028 at 375x812 on the
+commit before this work. The big circle made that worse at first (0.11 and 0.16).
+`site.css` now keeps the preview's place while its holder is empty and the circle
+waits for it: 0.0001 and 0.
+
+**Tests.** 679 before, 709 now, 0 failing. New file `tests/motion.test.js` (24):
+the easing, the count-up and its separators, each example's count ending on the
+engine's figures, the cycle's state machine with a pretend clock (order, Pause
+lands on a finished example, a long sleep never replays rounds), the one
+animation-frame loop with pretend frames, and source scans (everything that moves
+or hides is inside the `no-preference` block, only transform and opacity in the
+keyframes plus the one line, the stylesheet's timeline ends exactly when the script
+calls an example finished, the hiding classes are in no HTML file).
+`tests/preview.test.js` grew from 5 to 8: every string of all three examples
+against the engine, and the count-up's last frame against `runCheck`.
+`tests/shell.test.js` grew from 70 to 73. `node tools/contrast.mjs`: 116 checks (58
+pairs, two themes), 0 under the bar. The worker was re-stamped and saves 40 files
+(`motion.js` and `motion.css` are the two new ones).
+
+**Verified in a real browser.** Headless Chrome, driven over its debugging port by a
+throwaway script (nothing installed, not part of the repo), against
+`PORT=4189 node serve.mjs` with `?nosw`. The app's own browser pane reports itself
+hidden, and a hidden page gets no animation frames, so it could not be used to watch
+anything move.
+
+- 1280x900, 768x1024, 375x812 and 320x640, light and dark, a walk down the whole
+  page each time: zero console messages, no sideways scroll (asking for one leaves
+  `scrollX` at 0), every section revealed and left with no motion class and no
+  style attribute, the figures ending as plain "30 of 30" and "150,000", the
+  request counter 0, nothing fetched after load, the Pause pill clear of the chips.
+- A full cycle at 1280: example 1, 2, 3, then 1 again. Each example's finished
+  figures, label and headline equal what `check.html#example-N` shows for it. The
+  frame and the stage kept one height through all of it.
+- Pause by mouse and by keyboard (Tab reaches it, Enter and Space work, the focus
+  ring shows), hover holds the cycle and leaving restarts it, Play wins over a mouse
+  still resting on the button. While paused for 7 seconds nothing advanced, the
+  chips' float read `paused` and the lean went back to 0.
+- Reduced motion emulated: no button, no classes, one verdict card, 0 animations on
+  the page, nothing transformed, nothing hidden, example 2 finished. Switched off
+  and on again with the page open: it started, then stopped and put example 2 back.
+- The count-up sampled every frame: 0 upward, separators kept, ends as the plain
+  text 150,000; the figure's box, the number's width and the band's height did not
+  change by a pixel; screen-reader text was 150,000 throughout.
+- Layout shift over a whole visit (load, every section, the count-up, two examples):
+  0.0002 at 1280 and 0.0006 at 375, from one text node.
+- Two minutes idle on the landing page with the cycle running: request counter 0 at
+  0.5s, 60s and 122s, the browser saw no request after load, and no task over 50ms
+  at all (load included).
+- The scroll parallax ran as CSS in this browser (no script wrote `--par`). The
+  script fallback was started by hand there: it wrote the number the pure function
+  gives, asked for no frames while idle, and cleaned up.
+- The other pages: zero console messages, no motion layer loaded, the tab line
+  lands under the chosen tab (also after arrow keys, and inside the sideways
+  scrolling row at 375), the chart in a newly opened tab has its real width.
+- Without `?nosw`: the worker activated with 40 files; with the server stopped the
+  landing page reloaded and played example 1 then 2, counter 0, and the other three
+  pages opened.
+- Page height at 1280x900: 3,711px, 4.12 screens (it was 3,693).
+
+**Not verified.** Safari and Firefox (so the scroll fallback has only been run by
+hand in Chrome, and the `translate` / `scale` properties and `:has()` only there), a
+real phone, a screen reader, Windows High Contrast, a real mouse (the lean and the
+hover were driven by synthetic mouse events). How the loop FEELS at full speed was
+judged from screenshots and per-frame samples, not watched live.
