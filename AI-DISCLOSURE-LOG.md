@@ -87,3 +87,18 @@ direction. The running detail (which agent built which file, and when) is in
   model to copy (his own Keepbook landing page), and the structure were his.
   Merging or shipping it is his call.
 - Not verified by anyone: Safari, Firefox, a real phone, a screen reader.
+
+## 2026-09-21: the landing page moves
+
+- AI wrote it. A Claude Code agent (model: Claude Fable 5.1) added the motion layer on
+  the branch `site-v2`: `motion.js`, `motion.css`, the changes to `preview.js`,
+  `tabs.js`, `site.css` and `styles.css` that go with them, and the tests
+  (`tests/motion.test.js` is new). It used the `frontend-design` and `ui-ux-pro-max`
+  skills. The engine was not touched. Details, and what was and was not checked,
+  are in `BUILD-LOG.md`.
+- Vihaan directed it: he picked the site to learn from (modalyst.co) and said what
+  he liked about it, "the moving figures and the parallax". Merging or shipping it
+  is his call.
+- Not verified by anyone: Safari, Firefox, a real phone, a screen reader, and how
+  the loop feels watched live (it was checked from measurements and screenshots in
+  headless Chrome).

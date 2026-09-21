@@ -110,6 +110,7 @@ of credit) are not covered by that rule at all.
 | Path | What it is |
 |---|---|
 | `index.html` + `landing.js` | The landing page: the pitch, a sample result, the three examples |
+| `motion.js`, `motion.css` | What moves on the landing page. The sample result plays the three examples, with a Pause button. None of it runs if your device asks for less motion |
 | `check.html` + `check.js` | The tool: the form in four steps, the result in six tabs (`render.js`, `chart.js`, `guide.js`, `tabs.js` do the drawing) |
 | `proof.html` + `proof-page.js` | The self check, run on your device as the page opens (`selfcheck-ui.js`) |
 | `privacy.html` + `privacy-page.js` | The privacy panel (`proof.js`), what the site can't tell you, how it works, the glossary |

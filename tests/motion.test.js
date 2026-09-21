@@ -483,10 +483,11 @@ test("the Pause button: a real button next to (not inside) the hidden picture, w
   assert.ok(/\.has-motion\.motion-paused \.preview-chip,[\s\S]*?animation-play-state: paused;/.test(css), "Pause must stop the floating chips.");
   assert.ok(/if \(stageBox\.classList\.contains\("motion-paused"\)\) \{\s*targetX = 0;\s*targetY = 0;/.test(code), "Pause must stop the lean toward the mouse.");
   // The cycle also stops for a resting mouse, for focus, for a hidden tab and when off the screen.
-  for (const reason of ['hold("hover")', 'hold("focus")', 'hold("hidden")', 'hold("offscreen")']) {
+  for (const reason of ['hold("hover")', 'hold("focus")', 'hold("hidden")', 'hold("offscreen")', 'hold("print")']) {
     assert.ok(code.includes(reason), "motion.js never calls " + reason + ".");
   }
   assert.ok(/document\.addEventListener\("visibilitychange", onVisibility\)/.test(code));
+  assert.ok(/window\.addEventListener\("beforeprint", onBeforePrint\)/.test(code), "Paper must get a finished example, never a half-counted one.");
   // The float only runs while there is a button to stop it.
   assert.ok(/\.has-motion \.preview-chip \{\s*animation: chip-float/.test(css));
   assert.ok(!/(?<!\.has-motion )\.preview-chip \{\s*animation\s*:/.test(css), "A chip may only float under .has-motion.");

@@ -145,7 +145,8 @@ page already used for "look here"; its one new job is the italic headline word
 (`--punch`), because navy next to blue-black ink does not read as an accent. Scope
 Teal is retired everywhere, including the logo files and the tab icon. Green still
 means "matches", amber "look here", red only broken input. All 55 color pairs are
-checked in both themes by `tools/contrast.mjs` (110 checks, 0 under the bar). The
+checked in both themes by `tools/contrast.mjs` (110 checks, 0 under the bar; 58
+pairs and 116 checks since the navy big-figures band of F11 added three). The
 two paragraphs below describe the layout, which did not change; where they say
 teal or `#F7F6F2`, read navy and `#F8F5EE`.
 
@@ -675,3 +676,13 @@ Parts A to E describe one long page. The owner's note on it: "everything is on o
 **F9. The big figures are true or they are not shown.** The count of worked cases is counted on the device when the page loads. The 150,000 comes from `docs/verification/math-audit.md` and a test fails if the audit stops saying it. The request count is a live reading.
 
 **F10. Hooks for a motion layer** (nothing is animated by this part): `data-reveal` on each landing section's inner wrapper, `data-count-to` on each figure with the final number as its text, `#hero-preview` with `.preview-chip` chips, and an empty `aria-hidden` `.hero-backdrop` behind it.
+
+**F11. The motion layer (added 2026-09-21, the owner's call: "i like everything on this site like the moving figures and the parallax", about modalyst.co).** `motion.js` (imported by `landing.js`) and `motion.css` (linked by `index.html` only), built on the hooks of F10. No library, no video, no image; A4 is unchanged, byte for byte.
+
+- *What moves.* The framed sample result plays the three examples in turn, about 6.5 seconds each (figures count up, the balance line draws itself, the cushion line and the low point arrive with their chips, the verdict settles), with a browser-window top bar and "Example 1 of 3" on the dark pill. Chips float. Three depth layers (a big soft navy circle behind, the frame, the chips) drift apart with the scroll and lean a few pixels toward the mouse on fine pointers. The big figures count up when they come onto the screen, on a solid navy band. Sections rise 16px and fade in once. On every page: pills lift and press, the line under the serif tabs slides, a chosen panel fades in over 150ms, the verdict eases in once per check. Nothing else on the tool page moves.
+- *The page is complete first.* Movement starts last, on a finished page. No stylesheet hides content for a script to reveal: a hiding class is added by `motion.js` only, to pieces below the screen, after the watcher that removes it exists.
+- *Every number stays true (A7, D3).* Each example shown comes from `runCheck`. A count-up's last frame is the engine's own string. Pausing always lands on a finished example. A big figure shows its real number except for the 1.2 seconds it counts, and screen readers get the final number throughout.
+- *WCAG 2.2.2.* A real Pause / Play button with `aria-pressed`, next to (not inside) the `aria-hidden` picture, stops the cycle, the float and the lean. The cycle also stops on hover, on focus inside, when the tab is hidden, when the hero is mostly off the screen, and for printing.
+- *`prefers-reduced-motion: reduce` (A6).* Nothing starts and nothing in `motion.css` applies: the page shows example 2 finished, as before. A change of the setting while the page is open is obeyed.
+- *Cost.* Only transform and opacity animate, plus the one `stroke-dashoffset` that draws the line. One `requestAnimationFrame` loop at most, idle when nothing needs it; watchers disconnect when done; nothing runs while the hero is off the screen. The scroll parallax is a CSS scroll-driven animation behind `@supports`, with a passive-listener fallback.
+- *How script reaches CSS.* Classes, and custom properties through `element.style.setProperty("--name", …)`. A shell test allows `.style` for nothing else.

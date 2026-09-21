@@ -1221,9 +1221,18 @@ code,
     display: none;
   }
 
+  .preview-number {
+    padding-inline: 8px;
+  }
+
   .preview-number dt {
     font-size: 10px;
     letter-spacing: 0.02em;
+  }
+
+  /* Example 3's "$1,200.00" is the widest figure the loop shows. */
+  .preview-number dd {
+    font-size: 13px;
   }
 }
 

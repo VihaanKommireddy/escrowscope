@@ -404,6 +404,13 @@ function startPlayer(stage, stageBox, loop) {
     if (document.hidden) hold("hidden");
     else release("hidden");
   }
+  // Paper gets a finished example, never a half-counted one.
+  function onBeforePrint() {
+    hold("print");
+  }
+  function onAfterPrint() {
+    release("print");
+  }
 
   button.addEventListener("click", onButton);
   stageBox.addEventListener("pointerenter", onPointerEnter);
@@ -411,6 +418,8 @@ function startPlayer(stage, stageBox, loop) {
   stageBox.addEventListener("focusin", onFocusIn);
   stageBox.addEventListener("focusout", onFocusOut);
   document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("beforeprint", onBeforePrint);
+  window.addEventListener("afterprint", onAfterPrint);
 
   // Nothing runs while the hero is off the screen. This watcher stays for as
   // long as the page does: it is what starts the cycle again.
@@ -452,6 +461,8 @@ function startPlayer(stage, stageBox, loop) {
     stageBox.removeEventListener("focusin", onFocusIn);
     stageBox.removeEventListener("focusout", onFocusOut);
     document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("beforeprint", onBeforePrint);
+    window.removeEventListener("afterprint", onAfterPrint);
     button.remove();
     stageBox.classList.remove("has-motion", "motion-paused", "is-offscreen");
     holder.classList.remove("is-cycling", "is-playing", "is-leaving");
