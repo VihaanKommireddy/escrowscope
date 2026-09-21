@@ -75,3 +75,15 @@ direction. The running detail (which agent built which file, and when) is in
   own earlier project), and merging or shipping it is his call.
 - The font (Fraunces) is not AI-made. It is an open-source typeface under the SIL
   Open Font License 1.1, copied from the Keepbook project.
+
+## 2026-09-21: four pages instead of one
+
+- AI wrote it. A Claude Code agent (model: Claude Fable 5.1) split the one long
+  page into four on the branch `site-v2`: `index.html` (landing), `check.html` (the
+  tool, with the form as four steps and the result as six tabs), `proof.html` and
+  `privacy.html`, the new scripts and stylesheet that go with them, and the tests.
+  The engine was not touched. Details are in `BUILD-LOG.md`.
+- Vihaan directed it: the complaint ("everything is on one page I HATE THAT"), the
+  model to copy (his own Keepbook landing page), and the structure were his.
+  Merging or shipping it is his call.
+- Not verified by anyone: Safari, Firefox, a real phone, a screen reader.

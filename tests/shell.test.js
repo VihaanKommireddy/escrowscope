@@ -2427,3 +2427,25 @@ test("the landing page carries the hooks the motion layer is built on", () => {
     assert.ok(!other.raw.includes("data-reveal") && !other.raw.includes("data-count-to"), other.file + " should not carry the landing page's motion hooks.");
   }
 });
+
+// ───────── a step that is waiting its turn is still part of the form ─────────
+
+// Found in the browser on 2026-09-21. guide.js numbers the boxes and takes a box
+// off the sample statement when the box is switched off (`hidden`). With the
+// form in four steps, the steps that are not showing are hidden tab panels, and
+// every box in steps 2 to 4 lost its number. THIS IS A SOURCE SCAN.
+test("guide.js: a box inside a step that is not showing keeps its number; only a box that is itself switched off drops out", () => {
+  const source = readText("guide.js");
+  assert.ok(source.includes(`const HIDDEN_BUT_NOT_A_WAITING_STEP = '[hidden]:not([role="tabpanel"])';`), "guide.js must not count a hidden tab panel as a switched-off box.");
+  assert.ok(/wrapper\.closest\(HIDDEN_BUT_NOT_A_WAITING_STEP\)/.test(source));
+  assert.ok(!/closest\("\[hidden\]"\)/.test(source), 'guide.js still asks closest("[hidden]") somewhere: that treats steps 2 to 4 as switched off.');
+  // The boxes that really are switched off carry `hidden` themselves, inside their step.
+  const page = pageNamed("check.html");
+  for (const id of ["claimed-amount-field", "spread-months-field", "lump-sum-field"]) {
+    const box = page.tags.find((tag) => tag.attrs.id === id);
+    assert.ok(box !== undefined && box.attrs.hidden !== undefined && box.attrs.role !== "tabpanel", "#" + id + " starts switched off, with its own hidden attribute.");
+  }
+  // And the sample statement can bring a waiting step forward.
+  assert.ok(/export function initGuide\(\{ panel, form, example, reveal \}\)/.test(source), "initGuide takes a `reveal` function…");
+  assert.ok(/reveal: revealBox/.test(readText("check.js")), "…and check.js hands it the one that switches steps.");
+});

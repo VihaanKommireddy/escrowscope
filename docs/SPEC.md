@@ -643,3 +643,35 @@ added to TV01–TV21; a script proved no pre-existing value changed.
    (an echo of the normalized account): it follows the typed bill order, so it
    is excluded from "bill order changes nothing" checks. Every math field must
    still be order-proof.
+
+
+## Part F: four pages (2026-09-21)
+
+Parts A to E describe one long page. The owner's note on it: "everything is on one page I HATE THAT". So the site is four pages now. Nothing in Parts A to E is withdrawn. This part says where each thing lives and adds the rules that only exist because there are four pages.
+
+**F1. The pages.**
+
+| Page | What is on it |
+|---|---|
+| `index.html` | The landing page: hero with the framed sample result, four big figures, how it works in three steps, the three examples, two cards that link to the proof and privacy pages, the closing call to action. About 4 screens at 1280x900. |
+| `check.html` | The tool (Part B): the form, the sample statement (D2), the results, the honest limits in one line with all five behind "Read all five limits". |
+| `proof.html` | The self-check (D1), run as the page opens. |
+| `privacy.html` | The privacy panel (D1), the five limits in full, how it works and the sources, the glossary. |
+
+**F2. A4 on every page.** Every page carries the policy line of A4, the same bytes, straight after the charset line. Every page has an inline tab icon and preloads the font, so every page's request counter can read 0.
+
+**F3. A5 on every page.** The service worker saves all four pages and every file any of them loads. Each page opens offline, with or without a `#hash`.
+
+**F4. The form is four steps** in one card: Your payment, Your balance, What the statement concluded, Your bills. Real ARIA tabs, free movement, Back and Next, and "Check the math" on every step. The order of the boxes (B3) and their ids are unchanged. A failed check switches to the first step with a mistake and moves focus to the error summary (A6).
+
+**F5. The result is six tabs:** Verdict (banner, three numbers, flag cards, refund window), Compare, Chart, Why it jumped, The math, What next (next steps, letter, print). D4 still holds: live what-if redraws every tab in place and only `#verdict-live` is announced.
+
+**F6. Printing.** "Print this report" gives the same one page from any tab.
+
+**F7. Examples by link.** `./check.html#example-N` fills the form, runs the check and lands on the Verdict tab, on load and when only the `#` changes. Only that one digit is ever read from the address.
+
+**F8. One top bar and one footer,** the same markup on every page. Only `aria-current="page"` differs.
+
+**F9. The big figures are true or they are not shown.** The count of worked cases is counted on the device when the page loads. The 150,000 comes from `docs/verification/math-audit.md` and a test fails if the audit stops saying it. The request count is a live reading.
+
+**F10. Hooks for a motion layer** (nothing is animated by this part): `data-reveal` on each landing section's inner wrapper, `data-count-to` on each figure with the final number as its text, `#hero-preview` with `.preview-chip` chips, and an empty `aria-hidden` `.hero-backdrop` behind it.

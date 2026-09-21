@@ -471,3 +471,118 @@ manifest and the theme-color tags changed. No layout, copy or engine change.
 657 of 657. One test was changed on purpose: the accent is now pinned as navy, and
 as different from both the green and the gold marks. Looked at in Chromium, light
 and dark, hero and a green verdict; request counter still 0; console clean.
+
+### 2026-09-21: four pages instead of one (owner: "everything is on one page I HATE THAT")
+
+The owner's complaint, in his words: "i dont wanna scroll for that long like it way
+too long, make a subsection for the tool". He wanted it to work like his Keepbook
+landing page: a short page that sells, a top bar that goes to separate pages, and
+the product behind one button. A Claude Code agent (model: Claude Fable 5.1) did the
+restructure on the branch `site-v2`, using the `frontend-design` and `ui-ux-pro-max`
+skills for the checklists (touch targets, focus, forms, navigation, reduced motion).
+Nothing was pushed. A second agent adds motion after this; this entry is structure
+and UX only.
+
+**What moved where.**
+
+| Was on the one page | Is now |
+|---|---|
+| Hero, the framed sample result | `index.html` (unchanged words; the two buttons open the tool) |
+| "Your escrow payment went up" intro | `index.html`, as the lede of a three-step "How it works" |
+| The three examples (serif tabs) | `index.html`. Each panel's button opens `./check.html#example-N` |
+| "Is this the right tool for me?" | `check.html`, above the form |
+| The form (Parts 1 to 4) | `check.html`, as four steps in one card, real ARIA tabs, Back / Next, "Check the math" on every step |
+| "Less common situations" and "Keep your numbers" | `check.html`, inside one "More" disclosure in the card |
+| The results (one long column) | `check.html`, as six tabs: Verdict, Compare, Chart, Why it jumped, The math, What next |
+| The flag cards | The Verdict tab (they were under the comparison table) |
+| "What this page can't tell you" | One line under the results on `check.html` with all five behind "Read all five limits", and in full on `privacy.html` |
+| "Check the checker" | `proof.html`, and it runs as the page opens |
+| "Privacy you can check", "How this works", the glossary | `privacy.html` |
+| `app.js` | `check.js` (renamed with `git mv`), plus `landing.js`, `proof-page.js`, `privacy-page.js`, `site.js`, `example-link.js` |
+
+New on the landing page: a band of four figures. The worked-case count is counted
+on the device when the page loads (never typed). "150,000 random accounts" comes
+from `docs/verification/math-audit.md`, and a test fails if the audit stops saying
+it. "0 requests" is a live reading. "$0, no account" is backed by tests that no page
+has an email, password or card box and nowhere to send one.
+
+**How tall things are now** (Chromium, 1280x900, measured, one screen = 900px):
+
+| | Before | After |
+|---|---|---|
+| The first page a visitor lands on | 9,433px, 10.5 screens (19.2 with a result open) | 3,693px, 4.1 screens |
+| The form | 3,555px, 3.95 screens | One card. Blank: 893 / 1,122 / 982 / 1,039px for steps 1 to 4 (at most 1.25 screens). With example 3 loaded: 919 / 1,119 / 1,351 / 1,213px |
+| The results | 7,274px, 8.1 screens (example 3) | Verdict tab: 778px, 848px and 1,320px for examples 1, 2 and 3 (0.86, 0.94, 1.47 screens) |
+| The whole tool page with example 3's result | 17,296px (the one page) | 3,258px, 3.6 screens |
+
+One target was missed and is said plainly: step 3 with a shortage picked shows all
+of its optional boxes and reaches 1,351px (1.5 screens), over the 1.3 aimed for.
+Step 4 with three bills is 1,213px (1.35). Every step is under 1.3 when blank.
+
+**Found in the browser and fixed.**
+
+- `guide.js` dropped every box in steps 2 to 4 from the numbering and from the
+  sample statement, because a step that is not showing is a `hidden` tab panel and
+  it read any `hidden` as "switched off". Now only `hidden` that is not a tab
+  panel counts. A test pins it.
+- The chart measures the box it is drawn into. Inside a closed tab that is 0, so
+  it drew at a stand-in width. `check.js` now lays every panel out while the
+  results are drawn and puts the tabs back before the browser paints.
+- The printed report went to two pages: two screen rules with two classes each
+  beat the print rules with one. Fixed in `site.css`.
+- A new test caught the agent's own comment: `landing.js` said the count of worked
+  cases in a comment. Reworded.
+
+**Tests.** `npm test`: 679 of 679 (was 657). `node tools/contrast.mjs`: 110 checks
+(55 pairs x 2 themes), 0 under the bar. No test was deleted. These were changed on
+purpose, because they pinned the one-page structure:
+
+- `tests/shell.test.js`: every rule it held `index.html` to is now held on all four
+  pages (exact CSP on each and the same bytes on each, no inline anything, every
+  file real and relative, the import graph from every page's script fully saved by
+  `sw.js`, the banned-text scan over every shell file, the font preload and the
+  inline tab icon on each page). 50 tests became 70. The link scan now also accepts
+  `href: "./…"` as local (an address that starts with `./` cannot leave the site).
+  The one allowed download link is in `check.js`, not `app.js`. The voice-scan
+  exemptions name "any page" instead of `index.html`.
+- `tests/pipeline.test.js` B3 reads the box order from `check.html`.
+- `tests/preview.test.js`: the two "Watch an example" links are plain links to
+  `./check.html#example-1` now, not same-page hooks.
+- `tests/sw.test.js`: two new tests (each page answered offline plain, with a
+  query, with a `#hash` and without `.html`; the no-`.html` rule only reaches a
+  page on the list), and the hostile-query probe uses `check.js`.
+
+**Verified, in Chromium** (the app's browser pane, plus headless Chrome driven
+over its debugging port for printing and offline):
+
+- All four pages at 1280, 768, 375 and 320 wide, light and dark: no console
+  messages, no sideways page scroll, one `h1`, no heading level skipped (built
+  headings included), no block-level target under 44px, no typed box under 16px.
+  On `check.html` that includes every step, every result tab and "More" open.
+- The three examples from the landing buttons and from `check.html#example-N`, on
+  load and when only the `#` changes: form filled, Verdict tab, focus on the
+  verdict heading.
+- A blank bill on step 4 while step 1 was showing: the page switched to step 4,
+  marked its tab, focused the summary; the summary link focused the bill's box.
+- Keyboard only through the steps and the result tabs: arrows, Home, End, wrap
+  round, one Tab stop per row, Tab from a tab lands in its panel.
+- Live what-if redrew every tab in place and only `#verdict-live` spoke.
+- The N1 case (bills $3,600 in June and December, balance $1,800, required minimum
+  $1,800): amber, "Cushion above the limit".
+- `proof.html`: 30 of 30, as the page opens.
+- The request counter read 0 on every page, after interaction too.
+- Print: examples 1, 2 and 3 each one page (US Letter). Example 3 printed from each
+  of the six tabs: one page each time, byte-identical. "Print the letter" prints
+  only the letter.
+- Offline, without `?nosw`: the worker saved 38 files; with the server stopped all
+  four pages reloaded, so did `/`, `/proof` (no `.html`), `check.html#example-2`
+  and `privacy.html#glossary`, and clicking through the top bar and an example
+  button worked. No console messages.
+
+**Not verified.** Safari, Firefox, a real phone, a screen reader, real Windows High
+Contrast (the `forced-colors` rules were written, not seen). Printing on A4 paper.
+The app's browser pane could not register a service worker at all (it logs "An
+unknown error occurred when fetching the script" without `?nosw`), so offline was
+checked in headless Chrome only. Screenshots in that pane lag behind scripted
+changes, so layout was judged mostly from measurements plus a smaller number of
+screenshots taken after a wait.
