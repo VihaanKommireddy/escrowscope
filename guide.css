@@ -1,0 +1,692 @@
+/* guide.css — the "Where do I find this?" statement guide (SPEC D2).
+
+   Two faces of the same drawing, switched by media queries only (never by
+   script), so exactly one of them is in the accessibility tree at a time:
+     - 1080px and wider: the full sample sheet inside .guide-panel
+     - narrower:         a <details class="where"> under each form box
+
+   Every color is a token from styles.css. The sheet is meant to read as a
+   piece of paper on the desk: hairline rules, small mono section heads,
+   tabular mono numbers, tight corners. It copies no real servicer's look. */
+
+/* ───────────────────────── 1. Which face shows ───────────────────────── */
+
+@media (max-width: 1079.98px) {
+  .guide-panel {
+    display: none;
+  }
+}
+
+@media (min-width: 1080px) {
+  .where {
+    display: none;
+  }
+}
+
+@media print {
+  .guide-panel,
+  .where {
+    display: none;
+  }
+}
+
+/* ───────────────────────── 2. The panel around the sheet ───────────────────────── */
+
+@media (min-width: 1080px) {
+  /* The page layout (styles.css, .guide-col) makes the panel sticky with
+     top: 16px. The panel must then fit in the window, so the sheet scrolls
+     inside it. If that sticky `top` ever changes, set --guide-panel-top on
+     the panel to the same value. */
+  .guide-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-height: calc(100vh - 2 * var(--guide-panel-top, 16px));
+  }
+
+  @supports (height: 100dvh) {
+    .guide-panel {
+      max-height: calc(100dvh - 2 * var(--guide-panel-top, 16px));
+    }
+  }
+}
+
+.guide-title {
+  margin-top: var(--space-1);
+}
+
+.guide-intro {
+  margin-top: var(--space-2);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.guide-status {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-info-tint);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+/* An empty status line takes no room. */
+.guide-status:empty {
+  display: none;
+}
+
+.guide-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: var(--space-3);
+  /* Room for the focus ring and the "You are here" tab, which poke out. */
+  padding: var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ───────────────────────── 3. The sheet of paper ───────────────────────── */
+
+.guide-sheet {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-4);
+  border: 1px solid var(--color-hairline);
+  border-top: 3px solid var(--color-ink);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sheet, none);
+  font-size: var(--text-small);
+  line-height: 1.45;
+  color: var(--color-ink);
+}
+
+/* The faint SAMPLE mark across the page. Decoration only (aria-hidden). */
+.guide-watermark {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-24deg);
+  font-family: var(--font-mono);
+  font-size: 84px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-ink);
+  opacity: 0.05;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Everything else sits above the watermark. */
+.guide-letterhead,
+.guide-section {
+  position: relative;
+}
+
+.guide-section {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.guide-head {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.guide-story,
+.guide-note {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.guide-note {
+  margin: var(--space-2) 0 0;
+}
+
+/* Letterhead */
+
+.guide-letterhead-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.guide-letterhead-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.guide-servicer {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.guide-doc-title {
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+
+/* The "not a real statement" stamp. A border, not a color, carries it. */
+.guide-stamp {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ───────────────────────── 4. Lines, regions, badges ───────────────────────── */
+
+/* A plain "label ........ value" line that is not a region. */
+.guide-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) 7px;
+}
+
+/* Lines up with the text inside a region (border + padding + badge + gap). */
+.guide-line-indent {
+  padding-left: 37px;
+}
+
+.guide-label {
+  min-width: 0;
+}
+
+.guide-value {
+  text-align: right;
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.guide-sub {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+/* A region: on the full sheet it is a real <button>, in a snippet a <span>. */
+.guide-region {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  /* Short region: everything centered in the 44px target. Tall region (the
+     bills): the badge stays at the top, next to the first line. */
+  align-items: start;
+  align-content: center;
+  column-gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  margin: 3px 0;
+  padding: 6px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+
+button.guide-region {
+  appearance: none;
+  cursor: pointer;
+}
+
+button.guide-region:hover {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: var(--color-info-tint);
+}
+
+.guide-region-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  align-self: center;
+  gap: 2px var(--space-2);
+  min-width: 0;
+}
+
+/* Same look as .field-badge next to the form labels. */
+.guide-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Active = the form box for this region has focus. Three signals, so it never
+   depends on color alone: a thicker solid border, an inverted badge, and the
+   words "You are here". The inset shadow doubles the 1px border to 2px
+   without moving anything. */
+.guide-region.is-active,
+.guide-region-static {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: var(--color-info-tint);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.guide-region.is-active .guide-badge {
+  background: var(--color-on-primary);
+  color: var(--color-primary);
+}
+
+.guide-here {
+  display: none;
+}
+
+/* A small tab that sits on the region's top edge. It is placed by position,
+   not in the flow, so nothing on the sheet jumps when the highlight moves.
+   The rows above a region leave it enough room (see the two "room for the
+   tab" notes below). */
+.guide-region.is-active .guide-here {
+  position: absolute;
+  /* 10px above the edge, about 6px inside it: the region's own 6px padding
+     keeps it off the text inside, and every row above leaves 10px free. */
+  top: -10px;
+  right: var(--space-2);
+  display: block;
+  padding: 0 6px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* Snippets draw the other regions as plain statement text. */
+.guide-plain {
+  display: block;
+  padding: 6px 7px 6px 37px;
+}
+
+/* Windows high-contrast mode drops backgrounds and shadows. Keep the active
+   region obvious with a real thick border there. */
+@media (forced-colors: active) {
+  .guide-region.is-active,
+  .guide-region-static {
+    border-width: 3px;
+    padding: 4px;
+  }
+
+  .guide-badge,
+  .guide-here {
+    forced-color-adjust: none;
+  }
+}
+
+/* ───────────────────────── 5. The payment box ───────────────────────── */
+
+.guide-pay {
+  display: grid;
+  /* Cells fill the whole row height, so the rules above "Total payment" line
+     up across all three columns. */
+  align-items: stretch;
+  /* Room for the "You are here" tab above the escrow row. */
+  gap: var(--space-1) var(--space-2);
+}
+
+.guide-pay-two {
+  grid-template-columns: minmax(0, 1fr) 108px 108px;
+}
+
+.guide-pay-one {
+  grid-template-columns: minmax(0, 1fr) 116px;
+}
+
+.guide-pay-colhead {
+  padding: 0 7px var(--space-1);
+  border-bottom: 1px solid var(--color-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.guide-pay-corner {
+  align-self: stretch;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.guide-pay-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-1) 0;
+}
+
+.guide-pay-label-escrow {
+  font-weight: var(--weight-semibold);
+}
+
+.guide-pay-value {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-1) 7px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.guide-pay-total {
+  border-top: 1px solid var(--color-ink);
+  font-weight: var(--weight-semibold);
+}
+
+/* Inside the payment grid a region is one cell: badge, then the amount. */
+.guide-pay .guide-region,
+.guide-pay .guide-plain {
+  margin: 0;
+}
+
+.guide-pay .guide-region-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.guide-pay .guide-plain {
+  padding: var(--space-1) 7px;
+}
+
+/* ───────────────────────── 6. The coupon ───────────────────────── */
+
+.guide-coupon {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border-strong);
+}
+
+.guide-coupon-tear {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ───────────────────────── 7. The 12-month table ───────────────────────── */
+
+/* The sheet is a "container", so the table can ask how wide the PAPER is (not
+   the window). On a narrow sheet (a phone) each row stacks: the month sits
+   above the activity as a small label. On a wider sheet it is three columns.
+   Browsers without container queries keep the stacked rows, which always fit. */
+.guide-sheet {
+  container-type: inline-size;
+}
+
+.guide-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Several bill rows share one region: a hairline between them. */
+.guide-row + .guide-row {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.guide-row-head {
+  padding: 0 7px var(--space-1) 37px;
+  border-bottom: 1px solid var(--color-ink);
+  /* Room for the "You are here" tab above the first row. */
+  margin-bottom: var(--space-2);
+}
+
+.guide-row-head .guide-cell {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.guide-cell {
+  min-width: 0;
+}
+
+/* Stacked rows: the month is a small label on its own line. */
+.guide-cell-month {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.guide-cell-month:empty,
+.guide-row-head .guide-cell-month {
+  display: none;
+}
+
+.guide-cell-amount {
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Region 4 is about the month itself, so there the month is the loud part. */
+.guide-row-first .guide-cell-month {
+  font-family: var(--font-ui);
+  font-size: inherit;
+  font-weight: var(--weight-bold);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-ink);
+}
+
+.guide-row-first .guide-cell-activity {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* The first-month row has no amount, so its words may use that room. */
+.guide-row-first .guide-cell-amount {
+  display: none;
+}
+
+@container (min-width: 320px) {
+  .guide-row {
+    grid-template-columns: 5.6em minmax(0, 1fr) minmax(5.2em, auto);
+  }
+
+  .guide-cell-month,
+  .guide-cell-month:empty,
+  .guide-row-head .guide-cell-month {
+    display: block;
+    grid-column: auto;
+  }
+
+  .guide-row:not(.guide-row-head) .guide-cell-month {
+    font-family: var(--font-ui);
+    font-size: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+    color: var(--color-ink);
+  }
+
+  .guide-row-first .guide-cell-activity {
+    grid-column: 2 / -1;
+  }
+}
+
+/* ───────────────────────── 8. Narrow screens: the per-box disclosure ───────────────────────── */
+
+.where {
+  margin-top: var(--space-2);
+}
+
+.where-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-1) 0;
+  color: var(--color-primary);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.where-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Our own open/closed arrow: a small corner that turns when open. */
+.where-summary::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 2px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.where[open] > .where-summary::before {
+  transform: rotate(45deg);
+}
+
+.where-summary:hover {
+  color: var(--color-primary-ink);
+  text-decoration-thickness: 2px;
+}
+
+.where-body {
+  max-width: 460px;
+  padding-bottom: var(--space-2);
+}
+
+.guide-sheet-snippet {
+  padding: var(--space-3);
+}
+
+/* In a snippet the first thing on the paper is the small SAMPLE stamp. */
+.guide-stamp-small {
+  margin-bottom: var(--space-2);
+}
+
+.guide-sheet-snippet .guide-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.guide-sheet-snippet .guide-letterhead-top {
+  margin-bottom: var(--space-2);
+}
+
+.where-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.where-hint strong {
+  color: var(--color-ink);
+}
+
+/* ───────────────────────── 9. The form box you just jumped to ───────────────────────── */
+
+/* guide.js adds this class for a moment after a region is clicked, so the eye
+   can find the box even when the browser shows no focus ring (a drop-down or a
+   radio button focused by script after a mouse click). */
+.guide-jump {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* ───────────────────────── "Not this one": the low-point line ───────────────────────── */
+
+/* Real statements print the LOWEST PROJECTED BALANCE close to the REQUIRED
+   MINIMUM BALANCE, and people copy the wrong one. The sample shows both and
+   makes them look different in three ways that do not rely on color: the
+   low-point line has no number badge, its figures are crossed through, and it
+   carries the words "Not this one". */
+.guide-not-this {
+  display: grid;
+  gap: 2px;
+  margin-block: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dotted var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+
+.guide-not-this-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.guide-not-this-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+}

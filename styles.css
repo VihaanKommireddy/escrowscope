@@ -1,0 +1,2694 @@
+/* styles.css — EscrowScope v1
+   Design tokens, base styles, and every component the UI Builder owns.
+   (The chart, the statement guide, and the self-check have their own files:
+   chart.css, guide.css, selfcheck.css. They use the tokens defined here.)
+
+   The look: "the ledger under the lens". Ink on paper, hairline rules, big
+   tabular monospace numbers, one teal, amber only for "look here", green only
+   for "matches". Red is reserved for broken input and is never a verdict.
+   Colors come from the brand guide, where their contrast is computed. */
+
+/* ───────────────────────── 1. Tokens ───────────────────────── */
+
+:root {
+  color-scheme: light dark;
+
+  /* Brand / interactive */
+  --color-primary: #0C5460;
+  --color-primary-ink: #083A44;
+  --color-on-primary: #FFFFFF;
+
+  /* Neutrals */
+  --color-ink: #0F172A;
+  --color-muted: #475569;
+  --color-hairline: #E2E8F0;
+  --color-border-strong: #64748B;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F8FAFC;
+  --color-surface-raised: #FFFFFF;
+
+  /* Flag = amber, never red */
+  --color-flag: #B45309;
+  --color-flag-mark: #F59E0B;
+  --color-flag-tint: #FEF3C7;
+  --color-ink-on-mark: #0F172A;
+
+  /* Clear = green */
+  --color-clear: #047857;
+  --color-clear-tint: #D1FAE5;
+
+  /* Info = teal tint */
+  --color-info-tint: #E3F1F2;
+
+  /* Broken input only */
+  --color-error: #B91C1C;
+  --color-error-tint: #FEE2E2;
+
+  --color-focus: #0C5460;
+
+  /* Masthead band */
+  --color-masthead: #0C5460;
+  --color-masthead-ink: #FFFFFF;
+  --color-masthead-muted: #CFE5E7;
+  --color-masthead-rule: rgba(255, 255, 255, 0.34);
+
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* rem, not px: 1rem is whatever text size the visitor picked in their browser
+     (16px unless they changed it), so a larger default makes this page larger
+     too. The smallest size was raised from 12px to 13px for this audience. */
+  --text-display: 2.75rem;
+  --text-h1: 2rem;
+  --text-h2: 1.5rem;
+  --text-h3: 1.125rem;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-micro: 0.8125rem;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --space-10: 64px;
+
+  --page-max: 1160px;
+  --page-gutter: clamp(16px, 4vw, 40px);
+  --shadow-sheet: 0 1px 0 rgba(15, 23, 42, 0.04), 0 12px 32px -16px rgba(15, 23, 42, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #5EEAD4;
+    --color-primary-ink: #99F6E4;
+    --color-on-primary: #0B1220;
+
+    --color-ink: #E2E8F0;
+    --color-muted: #94A3B8;
+    --color-hairline: #1E293B;
+    --color-border-strong: #7C8BA1;
+    --color-surface: #0B1220;
+    --color-surface-subtle: #111827;
+    --color-surface-raised: #111827;
+
+    --color-flag: #FBBF24;
+    --color-flag-mark: #F59E0B;
+    --color-flag-tint: #422006;
+    --color-ink-on-mark: #0F172A;
+
+    --color-clear: #34D399;
+    --color-clear-tint: #052E24;
+
+    --color-info-tint: #0D2B30;
+
+    --color-error: #FCA5A5;
+    --color-error-tint: #450A0A;
+
+    --color-focus: #5EEAD4;
+
+    --color-masthead: #08262C;
+    --color-masthead-ink: #E2E8F0;
+    --color-masthead-muted: #9FC3C7;
+    --color-masthead-rule: rgba(94, 234, 212, 0.35);
+
+    --shadow-sheet: 0 0 0 1px #1E293B;
+  }
+}
+
+/* ───────────────────────── 2. Base ───────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Smooth scrolling only for people who have not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  /* Long dollar figures and URLs must wrap instead of forcing a sideways scroll. */
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: clamp(22px, 1.1rem + 1.2vw, 30px);
+  font-weight: var(--weight-bold);
+}
+
+h3 {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-semibold);
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}
+
+p {
+  margin: 0;
+}
+
+p + p {
+  margin-top: var(--space-3);
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--color-primary-ink);
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Headings that receive focus from script (tabindex="-1") still show a ring,
+   so a sighted keyboard user can see where they were taken. */
+[tabindex="-1"]:focus {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ───────────────────────── 3. Utilities ───────────────────────── */
+
+.num,
+td.num,
+th.num,
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.small {
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -80px;
+  z-index: 100;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-raised);
+  color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+}
+
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+/* ───────────────────────── 4. Buttons ───────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 10px 20px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-ink);
+  border-color: var(--color-primary-ink);
+  color: var(--color-on-primary);
+}
+
+.btn-secondary {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-surface-raised);
+}
+
+.btn-secondary:hover {
+  background: var(--color-info-tint);
+  color: var(--color-primary-ink);
+}
+
+.btn-quiet {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.btn-quiet:hover {
+  background: var(--color-info-tint);
+  color: var(--color-primary-ink);
+}
+
+.btn-large {
+  min-height: 56px;
+  padding: 14px 28px;
+  font-size: 18px;
+}
+
+.btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ───────────────────────── 5. Tables ───────────────────────── */
+
+/* Wide tables scroll inside their own box, never the page. The box is
+   focusable (tabindex="0" in the markup) so keyboard users can scroll it. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+/* The box itself takes keyboard focus (so it can be scrolled with the arrow
+   keys), and shows the same ring as every other control when it does. */
+.table-scroll:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+  border-radius: var(--radius-md);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.data-table caption {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+  caption-side: top;
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px var(--space-4);
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.data-table thead th {
+  font-family: var(--font-ui);
+  border-top: 0;
+  border-bottom: 2px solid var(--color-ink);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.data-table th.num,
+.data-table td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: var(--color-surface-subtle);
+}
+
+/* ───────────────────────── 6. Masthead ───────────────────────── */
+
+.masthead {
+  --color-focus: var(--color-masthead-ink);
+  background: var(--color-masthead);
+  color: var(--color-masthead-ink);
+}
+
+.masthead-inner {
+  padding-top: var(--space-5);
+  padding-bottom: clamp(32px, 6vw, 64px);
+}
+
+.masthead-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  margin-bottom: clamp(32px, 7vw, 72px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.brand-mark {
+  flex: none;
+  color: var(--color-masthead-ink);
+}
+
+.brand-name {
+  font-size: 21px;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.privacy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-masthead-rule);
+  border-radius: var(--radius-pill);
+  color: var(--color-masthead-ink);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.privacy-chip:hover {
+  color: var(--color-masthead-ink);
+  border-color: var(--color-masthead-ink);
+  text-decoration: underline;
+}
+
+.chip-icon {
+  flex: none;
+}
+
+.masthead-title {
+  max-width: 15ch;
+  font-size: clamp(34px, 1.4rem + 4.4vw, 68px);
+  font-weight: var(--weight-bold);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.masthead-sub {
+  max-width: 58ch;
+  margin-top: var(--space-5);
+  color: var(--color-masthead-muted);
+  font-size: clamp(16px, 0.95rem + 0.4vw, 19px);
+  line-height: 1.55;
+}
+
+/* The instrument motif: a ruler edge. Tall ticks every 50px, short ones every 10px. */
+.tick-rule {
+  height: 16px;
+  background-image:
+    repeating-linear-gradient(90deg, var(--color-masthead-rule) 0 1px, transparent 1px 50px),
+    repeating-linear-gradient(90deg, var(--color-masthead-rule) 0 1px, transparent 1px 10px);
+  background-size: 100% 16px, 100% 7px;
+  background-position: left bottom, left bottom;
+  background-repeat: no-repeat;
+}
+
+/* ───────────────────────── 7. Intro, examples, disclosures ───────────────────────── */
+
+.intro {
+  padding-block: clamp(40px, 7vw, 80px) var(--space-6);
+}
+
+.intro h2,
+.workbench h2,
+.limits h2,
+.selfcheck-section h2,
+.privacy-proof h2 {
+  margin-top: var(--space-2);
+  max-width: 24ch;
+}
+
+.intro-copy {
+  max-width: 68ch;
+  margin-top: var(--space-4);
+  font-size: 17px;
+}
+
+.examples {
+  margin-top: var(--space-8);
+}
+
+.examples h3 {
+  margin-bottom: var(--space-1);
+}
+
+.example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.example-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-top: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.example-card:hover {
+  background: var(--color-info-tint);
+  border-color: var(--color-primary);
+}
+
+.example-card[aria-pressed="true"] {
+  background: var(--color-info-tint);
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.example-index {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.example-title {
+  font-size: 18px;
+  font-weight: var(--weight-bold);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.example-blurb {
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.example-go {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+}
+
+.disclosure {
+  margin-top: var(--space-6);
+  border-top: 1px solid var(--color-border-strong);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.disclosure > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: 56px;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A plus that turns into a minus: drawn with two bars, so it needs no icon font. */
+.disclosure > summary::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-right: var(--space-1);
+  background:
+    linear-gradient(var(--color-primary), var(--color-primary)) center / 16px 2px no-repeat,
+    linear-gradient(var(--color-primary), var(--color-primary)) center / 2px 16px no-repeat;
+}
+
+.disclosure[open] > summary::before {
+  background: linear-gradient(var(--color-primary), var(--color-primary)) center / 16px 2px no-repeat;
+}
+
+.summary-title {
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+}
+
+.disclosure > summary:hover .summary-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.summary-note {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.disclosure-body,
+.precheck-list,
+.glossary-list {
+  padding-bottom: var(--space-5);
+}
+
+.precheck-list {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 72ch;
+  padding-left: var(--space-5);
+}
+
+.precheck-list h4 {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.precheck-list p {
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+}
+
+.precheck-list li::marker {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+}
+
+.glossary-list {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  max-width: 72ch;
+}
+
+.glossary-list dt {
+  font-weight: var(--weight-semibold);
+}
+
+.glossary-list dd {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.noscript-note {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 2px solid var(--color-flag-mark);
+  border-radius: var(--radius-md);
+  background: var(--color-flag-tint);
+}
+
+/* ───────────────────────── 8. The form ───────────────────────── */
+
+.workbench {
+  padding-block: var(--space-8) clamp(48px, 8vw, 96px);
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-surface-subtle);
+}
+
+.workbench-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.form-col {
+  min-width: 0;
+  max-width: 680px;
+}
+
+.guide-col {
+  display: none;
+  min-width: 0;
+}
+
+/* Two columns once there is room: the form on the left, the sample statement
+   pinned on the right. Below this width guide.css swaps in the per-box
+   "Where is this on my statement?" disclosures instead. */
+@media (min-width: 1080px) {
+  .workbench-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+    gap: var(--space-10);
+  }
+
+  .guide-col {
+    display: block;
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+}
+
+.section-lede {
+  max-width: 64ch;
+  margin-top: var(--space-3);
+  color: var(--color-muted);
+}
+
+.escrow-form {
+  margin-top: var(--space-5);
+}
+
+.part {
+  min-width: 0;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.part-legend {
+  display: block;
+  width: 100%;
+  padding: var(--space-4) 0 0;
+  border-top: 2px solid var(--color-ink);
+  font-size: 21px;
+  font-weight: var(--weight-bold);
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.part-index {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.part-hint {
+  max-width: 64ch;
+  margin-top: var(--space-2);
+  color: var(--color-muted);
+}
+
+.tag {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+
+.tag-required {
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+}
+
+.tag-optional {
+  border: 1px solid transparent;
+  padding-left: 0;
+  color: var(--color-muted);
+}
+
+.field-grid {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-5);
+}
+
+.field,
+.choice-group {
+  min-width: 0;
+}
+
+.part > .field,
+.part > .choice-group {
+  margin-top: var(--space-5);
+}
+
+.choice-group {
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field-label {
+  display: block;
+  padding: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
+}
+
+.field-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  vertical-align: 2px;
+}
+
+.hint {
+  max-width: 62ch;
+  margin-top: var(--space-1);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 48px;
+  margin-top: var(--space-2);
+  padding: 10px 14px;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.input:hover {
+  border-color: var(--color-ink);
+}
+
+.input:focus-visible {
+  border-color: var(--color-primary);
+  border-radius: var(--radius-md);
+}
+
+.money {
+  position: relative;
+  max-width: 260px;
+}
+
+/* The dollar sign is decoration: people are told they don't need to type it. */
+.money::before {
+  content: "$";
+  position: absolute;
+  left: 14px;
+  top: calc(var(--space-2) + 23px);
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  line-height: 1;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.input-money {
+  padding-left: 30px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+}
+
+.input-select {
+  max-width: 420px;
+  padding-right: 40px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-ink) 50%),
+    linear-gradient(135deg, var(--color-ink) 50%, transparent 50%);
+  background-position: calc(100% - 21px) 55%, calc(100% - 15px) 55%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.input-short {
+  max-width: 120px;
+  font-size: 17px;
+}
+
+.input-date {
+  max-width: 240px;
+}
+
+.input[aria-invalid="true"] {
+  border: 2px solid var(--color-error);
+  box-shadow: inset 4px 0 0 var(--color-error);
+}
+
+.field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1.45;
+  color: var(--color-error);
+}
+
+.field-error:empty {
+  display: none;
+}
+
+/* A soft "worth a second look" note under a box. Not an error: neutral ink,
+   an "i" mark, and it never blocks the check. */
+.field-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-info-tint);
+  font-size: var(--text-small);
+  line-height: 1.45;
+}
+
+.field-warning::before {
+  content: "i";
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.field-error::before,
+.stale-mark,
+.error-summary-title::before {
+  content: "!";
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-error);
+  color: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 8px 16px 8px 12px;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--color-ink);
+}
+
+.choice input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.choice:has(input:checked) {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.choice-block {
+  display: flex;
+  max-width: 560px;
+}
+
+.choice-inline {
+  margin-top: var(--space-3);
+  padding-left: 0;
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--text-small);
+}
+
+.choice-inline:hover {
+  border-color: transparent;
+  text-decoration: underline;
+}
+
+.choice-inline:has(input:checked) {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.tips {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 62ch;
+  margin-top: var(--space-3);
+  padding-left: 20px;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+/* A calm note under a box ("This page guessed this month…"). */
+.field-note {
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-flag-mark);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  line-height: 1.45;
+}
+
+/* "If the buttons on this page do nothing…". The words are in index.html so they
+   exist even when no script runs. They stay folded away for the first few
+   seconds (scripts on a slow phone need a moment), then unfold by themselves
+   unless app.js has finished starting and hidden them. Nothing moves: the delay
+   is the only "animation", so it is fine for people who ask for less motion. */
+.page-problem {
+  max-height: 0;
+  margin: 0;
+  overflow: hidden;
+  animation: page-problem-unfold 0s linear 6s forwards;
+}
+
+.page-problem.is-shown {
+  animation: none;
+}
+
+.page-problem.is-shown,
+.page-alert {
+  max-height: none;
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 2px solid var(--color-flag-mark);
+  border-radius: var(--radius-md);
+  background: var(--color-flag-tint);
+  font-weight: var(--weight-semibold);
+}
+
+@keyframes page-problem-unfold {
+  to {
+    max-height: 40em;
+    margin-top: var(--space-5);
+    padding: var(--space-4);
+    border: 2px solid var(--color-flag-mark);
+    border-radius: var(--radius-md);
+    background: var(--color-flag-tint);
+    font-weight: var(--weight-semibold);
+  }
+}
+
+.page-alert {
+  margin-block: var(--space-5);
+}
+
+.form-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-height: 0;
+  margin-top: var(--space-3);
+  font-weight: var(--weight-semibold);
+}
+
+/* Bill rows */
+
+.bill-rows {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.bill-row {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.bill-legend {
+  padding: 0 var(--space-2);
+  margin-left: calc(var(--space-2) * -1);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.bill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+
+.bill-grid .field-kind,
+.bill-grid .field-name,
+.bill-grid .bill-remove-cell {
+  grid-column: 1 / -1;
+}
+
+.bill-grid .field-label {
+  font-size: var(--text-small);
+}
+
+.bill-grid .money,
+.bill-grid .input-select {
+  max-width: none;
+}
+
+.bill-remove-cell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (min-width: 620px) {
+  .bill-grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .bill-grid .field-kind {
+    grid-column: auto;
+  }
+}
+
+.bills-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.bills-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: 0 0 0 auto;
+  text-align: right;
+}
+
+.bills-total-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.bills-total-figure {
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+}
+
+.less-common .field + .field {
+  margin-top: var(--space-5);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin-top: var(--space-8);
+}
+
+.file-actions {
+  margin-top: var(--space-8);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.file-actions-title {
+  font-size: var(--text-body);
+}
+
+.file-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+/* The real file input is visually hidden; its label is the button. This keeps
+   keyboard focus visible on the label when the input has focus. */
+.file-picker:has(+ .file-input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.file-status:empty,
+.action-status:empty {
+  display: none;
+}
+
+.file-status {
+  margin-top: var(--space-3);
+}
+
+.glossary {
+  margin-top: var(--space-8);
+}
+
+/* Error summary (focus lands here after a failed check) */
+
+.error-summary {
+  scroll-margin-top: var(--space-4);
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border: 2px solid var(--color-error);
+  border-left-width: 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-error-tint);
+}
+
+.error-summary-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-h3);
+}
+
+.error-summary-list {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding-left: 28px;
+}
+
+.error-summary-list a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-error);
+  font-weight: var(--weight-semibold);
+}
+
+/* ───────────────────────── 9. Results ───────────────────────── */
+
+.results {
+  padding-block: clamp(48px, 7vw, 88px);
+  border-top: 2px solid var(--color-ink);
+  scroll-margin-top: var(--space-4);
+}
+
+.print-header {
+  display: none;
+}
+
+.stale-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.stale-mark {
+  margin-top: 2px;
+  background: var(--color-ink);
+}
+
+.verdict {
+  --tone: var(--color-primary);
+  --tone-mark: var(--color-primary);
+  --tone-on-mark: var(--color-on-primary);
+  --tone-tint: var(--color-info-tint);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4) var(--space-5);
+  margin-top: var(--space-3);
+  padding: clamp(20px, 3.5vw, 40px);
+  border: 1px solid var(--tone);
+  border-left: 10px solid var(--tone-mark);
+  border-radius: var(--radius-md);
+  background: var(--tone-tint);
+}
+
+.verdict--clear {
+  --tone: var(--color-clear);
+  --tone-mark: var(--color-clear);
+  --tone-on-mark: var(--color-surface);
+  --tone-tint: var(--color-clear-tint);
+}
+
+.verdict--flag {
+  --tone: var(--color-flag);
+  --tone-mark: var(--color-flag-mark);
+  --tone-on-mark: var(--color-ink-on-mark);
+  --tone-tint: var(--color-flag-tint);
+}
+
+/* SPEC E3, "too close to call": calm teal, a dashed edge, its own icon and label. */
+.verdict--close {
+  border-style: dashed;
+  border-left-style: solid;
+}
+
+.verdict-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(44px, 6vw, 64px);
+  height: clamp(44px, 6vw, 64px);
+  border-radius: 50%;
+  background: var(--tone-mark);
+  color: var(--tone-on-mark);
+}
+
+.verdict-mark svg {
+  width: 58%;
+  height: 58%;
+}
+
+.verdict-text {
+  min-width: 0;
+}
+
+.verdict-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tone);
+}
+
+.verdict-headline {
+  margin-top: var(--space-2);
+  max-width: 28ch;
+  font-size: clamp(24px, 1.1rem + 2vw, 40px);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.verdict-headline.is-long {
+  max-width: 34ch;
+  font-size: clamp(22px, 1rem + 1.3vw, 30px);
+  line-height: 1.18;
+}
+
+.verdict-headline:focus {
+  outline-offset: 6px;
+}
+
+.verdict-body {
+  max-width: 68ch;
+  margin-top: var(--space-3);
+  font-size: 17px;
+}
+
+.verdict-figure {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--tone);
+}
+
+.verdict-figure:empty {
+  display: none;
+}
+
+.verdict-figure-number {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(34px, 1.4rem + 3.4vw, 60px);
+  font-weight: var(--weight-semibold);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.verdict-figure-caption {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tone);
+}
+
+/* Phones: the icon sits above the words so the sentence gets the full width. */
+@media (max-width: 559px) {
+  .verdict {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) var(--space-5);
+    border-left-width: 6px;
+  }
+
+  .verdict-mark {
+    width: 44px;
+    height: 44px;
+  }
+
+  .verdict-body {
+    font-size: var(--text-body);
+  }
+}
+
+@media (min-width: 900px) {
+  .verdict {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .verdict-figure {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-1);
+    padding: 0 0 0 var(--space-6);
+    border-top: 0;
+    border-left: 1px solid var(--tone);
+    text-align: right;
+  }
+}
+
+/* While a box is broken the last good results stay, clearly marked as old. */
+.results.is-stale .verdict,
+.results.is-stale .three-numbers,
+.results.is-stale .result-block,
+.results.is-stale .refund-clock {
+  filter: grayscale(1);
+}
+
+.results.is-stale .verdict {
+  border-style: dashed;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .verdict.just-updated {
+    animation: verdict-updated 700ms ease-out;
+  }
+
+  @keyframes verdict-updated {
+    from {
+      box-shadow: 0 0 0 6px var(--tone-mark);
+    }
+
+    to {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+}
+
+.refund-clock,
+.nudges {
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.refund-clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  border-color: var(--color-flag);
+  border-left: 6px solid var(--color-flag-mark);
+}
+
+.refund-date {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: var(--weight-semibold);
+}
+
+.nudges-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+.nudges ul {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-left: 20px;
+}
+
+.nudges a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--weight-semibold);
+}
+
+/* The three numbers: a ledger strip */
+
+.three-numbers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: var(--space-6);
+  border-top: 2px solid var(--color-ink);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.big-number {
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.big-number:first-child {
+  border-top: 0;
+}
+
+.big-number-figure {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(28px, 1.2rem + 1.8vw, 40px);
+  font-weight: var(--weight-semibold);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.big-number-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+@media (min-width: 760px) {
+  /* Three across. Subgrid keeps the three big figures on one line even when one
+     label wraps to two lines. */
+  .three-numbers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto auto auto;
+  }
+
+  .big-number {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    padding: var(--space-5) var(--space-5);
+    border-top: 0;
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .big-number .eyebrow {
+    align-self: end;
+  }
+
+  .big-number:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+.result-block {
+  margin-top: clamp(40px, 6vw, 72px);
+}
+
+.result-block > h3 {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-strong);
+  font-size: clamp(20px, 1rem + 0.7vw, 24px);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.result-block > h3 + * {
+  margin-top: var(--space-4);
+}
+
+.block-lede {
+  max-width: 68ch;
+}
+
+.block-note {
+  max-width: 68ch;
+  margin-top: var(--space-4);
+  color: var(--color-muted);
+}
+
+/* Statement vs federal math */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 6px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.status svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.status--match {
+  background: var(--color-clear-tint);
+  color: var(--color-clear);
+}
+
+.status--flag {
+  background: var(--color-flag-tint);
+  color: var(--color-flag);
+}
+
+/* "Not compared": plain grey with a dash. Never the green tick, never the amber mark. */
+.status--neutral {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-subtle);
+  color: var(--color-muted);
+}
+
+.row-label {
+  display: block;
+  font-weight: var(--weight-semibold);
+}
+
+.row-note {
+  display: block;
+  max-width: 44ch;
+  margin-top: 2px;
+  font-size: var(--text-small);
+  font-weight: var(--weight-regular);
+  line-height: 1.45;
+  color: var(--color-muted);
+  white-space: normal;
+}
+
+.compare-table th[scope="row"] {
+  min-width: 200px;
+}
+
+.flag-list {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  list-style: none;
+}
+
+.flag-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-flag);
+  border-left: 6px solid var(--color-flag-mark);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.flag-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+}
+
+.flag-card-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-flag);
+}
+
+.flag-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flag-card-tag svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.flag-card-jump a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--weight-semibold);
+}
+
+.flag-card-amount {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: var(--weight-semibold);
+}
+
+.cite {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+/* Your lawful payment: a receipt */
+
+.receipts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 400px));
+  gap: var(--space-5);
+}
+
+.receipt {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.receipt-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+
+.receipt-rows {
+  display: grid;
+  margin: var(--space-3) 0 0;
+}
+
+.receipt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--space-4);
+  padding: var(--space-2) 0;
+  border-top: 1px dashed var(--color-border-strong);
+}
+
+.receipt-row dt {
+  color: var(--color-muted);
+}
+
+.receipt-row dd {
+  margin: 0 0 0 auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.receipt-row.is-total {
+  border-top: 2px solid var(--color-ink);
+}
+
+.receipt-row.is-total dt {
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+}
+
+.receipt-row.is-total dd {
+  font-size: 24px;
+  font-weight: var(--weight-semibold);
+}
+
+/* Show the math */
+
+.step {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.step:last-child {
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.step > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.step > summary::-webkit-details-marker {
+  display: none;
+}
+
+.step-number {
+  flex: none;
+  min-width: 56px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.step-title {
+  flex: 1 1 10ch;
+  min-width: 0;
+  font-weight: var(--weight-semibold);
+}
+
+.step > summary:hover .step-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.step-toggle {
+  flex: none;
+  margin-left: auto;
+  font-size: var(--text-small);
+  color: var(--color-primary);
+}
+
+.step[open] .step-toggle-open,
+.step:not([open]) .step-toggle-close {
+  display: none;
+}
+
+.step-body {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 76ch;
+  padding: 0 0 var(--space-5);
+}
+
+@media (min-width: 620px) {
+  .step-body {
+    padding-left: calc(56px + var(--space-3));
+  }
+}
+
+.step-math {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-surface-subtle);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* What you can do next */
+
+.next-list {
+  display: grid;
+  gap: var(--space-4);
+  counter-reset: next;
+  list-style: none;
+}
+
+.next-item {
+  position: relative;
+  padding-left: 48px;
+  counter-increment: next;
+}
+
+.next-item::before {
+  content: counter(next);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--color-primary);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+}
+
+.next-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
+  letter-spacing: 0;
+  padding-top: 4px;
+}
+
+.next-body {
+  max-width: 68ch;
+  margin-top: var(--space-1);
+}
+
+.next-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-5);
+  margin-top: var(--space-2);
+}
+
+.next-links a {
+  display: inline-block;
+  padding-block: 10px;
+  font-weight: var(--weight-semibold);
+}
+
+/* The letter */
+
+.letter-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-5);
+  max-width: 680px;
+  margin-block: var(--space-5);
+}
+
+.letter-text {
+  display: block;
+  width: 100%;
+  max-width: 820px;
+  min-height: 320px;
+  margin-top: var(--space-2);
+  padding: var(--space-5);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.letter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.action-status {
+  font-weight: var(--weight-semibold);
+  color: var(--color-clear);
+}
+
+.letter-print {
+  display: none;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin-top: clamp(40px, 6vw, 72px);
+  padding-top: var(--space-5);
+  border-top: 2px solid var(--color-ink);
+}
+
+.report-actions p {
+  max-width: 52ch;
+  margin: 0;
+}
+
+/* ───────────────────────── 10. Limits, self-check, footer ───────────────────────── */
+
+.limits {
+  padding-block: clamp(48px, 7vw, 88px);
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-surface-subtle);
+}
+
+.limits-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-5) var(--space-8);
+  margin-top: var(--space-6);
+  list-style: none;
+  counter-reset: limit;
+}
+
+.limits-list li {
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--color-ink);
+  counter-increment: limit;
+}
+
+.limits-list li::before {
+  content: "0" counter(limit);
+  display: block;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.14em;
+  color: var(--color-muted);
+}
+
+.limits-list strong {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
+.selfcheck-section {
+  padding-block: clamp(48px, 7vw, 88px);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.site-footer {
+  padding-block: clamp(48px, 7vw, 88px) var(--space-8);
+  border-top: 2px solid var(--color-ink);
+  background: var(--color-surface-subtle);
+}
+
+.privacy-proof {
+  scroll-margin-top: var(--space-4);
+}
+
+.privacy-proof:focus {
+  outline: none;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-8);
+  margin-top: var(--space-10);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-strong);
+}
+
+.footer-h {
+  font-size: var(--text-h3);
+  margin-bottom: var(--space-3);
+}
+
+.link-list {
+  display: grid;
+  gap: var(--space-1);
+  list-style: none;
+}
+
+.link-list a {
+  display: inline-block;
+  padding-block: 10px;
+}
+
+.footer-note {
+  margin-top: var(--space-8);
+  color: var(--color-muted);
+}
+
+/* ───────────────────────── 10b. Forced colors (Windows High Contrast) ───────────────────────── */
+
+/* In this mode the browser throws away background tints and box-shadows. Every
+   state that leaned on one gets a real outline or border here, using the
+   system's own color names so it fits whatever theme the visitor chose. */
+@media (forced-colors: active) {
+  .example-card[aria-pressed="true"],
+  .choice:has(input:checked) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .verdict,
+  .flag-card,
+  .refund-clock,
+  .error-summary,
+  .field-warning,
+  .field-note,
+  .stale-note,
+  .page-alert,
+  .page-problem.is-shown {
+    border: 2px solid CanvasText;
+  }
+
+  .verdict-mark,
+  .field-badge,
+  .field-error::before,
+  .field-warning::before,
+  .stale-mark,
+  .error-summary-title::before {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+    background: CanvasText;
+    color: Canvas;
+  }
+
+  .status {
+    border: 1px solid CanvasText;
+  }
+
+  .input[aria-invalid="true"] {
+    outline: 2px solid Mark;
+    outline-offset: 1px;
+  }
+
+  .disclosure > summary::before {
+    forced-color-adjust: none;
+    background:
+      linear-gradient(CanvasText, CanvasText) center / 16px 2px no-repeat,
+      linear-gradient(CanvasText, CanvasText) center / 2px 16px no-repeat;
+  }
+
+  .disclosure[open] > summary::before {
+    background: linear-gradient(CanvasText, CanvasText) center / 16px 2px no-repeat;
+  }
+
+  .tick-rule {
+    forced-color-adjust: none;
+  }
+}
+
+/* ───────────────────────── 11. Print ───────────────────────── */
+
+/* "Print this report" gives ONE page a housing counselor can read: the verdict,
+   the three numbers, the statement-vs-federal table, the month-by-month table
+   next to the math steps, and the honest limits. Black on white. Everything
+   that is only useful on a screen (the form, the guide, the chart picture, the
+   buttons, the letter, the self-check) is left out. */
+@media print {
+  :root {
+    color-scheme: light;
+    --color-primary: #000000;
+    --color-primary-ink: #000000;
+    --color-on-primary: #FFFFFF;
+    --color-ink: #000000;
+    --color-muted: #222222;
+    --color-hairline: #999999;
+    --color-border-strong: #555555;
+    --color-surface: #FFFFFF;
+    --color-surface-subtle: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-flag: #000000;
+    --color-flag-mark: #000000;
+    --color-flag-tint: #FFFFFF;
+    --color-ink-on-mark: #FFFFFF;
+    --color-clear: #000000;
+    --color-clear-tint: #FFFFFF;
+    --color-info-tint: #FFFFFF;
+  }
+
+  @page {
+    margin: 10mm;
+  }
+
+  body {
+    font-size: 9pt;
+    line-height: 1.32;
+  }
+
+  .skip-link,
+  .masthead,
+  .intro,
+  .workbench,
+  .selfcheck-section,
+  .site-footer,
+  .stale-note,
+  .report-actions,
+  .btn,
+  .eyebrow,
+  .nudges,
+  .flag-card-jump,
+  .block-lede,
+  .page-problem,
+  .page-alert,
+  #render-problem,
+  .step-toggle,
+  .step-body > p:first-child,
+  .balance-chart__figure,
+  .chart-legend,
+  #sec-jump,
+  #sec-payment,
+  #sec-next,
+  #sec-letter {
+    display: none !important;
+  }
+
+  .print-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12pt;
+    padding-bottom: 3pt;
+    border-bottom: 1.5pt solid #000000;
+  }
+
+  .print-title {
+    font-size: 12pt;
+    font-weight: 700;
+  }
+
+  .print-sub {
+    margin: 0;
+    font-size: 8pt;
+  }
+
+  .results,
+  .limits {
+    padding-block: 0;
+    border: 0;
+    background: none;
+  }
+
+  .wrap {
+    max-width: none;
+    padding-inline: 0;
+  }
+
+  /* Two columns: the month table on the left, the math steps on the right.
+     Everything else runs the full width. */
+  .results > .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    column-gap: 12pt;
+    align-items: start;
+  }
+
+  .results > .wrap > * {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .results > .wrap > #sec-chart {
+    grid-column: 1;
+  }
+
+  .results > .wrap > #sec-steps {
+    grid-column: 2;
+  }
+
+  .verdict {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6pt 10pt;
+    margin-top: 7pt;
+    padding: 6pt 9pt;
+    border: 1pt solid #000000;
+    border-left: 5pt solid #000000;
+    filter: none !important;
+  }
+
+  .verdict-mark {
+    width: 24pt;
+    height: 24pt;
+  }
+
+  .verdict-label {
+    font-size: 7.5pt;
+  }
+
+  .verdict-headline,
+  .verdict-headline.is-long {
+    max-width: none;
+    margin-top: 1pt;
+    font-size: 12pt;
+    line-height: 1.2;
+  }
+
+  .verdict-body {
+    max-width: none;
+    margin-top: 2pt;
+    font-size: 8.5pt;
+  }
+
+  .verdict-figure {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    padding: 0 0 0 9pt;
+    border-top: 0;
+    border-left: 1pt solid #000000;
+  }
+
+  .verdict-figure-number {
+    font-size: 16pt;
+  }
+
+  .verdict-figure-caption {
+    font-size: 7pt;
+  }
+
+  .refund-clock {
+    flex-wrap: nowrap;
+    margin-top: 4pt;
+    padding: 2pt 9pt;
+    border-left-width: 3pt;
+  }
+
+  .refund-clock .small {
+    font-size: 7.5pt;
+  }
+
+  .refund-date {
+    font-size: 10pt;
+  }
+
+  /* The little labels inside the ledger strip are eyebrows, which are hidden
+     above, so show these ones again. */
+  .three-numbers .eyebrow,
+  .refund-clock .eyebrow {
+    display: block !important;
+    font-size: 6.5pt;
+    letter-spacing: 0.08em;
+  }
+
+  .three-numbers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto auto auto;
+    margin-top: 7pt;
+    border-top-width: 1pt;
+  }
+
+  .big-number {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    padding: 4pt 8pt;
+    border-top: 0;
+    border-left: 0.5pt solid #999999;
+  }
+
+  .big-number:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .big-number-figure {
+    margin-top: 1pt;
+    font-size: 13pt;
+  }
+
+  .big-number-note {
+    margin-top: 1pt;
+    font-size: 7.5pt;
+  }
+
+  .result-block {
+    margin-top: 8pt;
+    break-inside: avoid;
+  }
+
+  .result-block > h3 {
+    padding-top: 3pt;
+    border-top: 1pt solid #000000;
+    font-size: 10pt;
+  }
+
+  .result-block > h3 + * {
+    margin-top: 2pt;
+  }
+
+  .table-scroll {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .data-table {
+    font-size: 7.5pt;
+    line-height: 1.25;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 1.5pt 4pt;
+  }
+
+  .data-table thead th {
+    border-bottom-width: 1pt;
+    font-size: 7pt;
+    white-space: normal;
+  }
+
+  .data-table caption {
+    padding: 0 0 2pt;
+    font-size: 7.5pt;
+  }
+
+  .data-table tbody tr:nth-child(even) {
+    background: none;
+  }
+
+  .compare-table th[scope="row"] {
+    min-width: 0;
+  }
+
+  /* The flag sentences and the caveat under them are printed, so a counselor
+     sees WHY a line says "Over the limit", not just the chip. */
+  .flag-list {
+    grid-template-columns: repeat(auto-fit, minmax(150pt, 1fr));
+    gap: 3pt 8pt;
+    margin-top: 4pt;
+  }
+
+  .flag-card {
+    gap: 0;
+    padding: 2pt 6pt;
+    border-left-width: 3pt;
+    font-size: 7.5pt;
+    line-height: 1.28;
+    break-inside: avoid;
+  }
+
+  .flag-card-tag {
+    font-size: 6.5pt;
+  }
+
+  .flag-card-amount {
+    font-size: 8.5pt;
+  }
+
+  .block-note {
+    max-width: none;
+    margin-top: 3pt;
+    font-size: 7.5pt;
+  }
+
+  /* The flag sentences say the same thing as the notes under the row names,
+     in more detail, so the row notes are left out of the printout. */
+  .row-note {
+    display: none;
+  }
+
+  .status {
+    padding: 0;
+    background: none;
+    font-size: 7.5pt;
+  }
+
+  .status svg {
+    width: 9pt;
+    height: 9pt;
+  }
+
+  /* The month table has five number columns: keep it inside its column. */
+  .results .balance-table th,
+  .results .balance-table td {
+    padding: 1.5pt 3pt;
+  }
+
+  /* (".results" in front so this wins over chart.css, which loads later.) */
+  .results .balance-table thead th {
+    min-width: 0;
+  }
+
+  .results .balance-table .balance-table__tag {
+    font-size: 6.5pt;
+    line-height: 1.1;
+  }
+
+  .chart-servicer {
+    margin: 0 0 3pt;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 7.5pt;
+  }
+
+  /* The steps print open (app.js opens them before printing). Only the title,
+     the numbers and the source are printed, to keep it to one page. */
+  .step {
+    break-inside: avoid;
+    border: 0 !important;
+  }
+
+  .step > summary {
+    display: block;
+    min-height: 0;
+    padding: 1pt 0 0;
+    font-size: 8pt;
+  }
+
+  .step-number {
+    display: inline;
+    min-width: 0;
+    margin-right: 3pt;
+    font-size: 7pt;
+  }
+
+  .step-body {
+    gap: 0;
+    padding: 0 0 1pt;
+    font-size: 7.5pt;
+  }
+
+  .step-math {
+    padding: 1pt 5pt;
+    border-left-width: 1.5pt;
+    font-size: 7.5pt;
+    line-height: 1.3;
+  }
+
+  .cite {
+    font-size: 6.5pt;
+    line-height: 1.2;
+  }
+
+  /* With several flags the report can run past one page. If it does, the
+     limits move to page two in one piece instead of being cut in half. */
+  .limits {
+    break-inside: avoid;
+  }
+
+  .compare-table caption {
+    display: none;
+  }
+
+  .limits h2 {
+    max-width: none;
+    margin-top: 8pt;
+    padding-top: 3pt;
+    border-top: 1pt solid #000000;
+    font-size: 10pt;
+  }
+
+  .limits-list {
+    display: block;
+    columns: 3;
+    column-gap: 12pt;
+    margin-top: 2pt;
+    font-size: 7pt;
+    line-height: 1.28;
+  }
+
+  .limits-list li {
+    padding-top: 0;
+    margin-bottom: 2pt;
+    border: 0;
+    break-inside: avoid;
+  }
+
+  .limits-list li::before {
+    display: none;
+  }
+
+  .limits-list strong {
+    display: inline;
+  }
+
+  a {
+    color: #000000;
+    text-decoration: none;
+  }
+
+  /* "Print the letter": only the letter, nothing else. */
+  .print-letter-mode main > *,
+  .print-letter-mode .results > .wrap > * {
+    display: none !important;
+  }
+
+  .print-letter-mode main > .results {
+    display: block !important;
+  }
+
+  .print-letter-mode .results > .wrap {
+    display: block;
+  }
+
+  .print-letter-mode .results > .wrap > #sec-letter {
+    display: block !important;
+    margin: 0;
+  }
+
+  .print-letter-mode #sec-letter > * {
+    display: none !important;
+  }
+
+  .print-letter-mode #sec-letter > .letter-print {
+    display: block !important;
+    font-family: var(--font-mono);
+    font-size: 10.5pt;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+}

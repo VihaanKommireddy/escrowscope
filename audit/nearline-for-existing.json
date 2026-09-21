@@ -1,0 +1,40 @@
+{
+  "TV01": null,
+  "TV02": null,
+  "TV03": null,
+  "TV04": null,
+  "TV05": null,
+  "TV06": {
+    "line": "SURPLUS_50",
+    "distanceCents": 0,
+    "toleranceCents": 700
+  },
+  "TV07": {
+    "line": "SURPLUS_50",
+    "distanceCents": 1,
+    "toleranceCents": 700
+  },
+  "TV08": null,
+  "TV09": null,
+  "TV10": {
+    "line": "ONE_MONTH_PAYMENT",
+    "distanceCents": 0,
+    "toleranceCents": 700
+  },
+  "TV10b": {
+    "line": "ONE_MONTH_PAYMENT",
+    "distanceCents": 1,
+    "toleranceCents": 700
+  },
+  "TV11": null,
+  "TV12": null,
+  "TV13": null,
+  "TV14": null,
+  "TV15": null,
+  "TV16": null,
+  "TV17": null,
+  "TV18": null,
+  "TV19": null,
+  "TV20": null,
+  "TV21": null
+}
