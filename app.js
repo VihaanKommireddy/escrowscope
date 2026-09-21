@@ -1006,7 +1006,13 @@ function start() {
   registerServiceWorker();
 
   guardAgainstFraming();
-  if (!pageIsFramed) runExampleFromAddress();
+  if (!pageIsFramed) {
+    runExampleFromAddress();
+    // The same link clicked while the page is already open only changes the "#"
+    // part of the address, and browsers do not reload for that. Listen for it, so
+    // ./#example-2 works from anywhere, not just on a fresh load.
+    window.addEventListener("hashchange", runExampleFromAddress);
+  }
 
   // LAST line on purpose: if anything above threw, this never runs and the
   // "If the buttons on this page do nothing…" paragraph stays on the page.
