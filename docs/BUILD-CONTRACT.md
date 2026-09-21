@@ -94,7 +94,8 @@ Pinned details:
 ## 3. `examples.js` (repo root, owned by Engine Builder — write it FIRST, it is small)
 
 ```js
-export const EXAMPLES = [ { id, title, blurb, account, statement, details, expect } × 3 ];
+export const EXAMPLES = [ { id, tab, title, blurb, account, statement, details, expect } × 3 ];
+// tab       = the short name on the example's tab (added 2026-09-21 with the serif tabs)
 // account   = exactly the C2 `account` shape (integer cents, months in escrow-year order)
 // statement = exactly the C2/D6 `statement` shape
 // details   = { analysisDate: "YYYY-MM-DD" } or {}

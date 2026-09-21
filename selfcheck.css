@@ -24,9 +24,9 @@
 .proof code,
 .selfcheck code {
   padding: 1px 5px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
+  background: var(--sunken);
   font-size: 0.875em;
   /* File paths are long. Let them break so a 320px screen never scrolls sideways. */
   overflow-wrap: anywhere;
@@ -52,10 +52,10 @@
 /* The meter: an instrument readout. Paper sheet, ink rule on top. */
 .proof-meter {
   padding: var(--space-5);
-  border: 1px solid var(--color-border-strong);
-  border-top: 3px solid var(--color-ink);
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--ink);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
+  background: var(--surface);
 }
 
 .proof-label {
@@ -70,7 +70,7 @@
   font-weight: var(--weight-semibold);
   line-height: 1;
   letter-spacing: -0.04em;
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 /* A ruler under the number: a long tick every 40px, a short tick every 8px.
@@ -78,10 +78,10 @@
 .proof-ticks {
   height: 12px;
   margin-top: var(--space-3);
-  border-top: 1px solid var(--color-border-strong);
+  border-top: 1px solid var(--border-strong);
   background-image:
-    repeating-linear-gradient(to right, var(--color-border-strong) 0 1px, transparent 1px 40px),
-    repeating-linear-gradient(to right, var(--color-border-strong) 0 1px, transparent 1px 8px);
+    repeating-linear-gradient(to right, var(--border-strong) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(to right, var(--border-strong) 0 1px, transparent 1px 8px);
   background-repeat: no-repeat;
   background-size: 100% 100%, 100% 50%;
 }
@@ -93,7 +93,7 @@
   margin-top: var(--space-4);
   font-weight: var(--weight-semibold);
   line-height: 1.45;
-  color: var(--color-clear);
+  color: var(--ok-text);
 }
 
 .proof-state .trust-icon {
@@ -102,12 +102,12 @@
 
 /* More than zero is not an alarm. It turns neutral and lists what was asked for. */
 .proof-meter.has-requests .proof-state {
-  color: var(--color-ink);
+  color: var(--ink);
   font-weight: var(--weight-regular);
 }
 
 .proof-meter.has-requests .proof-state .trust-icon {
-  color: var(--color-primary);
+  color: var(--accent);
 }
 
 /* The caveat that sits directly under the number, and the note under the
@@ -116,18 +116,18 @@
 .proof-under {
   margin-top: var(--space-3);
   line-height: 1.55;
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 .proof-list-intro {
   margin-top: var(--space-3);
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .proof-list {
   margin-top: var(--space-2);
   padding-left: var(--space-3);
-  border-left: 2px solid var(--color-border-strong);
+  border-left: 2px solid var(--border-strong);
   list-style: none;
   font-size: var(--text-small);
   line-height: 1.7;
@@ -151,7 +151,7 @@
 .proof-offline-block {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border-strong);
+  border-top: 1px solid var(--border-strong);
 }
 
 .proof-offline {
@@ -172,7 +172,7 @@
   break-inside: avoid;
   margin-bottom: var(--space-5);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border-strong);
+  border-top: 1px solid var(--border-strong);
 }
 
 .proof-note-title {
@@ -183,7 +183,7 @@
 .proof-note p {
   font-size: 15px;
   line-height: 1.6;
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 .proof-note p + p {
@@ -232,7 +232,7 @@
   max-width: 68ch;
   margin-top: var(--space-5);
   padding: var(--space-4);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--border-strong);
   border-left-width: 4px;
   border-radius: var(--radius-sm);
   font-weight: var(--weight-semibold);
@@ -249,21 +249,21 @@
 }
 
 .selfcheck-status.is-pass {
-  border-color: var(--color-clear);
-  background: var(--color-clear-tint);
+  border-color: var(--ok-text);
+  background: var(--ok-subtle);
 }
 
 .selfcheck-status.is-pass .trust-icon {
-  color: var(--color-clear);
+  color: var(--ok-text);
 }
 
 .selfcheck-status.is-differs {
-  border-color: var(--color-flag);
-  background: var(--color-flag-tint);
+  border-color: var(--warn-text);
+  background: var(--warn-subtle);
 }
 
 .selfcheck-status.is-differs .trust-icon {
-  color: var(--color-flag);
+  color: var(--warn-text);
 }
 
 .selfcheck-output > p {
@@ -291,24 +291,24 @@
 }
 
 .selfcheck-mark.is-pass {
-  background: var(--color-clear-tint);
-  color: var(--color-clear);
+  background: var(--ok-subtle);
+  color: var(--ok-text);
 }
 
 .selfcheck-mark.is-differs {
-  background: var(--color-flag-tint);
-  color: var(--color-flag);
+  background: var(--warn-subtle);
+  color: var(--warn-text);
 }
 
 /* The list of cases: a ledger. Ink rule on top, hairline between rows. */
 .selfcheck-list {
   margin-top: var(--space-4);
-  border-top: 2px solid var(--color-ink);
+  border-top: 2px solid var(--ink);
   list-style: none;
 }
 
 .selfcheck-item {
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--border);
 }
 
 .selfcheck-summary {
@@ -327,7 +327,7 @@
 }
 
 .selfcheck-summary:hover {
-  background: var(--color-surface-subtle);
+  background: var(--sunken);
 }
 
 /* The same plus-that-becomes-a-minus the rest of the page uses, drawn with two
@@ -339,12 +339,12 @@
   width: 16px;
   height: 16px;
   background:
-    linear-gradient(var(--color-primary), var(--color-primary)) center / 16px 2px no-repeat,
-    linear-gradient(var(--color-primary), var(--color-primary)) center / 2px 16px no-repeat;
+    linear-gradient(var(--accent), var(--accent)) center / 16px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) center / 2px 16px no-repeat;
 }
 
 .selfcheck-case[open] > .selfcheck-summary::after {
-  background: linear-gradient(var(--color-primary), var(--color-primary)) center / 16px 2px no-repeat;
+  background: linear-gradient(var(--accent), var(--accent)) center / 16px 2px no-repeat;
 }
 
 .selfcheck-id {
@@ -353,7 +353,7 @@
   font-size: var(--text-small);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.04em;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 /* Narrow screens: the title gets its own line under the mark and the id. */
@@ -373,7 +373,7 @@
   gap: var(--space-1) var(--space-3);
   font-size: var(--text-small);
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 @media (min-width: 720px) {
@@ -390,14 +390,14 @@
 
 .selfcheck-tag {
   padding: 1px 6px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
   font-weight: var(--weight-medium);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-primary);
+  color: var(--accent);
 }
 
 /* The opened row. */
@@ -409,7 +409,7 @@
   .selfcheck-body {
     margin-left: var(--space-3);
     padding-left: var(--space-5);
-    border-left: 1px solid var(--color-border-strong);
+    border-left: 1px solid var(--border-strong);
   }
 }
 
@@ -419,7 +419,7 @@
 
 .selfcheck-block-title {
   margin-bottom: var(--space-3);
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 .selfcheck-block > p {
@@ -434,8 +434,8 @@
   gap: var(--space-3) var(--space-5);
   margin: 0 0 var(--space-4);
   padding: var(--space-3) 0;
-  border-top: 1px solid var(--color-hairline);
-  border-bottom: 1px solid var(--color-hairline);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .selfcheck-block > p + .selfcheck-facts {
@@ -446,7 +446,7 @@
 .selfcheck-fact dt {
   font-size: var(--text-small);
   line-height: 1.4;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .selfcheck-fact dd {
@@ -490,7 +490,7 @@
   background: transparent;
   font-size: var(--text-micro);
   font-weight: var(--weight-regular);
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .selfcheck-compare td {
@@ -532,7 +532,7 @@
 /* A row or a cell that does not match: amber tint, plus the words in the row. */
 .selfcheck .data-table tbody tr.is-differs,
 .selfcheck .data-table td.is-differs {
-  background: var(--color-flag-tint);
+  background: var(--warn-subtle);
 }
 
 .selfcheck-cell-line {
@@ -556,7 +556,7 @@
 .selfcheck-months-toggle {
   width: fit-content;
   padding: 10px var(--space-1);
-  color: var(--color-primary);
+  color: var(--accent);
   font-weight: var(--weight-semibold);
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -565,7 +565,7 @@
 }
 
 .selfcheck-months-toggle:hover {
-  color: var(--color-primary-ink);
+  color: var(--accent-hover);
   text-decoration-thickness: 2px;
 }
 

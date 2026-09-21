@@ -1,0 +1,11 @@
+Fraunces-Variable.woff2
+
+Copyright 2018 The Fraunces Project Authors (https://github.com/undercasetype/Fraunces)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The license is available with a FAQ at: https://openfontlicense.org
+
+NOTE FOR THE OWNER: the full text of the SIL Open Font License 1.1 still needs
+to be added to this file. Copy it from https://openfontlicense.org (or from the
+OFL.txt file in the Fraunces repository above) and paste it below this line.
+It was left out on purpose rather than typed from memory.
