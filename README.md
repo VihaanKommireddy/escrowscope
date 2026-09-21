@@ -3,6 +3,8 @@
 EscrowScope answers one question that homeowners can't easily answer, which is
 why did my mortgage payment just jump?
 
+The page is live at https://vihaankommireddy.github.io/escrowscope/ and it is free.
+
 About 40 million US households pay into an escrow account, where the mortgage
 servicer collects extra money each month to pay property taxes and insurance.
 Once a year the servicer runs an escrow analysis and mails out a statement that
@@ -76,7 +78,7 @@ the tests, the research notes and the docs. I set the goal, the structure and
 the rules they worked under. `BUILD-LOG.md` and `AI-DISCLOSURE-LOG.md` say who
 did what, and I keep them honest on purpose.
 
-## Run it
+## Run it on your own computer
 
 You need Node and nothing else. There are no dependencies to install.
 
