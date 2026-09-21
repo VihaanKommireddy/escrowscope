@@ -909,7 +909,7 @@ main:focus {
 
 .form-aside a {
   display: inline-block;
-  padding-block: 10px;
+  padding-block: 12px;
 }
 
 /* ───────────────────────── 6. The tool: the result as six tabs ───────────────────────── */
@@ -1129,8 +1129,21 @@ main:focus {
     margin-top: 6pt;
   }
 
+  /* Two-class rules above set these paddings for the screen; a two-class rule
+     is needed to take them off again on paper. */
+  .page-check .results,
   .limits--brief {
     padding-block: 0;
+  }
+
+  /* On screen this title is sized by a two-class rule, which would beat the
+     plain ".limits h2" that styles.css uses on paper. Say the paper size again,
+     or the big title pushes the limits onto a second page. */
+  .limits .limits-brief-title {
+    margin-top: 8pt;
+    padding-top: 3pt;
+    border-top: 1pt solid #000000;
+    font-size: 10pt;
   }
 
   .limits-more {

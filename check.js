@@ -606,7 +606,14 @@ function showResults(check, moveFocus) {
   hasCheckedOnce = true;
   byId("results").hidden = false;
   byId("print-date").textContent = "Made on " + todayInWords() + ". Math, not legal advice.";
+  // The chart measures the box it is drawn into, and a tab that is not showing
+  // has no width. So every panel is laid out while the results are drawn, and
+  // the tabs are put back before the browser paints anything: nobody sees it,
+  // and the chart is the right size the first time its tab is opened.
+  const showing = resultTabs.selectedIndex();
+  for (const panel of resultTabs.panels) panel.hidden = false;
   const everyStepDrew = renderResults(check, { fieldToId: fieldToId, keepLetter: letterWasEdited });
+  resultTabs.select(showing, false);
   // Only call the results fresh when ALL of them were redrawn.
   setStale(!everyStepDrew);
   showWarnings(check.warnings);
