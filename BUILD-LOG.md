@@ -372,3 +372,84 @@ clean console. One bug found and fixed by the director: the editable letter box
 was 14px, and iPhone Safari zooms the page in when a text box under 16px is
 tapped. Now 1rem, with a regression test that was shown to fail on the old value.
 Still verified by nobody: a real iPhone, Safari's engine, a screen reader.
+
+### 2026-09-21: the page restyled to match the Keepbook landing page (branch `ui-keepbook`)
+
+Vihaan looked at the live page and said: "for the UI/UX what I want is like the
+Keepbook landing page." A UI agent (Claude Code) restyled the whole page on the
+branch `ui-keepbook`. Nothing was pushed and `main` (the live site) was not
+touched. No math changed: `engine/`, `audit/`, `docs/research/` and `v0/` were
+not opened for writing.
+
+**What changed**
+
+- **Colors.** `styles.css` now uses Keepbook's neutrals (warm paper `#F7F6F2`,
+  white sheets, a sunken well, hairline `#DCD8CE`, green-black ink) and its calm
+  pairs for the three verdicts, in light and dark. The accent stays EscrowScope's
+  own teal `#0C5460` (dark theme `#5BB8C6`), because on this page green already
+  means "matches". The old `--color-*` token names were renamed across all four
+  stylesheets.
+- **Type.** One serif, Fraunces, for the name, the headings, the tab labels and
+  the verdict headline. It is ONE file in `assets/fonts/` (SIL OFL 1.1, notice
+  next to it; the full license text still has to be pasted in by the owner).
+  Body text is still the system font. Every number, table cell, chip label and
+  eyebrow is still monospace with tabular figures.
+- **The policy line gained one directive**, `font-src 'self'`, so ten in all.
+  The font is preloaded while the page loads and saved by `sw.js`, so the
+  request counter still reads 0 and the page still opens offline with its serif.
+- **New top of the page.** A sticky paper bar (logo tile, serif name, three text
+  links, one filled pill), a hero with the headline and its italic punchline, two
+  pills, three true claims, and a small framed SAMPLE RESULT with chips around
+  it. Every number in that picture is worked out when the page loads, by running
+  example 2 through `pipeline.runCheck` and running `runSelfCheck` on all the
+  cases (`preview.js`). It is hidden from screen readers and described in one
+  sentence, so nobody hears a verdict that is not theirs.
+- **The three examples are tabs** (`tabs.js`): big serif labels on a hairline,
+  the real ARIA pattern (one Tab stop, arrow keys wrap, Home and End). Each panel
+  has the example's words, its button, and a slip of the numbers it types in.
+  `#example-2` links still work. `examples.js` gained a short `tab` name.
+- **New bottom of the page.** "How it works" and the privacy panel moved out of
+  the footer into their own sections, then a centered closing section and a small
+  footer. The order of form, results and honest limits did not change.
+- **Everything in between was re-themed, not rebuilt:** pill buttons, white
+  inputs with 1px edges, serif legends, hairlines between parts instead of boxes,
+  a sunken header row on tables, flat cards. No id or class that a script reads
+  was renamed except the example cards, which changed on both sides at once.
+
+**Tests: 657, all passing** (647 before). Changed on purpose, in the same commits:
+
+- `tests/shell.test.js`: the exact policy is now TEN directives, with three new
+  hostile `font-src` variants that must be rejected; a new test pins the page to
+  exactly one font file, from its own folder, preloaded, saved by `sw.js`, with
+  its license notice beside it; the list of exceptions to the banned-text scan
+  gained ONE narrow entry (`styles.css` may contain `src:`, once, because that
+  is the only way CSS can name a font file) and the test that pins that list was
+  updated to match and to count the one use.
+- `tests/examples.test.js`: the list of keys on each example now includes `tab`.
+- New: `tests/contrast.test.js` (54 color pairs x 2 themes, computed from the
+  tokens by `tools/contrast.mjs`, all at or above WCAG AA) and
+  `tests/preview.test.js` (every string in the hero picture equals what the engine
+  gives for example 2; no dollar figure is typed into the hero; tab keys wrap).
+
+**Checked in a real browser (Chromium only):** headless Chrome driven over its
+debugging port, plus the Claude Code browser pane. At 1280, 768, 375 and 320
+pixels, light and dark: no console messages, no sideways page scroll, no target
+under 44px, no typing box under 16px, one h1 and no skipped heading level, the
+font loaded, the counter at 0 after running an example. With real key presses:
+the skip link is the first stop and lands below the sticky bar; arrows move
+through the tabs; Enter on a panel's button runs the example and focus lands on
+the verdict heading, below the bar; Enter in an empty form puts focus on the
+error summary, below the bar. All three examples gave their verdicts, the N1
+case (two $3,600 bills, $1,800 balance, $1,800 minimum) came out amber, all 30
+checks passed, the letter box is 16px, the sample statement still follows the
+box in focus. Example 3 printed to ONE page (the focus ring on the verdict
+heading used to print as a box across the words; it no longer prints). With the
+service worker on: 29 files saved including the font; with the server killed the
+page reloaded, kept its serif, ran example 3 and all 30 checks, counter at 0.
+Reduced motion: nothing animates. Forced colors (emulated): borders and marks
+hold, only the chosen tab is underlined. 200% zoom (640px layout): no sideways
+scroll.
+
+**Still verified by nobody:** Safari, Firefox, a real phone, a screen reader,
+real Windows High Contrast. In Safari and Firefox the font preload and the
+counter reading 0 were NOT checked.
