@@ -15,9 +15,8 @@
 
 import { el, svgEl, clear } from "./dom.js";
 import { EXAMPLES } from "./examples.js";
-import { exampleToValues, runCheck } from "./pipeline.js";
+import { exampleToValues, runCheck, isTooCloseToCall } from "./pipeline.js";
 import { formatCents, MONTH_NAMES, VECTORS, runSelfCheck } from "./engine/index.js";
-import { isTooCloseToCall } from "./render.js";
 
 // Which example the picture shows (the second one: a surplus the rule says is
 // refunded, so the banner, the cushion and the low point all have a story).
@@ -132,12 +131,14 @@ function previewChart(facts) {
   return svg;
 }
 
+// "preview-chip" is a stable name for the motion layer to find the chips by. It
+// carries no styles of its own.
 function chip(className, dotClass, words, figure) {
   const children = [];
   if (dotClass) children.push(el("span", { className: "chip-dot " + dotClass }));
   children.push(words);
   if (figure) children.push(" · ", el("b", { text: figure }));
-  return el("p", { className: "chip " + className }, children);
+  return el("p", { className: "chip preview-chip " + className }, children);
 }
 
 const MARKS = { clear: "✓", flag: "!", info: "i" };
@@ -174,7 +175,7 @@ export function initHeroPreview(holder) {
       chip("chip--cushion", "chip-dot--warn", facts.cushionChip.words, facts.cushionChip.figure),
       chip("chip--low", "chip-dot--accent", facts.lowChip.words, facts.lowChip.figure),
       chip("chip--checks", facts.allChecksPassed ? "chip-dot--ok" : "chip-dot--warn", facts.checksChip, ""),
-      el("p", { className: "chip chip--example", text: "Example" })
+      el("p", { className: "chip preview-chip chip--example", text: "Example" })
     );
   } catch (problem) {
     // The picture is optional. Leave the space empty rather than break the page.

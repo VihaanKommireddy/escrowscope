@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <!-- The line above is the privacy rule, enforced by the browser. Every page of
+       this site carries exactly the same one (index.html explains each part). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F8F5EE" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0D1222" media="(prefers-color-scheme: dark)">
+  <title>Privacy you can check · EscrowScope</title>
+  <meta name="description" content="EscrowScope does not send your numbers anywhere. See the browser rule that blocks it, a live count of the requests this page has made, and what this site cannot tell you.">
+  <!-- An inline tab icon and a preloaded font, for the same reason as on
+       index.html: nothing may be fetched after the page has finished loading, so
+       the counter in the panel below can honestly read 0. -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%231D3A63' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="./assets/fonts/Fraunces-Variable.woff2">
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./site.css">
+  <link rel="stylesheet" href="./selfcheck.css">
+  <script type="module" src="./privacy-page.js"></script>
+</head>
+<body class="page-privacy">
+  <a class="skip-link" href="#main">Skip to the main content</a>
+
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <a class="brand" href="./index.html">
+        <span class="brand-tile" aria-hidden="true">
+          <svg class="brand-mark" viewBox="0 0 100 100" width="20" height="20" focusable="false">
+            <g fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 66.37 59.23 A 27 27 0 1 1 66.37 40.77"/>
+              <line x1="15" y1="50" x2="85" y2="50"/>
+            </g>
+          </svg>
+        </span>
+        <span class="brand-name">EscrowScope</span>
+      </a>
+      <nav class="masthead-nav" aria-label="Main">
+        <a class="masthead-link" href="./proof.html">How it’s checked</a>
+        <a class="masthead-link" href="./privacy.html" aria-current="page">Privacy</a>
+        <a class="btn btn-primary masthead-cta" href="./check.html">Check my statement</a>
+        <details class="masthead-menu">
+          <summary class="masthead-menu-button"><span class="menu-icon" aria-hidden="true"></span><span class="menu-word">Menu</span></summary>
+          <ul class="masthead-menu-list">
+            <li><a href="./proof.html">How it’s checked</a></li>
+            <li><a href="./privacy.html" aria-current="page">Privacy</a></li>
+          </ul>
+        </details>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <!-- ───────────── Privacy you can check ───────────── -->
+    <section id="privacy-proof" class="page-head privacy-proof" aria-labelledby="privacy-heading">
+      <div class="wrap">
+        <span class="eyebrow">Privacy you can check</span>
+        <h1 id="privacy-heading" class="page-title">This page does not send your numbers anywhere. Check it yourself.</h1>
+        <nav class="page-toc" aria-label="On this page">
+          <a href="#proof-panel-section">The live counter</a>
+          <a href="#limits">What this page can’t tell you</a>
+          <a href="#how">How this works</a>
+          <a href="#glossary">Words on your statement</a>
+        </nav>
+      </div>
+    </section>
+
+    <section class="privacy-section privacy-section--page" id="proof-panel-section" aria-labelledby="proof-panel-heading">
+      <div class="wrap">
+        <h2 id="proof-panel-heading" class="page-h2">A live reading, and the rule behind it</h2>
+        <div id="proof-panel">
+          <p class="page-problem">The privacy panel has not loaded. Your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────── Honest limits, in full ───────────── -->
+    <section class="limits" id="limits" aria-labelledby="limits-heading">
+      <div class="wrap">
+        <span class="eyebrow">The fine print, up front</span>
+        <h2 id="limits-heading">What this page can’t tell you</h2>
+        <ul class="limits-list">
+          <li><strong>This is math, not legal advice.</strong> It does not tell you whether you have a legal claim, and it is not a lawyer or a substitute for one.</li>
+          <li><strong>It is only as good as the numbers typed in.</strong> It cannot see your real bills or your servicer’s records. It can only redo the math from what you enter.</li>
+          <li><strong>Your servicer may know something you don’t.</strong> A gap between your statement and the federal math can come from a newer tax bill or insurance premium than the one you typed. A mismatch is a question to ask, not proof of a mistake.</li>
+          <li><strong>It only covers escrow.</strong> It checks the escrow rule (12 CFR 1024.17) and nothing else about your loan: not your interest rate, not whether mortgage insurance can come off.</li>
+          <li><strong>Not every loan is covered by this rule.</strong> Some loans, like home equity lines of credit and some seller-financed loans, fall outside it. See “Is this the right tool for me?” on the <a href="./check.html">Check my statement</a> page.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ───────────── How this works + the sources ───────────── -->
+    <section class="how" id="how" aria-labelledby="how-heading">
+      <div class="wrap how-grid">
+        <div>
+          <span class="eyebrow">How it works</span>
+          <h2 id="how-heading">The federal method, run on your numbers.</h2>
+          <div class="how-copy">
+            <p>Federal rule 12 CFR 1024.17 tells every mortgage servicer how to run an escrow account: add up the year’s bills, divide by 12, walk the balance forward month by month, and keep a cushion no bigger than one sixth of the year’s bills. This site runs that same method on the numbers you type and compares the answer with your statement.</p>
+            <p>The whole thing is a handful of plain files that run in your browser. There is no account and no tracking. The files are hosted on GitHub Pages, which, like any web host, can see that your browser downloaded them. It never sees what you type. After your first visit the site works with the internet turned off in most browsers.</p>
+          </div>
+        </div>
+        <div>
+          <span class="eyebrow">Read it yourself</span>
+          <h3 id="sources-heading" class="how-h">The rule, the agency, and this site’s code</h3>
+          <ul class="link-list">
+            <li><a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The federal escrow rule, 12 CFR 1024.17 (eCFR)</a></li>
+            <li><a href="https://www.consumerfinance.gov/rules-policy/regulations/1024/17/" rel="noopener noreferrer">The same rule on the CFPB’s site</a></li>
+            <li><a href="https://www.consumerfinance.gov/find-a-housing-counselor/" rel="noopener noreferrer">Find a HUD-approved housing counselor (CFPB)</a></li>
+            <li><a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">This site’s source code</a></li>
+          </ul>
+          <p class="small muted">These links open other websites. Clicking a link like these is the only way this site ever leads anywhere else.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────── The glossary ───────────── -->
+    <section class="glossary-section" id="glossary" aria-labelledby="glossary-heading" tabindex="-1">
+      <div class="wrap">
+        <span class="eyebrow">Plain English</span>
+        <h2 id="glossary-heading">Words on your statement, in plain English</h2>
+        <dl class="glossary-list glossary-list--page">
+          <div><dt>Escrow</dt><dd>A savings-like account your mortgage company holds for you. It is used only to pay your property taxes and insurance when they are due.</dd></div>
+          <div><dt>Servicer</dt><dd>The company that collects your mortgage payment and runs your escrow account. It is not always the company that first gave you the loan.</dd></div>
+          <div><dt>Escrow analysis</dt><dd>The yearly checkup your servicer does on the account: did they collect the right amount last year, and how much should they collect next year?</dd></div>
+          <div><dt>Disbursement</dt><dd>A payment your servicer makes out of your escrow account, like a property tax bill or an insurance premium.</dd></div>
+          <div><dt>Cushion</dt><dd>A safety buffer your servicer may keep in the account. Federal law caps it at one sixth of your yearly bills, which is the same as 2 months of escrow payments.</dd></div>
+          <div><dt>Low point</dt><dd>The lowest your escrow balance is expected to drop to in the next 12 months.</dd></div>
+          <div><dt>Shortage</dt><dd>The account has money in it, but not as much as it is supposed to have.</dd></div>
+          <div><dt>Deficiency</dt><dd>The account went below zero. The servicer paid a bill with money that was not there yet.</dd></div>
+          <div><dt>Surplus</dt><dd>The account has more money in it than it needs. Some servicers call this an “overage”.</dd></div>
+          <div><dt>Computation year</dt><dd>The 12-month cycle your servicer uses to review the account. It often starts on the month of your first payment, not in January.</dd></div>
+          <div><dt>RESPA and Regulation X</dt><dd>RESPA is the federal law that sets the rules for mortgage escrow accounts. Regulation X is the detailed rule written under it. The escrow section is “12 CFR 1024.17”.</dd></div>
+          <div><dt>CFPB</dt><dd>The Consumer Financial Protection Bureau: the federal agency that writes these rules and takes complaints from consumers.</dd></div>
+          <div><dt>Notice of error</dt><dd>A letter you send your servicer asking them to look at a specific mistake. They have set deadlines to answer it.</dd></div>
+          <div><dt>Request for information</dt><dd>A letter asking your servicer for the worksheet behind your statement, or for an explanation of a number. It does not say anything is wrong. They generally have set deadlines to answer it.</dd></div>
+          <div><dt>HUD-approved housing counselor</dt><dd>A trained advisor, approved by the Department of Housing and Urban Development, who gives free or low-cost independent help with your mortgage.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="closing closing--page" aria-labelledby="closing-heading">
+      <div class="wrap">
+        <h2 id="closing-heading">See the math behind your new payment.</h2>
+        <div class="cta-row cta-row--center">
+          <a class="btn btn-primary btn-large" href="./check.html">Check my statement</a>
+          <a class="btn btn-secondary btn-large" href="./proof.html">How it’s checked</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p class="footer-brand">EscrowScope · free and independent</p>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="./check.html">Check my statement</a>
+        <a href="./proof.html">How it’s checked</a>
+        <a href="./privacy.html" aria-current="page">Privacy you can check</a>
+        <a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">Source code</a>
+        <a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The rule on eCFR</a>
+      </nav>
+      <p class="footer-note">This is math, not legal advice. EscrowScope is not affiliated with any mortgage servicer or government agency. It shows math. What you do next is up to you.</p>
+    </div>
+  </footer>
+</body>
+</html>

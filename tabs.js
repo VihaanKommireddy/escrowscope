@@ -9,7 +9,12 @@
 //   - each tab says which panel it controls and whether it is the chosen one
 //     (aria-controls, aria-selected), and each panel says which tab names it.
 //
-// Nothing here knows about escrow. app.js uses it for the three examples.
+// Nothing here knows about escrow. Two ways in:
+//   buildTabs  makes the row and the panels from a list (the three examples on
+//              the landing page);
+//   wireTabs   takes a row that is ALREADY written in the HTML (the four steps of
+//              the form and the six parts of the result on check.html), so
+//              nothing on the page jumps when the script starts.
 
 import { el, clear } from "./dom.js";
 
@@ -25,22 +30,19 @@ export function nextTabIndex(current, count, key) {
   return current;
 }
 
-// buildTabs({ holder, labelledBy, idPrefix, items })
-//   holder      the element to fill (it is emptied first)
-//   labelledBy  the id of the heading that names the whole row of tabs
-//   idPrefix    "example" gives the ids example-tab-1, example-panel-1, …
-//   items       [{ label: "words on the tab", content: [nodes for its panel] }]
+// wireTabs({ list, tabs, panels, onSelect })
+//   list      the element with role="tablist"
+//   tabs      its role="tab" buttons, in order
+//   panels    the role="tabpanel" elements, in the same order
+//   onSelect  optional: called as onSelect(index, previousIndex) after every
+//             change of tab, however it happened
 // Returns { select(index, moveFocus), selectedIndex(), tabs, panels }.
-export function buildTabs({ holder, labelledBy, idPrefix, items }) {
-  clear(holder);
-  const tabs = [];
-  const panels = [];
+export function wireTabs({ list, tabs, panels, onSelect }) {
   let chosen = 0;
-
-  const list = el("div", { className: "tabs-list", attrs: { role: "tablist", "aria-labelledby": labelledBy } });
 
   function select(index, moveFocus) {
     if (!Number.isInteger(index) || index < 0 || index >= tabs.length) return;
+    const previous = chosen;
     chosen = index;
     tabs.forEach(function (tab, position) {
       const isChosen = position === index;
@@ -54,7 +56,43 @@ export function buildTabs({ holder, labelledBy, idPrefix, items }) {
     if (list.scrollWidth > list.clientWidth) {
       list.scrollLeft = Math.max(0, tabs[index].offsetLeft - list.offsetLeft - 16);
     }
+    if (typeof onSelect === "function") onSelect(index, previous);
   }
+
+  tabs.forEach(function (tab, index) {
+    tab.addEventListener("click", function () {
+      select(index, false);
+    });
+    tab.addEventListener("keydown", function (event) {
+      const target = nextTabIndex(index, tabs.length, event.key);
+      if (target === index && event.key !== "Home" && event.key !== "End") return;
+      event.preventDefault();
+      select(target, true);
+    });
+  });
+
+  return {
+    select: select,
+    selectedIndex: function () {
+      return chosen;
+    },
+    tabs: tabs,
+    panels: panels,
+  };
+}
+
+// buildTabs({ holder, labelledBy, idPrefix, items })
+//   holder      the element to fill (it is emptied first)
+//   labelledBy  the id of the heading that names the whole row of tabs
+//   idPrefix    "example" gives the ids example-tab-1, example-panel-1, …
+//   items       [{ label: "words on the tab", content: [nodes for its panel] }]
+// Returns the same object as wireTabs.
+export function buildTabs({ holder, labelledBy, idPrefix, items }) {
+  clear(holder);
+  const tabs = [];
+  const panels = [];
+
+  const list = el("div", { className: "tabs-list", attrs: { role: "tablist", "aria-labelledby": labelledBy } });
 
   items.forEach(function (item, index) {
     const number = index + 1;
@@ -68,15 +106,6 @@ export function buildTabs({ holder, labelledBy, idPrefix, items }) {
       },
       [el("span", { className: "tab-label", text: item.label })]
     );
-    tab.addEventListener("click", function () {
-      select(index, false);
-    });
-    tab.addEventListener("keydown", function (event) {
-      const target = nextTabIndex(index, tabs.length, event.key);
-      if (target === index && event.key !== "Home" && event.key !== "End") return;
-      event.preventDefault();
-      select(target, true);
-    });
     tabs.push(tab);
     list.append(tab);
 
@@ -90,14 +119,8 @@ export function buildTabs({ holder, labelledBy, idPrefix, items }) {
 
   holder.append(list);
   for (const panel of panels) holder.append(panel);
-  select(0, false);
 
-  return {
-    select: select,
-    selectedIndex: function () {
-      return chosen;
-    },
-    tabs: tabs,
-    panels: panels,
-  };
+  const wired = wireTabs({ list: list, tabs: tabs, panels: panels });
+  wired.select(0, false);
+  return wired;
 }

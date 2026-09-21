@@ -420,6 +420,19 @@ export function runCheck(values) {
   }
 }
 
+// SPEC E3: when a result sits within $7 of a legal line (the $50 refund line, or
+// one month's payment), the engine sets result.nearLine and softens its words.
+// The page must then stay calm too: teal "info" styling, never the amber
+// "refund required" look, and no refund date. The ONLY test is whether the
+// engine set nearLine. "Near" is never worked out again here.
+// (It lives in this file, not render.js, so the landing page's small preview can
+// ask the question without loading the whole results drawer.)
+export function isTooCloseToCall(check) {
+  if (!check || !check.result) return false;
+  const nearLine = check.result.nearLine;
+  return nearLine !== null && nearLine !== undefined;
+}
+
 // Is this dollar amount probably still being typed? While someone types 1,234
 // the box passes through "1," and "1,2", which are not valid amounts YET. Live
 // what-if uses this to stay quiet for a moment instead of flashing an error.

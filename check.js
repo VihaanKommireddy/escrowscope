@@ -1,14 +1,21 @@
-// app.js — DOM wiring only: read the form → pipeline.runCheck → render.
-// No math lives here. Everything about dollars, months and the federal rule is
-// behind pipeline.js (which calls the engine), so Node can test that same path.
+// check.js — the script for check.html, the tool. (It was app.js while the whole
+// site was one page.) DOM wiring only: read the form → pipeline.runCheck →
+// render. No math lives here. Everything about dollars, months and the federal
+// rule is behind pipeline.js (which calls the engine), so Node can test that
+// same path.
+//
+// The form is four short steps and the result is six tabs. Both rows of tabs are
+// written in check.html; this file wires them up with tabs.js. Every box keeps
+// the id it always had, so reading the form, showing errors and the sample
+// statement all work exactly as they did on one long page.
 //
 // Every module the page will ever need is imported right here, up front. There
-// is no lazy loading anywhere, which is what keeps the privacy panel's
-// "requests since load" counter honestly at 0 whatever gets clicked (SPEC D1).
+// is no lazy loading anywhere, which is what keeps the "requests since load"
+// counter under the form honestly at 0 whatever gets clicked (SPEC D1).
 
 import { el, clear } from "./dom.js";
 import { EXAMPLES } from "./examples.js";
-import { MONTH_NAMES, formatCents } from "./engine/index.js";
+import { MONTH_NAMES } from "./engine/index.js";
 import {
   BILL_KINDS,
   MAX_BILL_ROWS,
@@ -32,11 +39,10 @@ import {
   flashVerdict,
 } from "./render.js";
 import { initGuide, renumberBoxes } from "./guide.js";
-import { initProofPanel } from "./proof.js";
-import { initSelfCheck } from "./selfcheck-ui.js";
-import { registerServiceWorker } from "./sw-register.js";
-import { buildTabs } from "./tabs.js";
-import { initHeroPreview } from "./preview.js";
+import { initRequestLine } from "./proof.js";
+import { wireTabs } from "./tabs.js";
+import { initSite } from "./site.js";
+import { exampleNumberFromHash } from "./example-link.js";
 
 const LIVE_EDIT_DELAY_MS = 250;
 
@@ -45,7 +51,7 @@ function byId(id) {
 }
 
 // ─────────────────────────── when something breaks ───────────────────────────
-// index.html carries a plain paragraph ("If the buttons on this page do
+// check.html carries a plain paragraph ("If the buttons on this page do
 // nothing…"). start() hides it as its very last line, so it stays visible if
 // start-up never finishes. These two listeners bring it back if anything
 // throws later on. They are registered first, before anything else can fail.
@@ -107,6 +113,66 @@ function blankFormValues() {
 // which asks for smooth scrolling on in-page links.)
 function scrollBehavior() {
   return "instant";
+}
+
+// ─────────────────────────── the four steps, the six result tabs ───────────────────────────
+// Both rows of tabs are plain HTML in check.html. wireTabs (tabs.js) gives them
+// the keyboard rules: one Tab stop, arrow keys, Home and End.
+
+let stepTabs = null;
+let resultTabs = null;
+
+function wireTabRow(listSelector, tabSelector, panelSelector, onSelect) {
+  const list = document.querySelector(listSelector);
+  const tabs = Array.from(list.querySelectorAll(tabSelector));
+  const panels = tabs.map(function (tab) {
+    return byId(tab.getAttribute("aria-controls"));
+  });
+  if (document.querySelectorAll(panelSelector).length !== panels.length) {
+    throw new Error("check.html: the tabs and their panels do not line up");
+  }
+  return wireTabs({ list: list, tabs: tabs, panels: panels, onSelect: onSelect });
+}
+
+// Back is hidden on the first step and Next on the last. "Check the math" is
+// always there.
+function syncStepButtons(index) {
+  byId("step-back").hidden = index === 0;
+  byId("step-next").hidden = index === stepTabs.tabs.length - 1;
+}
+
+// Which step holds this box? -1 for a box that sits outside the steps (the
+// "More" section under them).
+function stepIndexOf(node) {
+  const panel = node.closest(".step-panel");
+  return panel ? stepTabs.panels.indexOf(panel) : -1;
+}
+
+// Bring the step that holds `node` forward, so the box can be seen and focused.
+function revealBox(node) {
+  if (!node || !stepTabs) return;
+  const index = stepIndexOf(node);
+  if (index !== -1 && index !== stepTabs.selectedIndex()) stepTabs.select(index, false);
+}
+
+// Back / Next: show the step and move focus to its heading, so a screen reader
+// says "Step 2 of 4, Your balance" and a keyboard user starts at the top of it.
+function goToStep(index) {
+  if (index < 0 || index >= stepTabs.tabs.length) return;
+  stepTabs.select(index, false);
+  const heading = byId("step-heading-" + (index + 1));
+  heading.scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
+  heading.focus({ preventScroll: true });
+}
+
+// A small mark on the tab of every step that has a box to fix. The words are
+// for screen readers; the dot (site.css) is for everyone else.
+function markStepsWithErrors(indexes) {
+  stepTabs.tabs.forEach(function (tab, index) {
+    const hasError = indexes.includes(index);
+    tab.classList.toggle("has-error", hasError);
+    tab.querySelector(".step-tab-flag").textContent = hasError ? " (has a box to fix)" : "";
+  });
 }
 
 // ─────────────────────────── bill rows ───────────────────────────
@@ -407,6 +473,7 @@ function clearErrors() {
   }
   byId("error-summary").hidden = true;
   clear(byId("error-summary-list"));
+  if (stepTabs) markStepsWithErrors([]);
 }
 
 function labelTextFor(controlId) {
@@ -425,6 +492,7 @@ function labelTextFor(controlId) {
 function showErrors(errors, withSummary) {
   clearErrors();
   const list = byId("error-summary-list");
+  const stepsWithErrors = [];
 
   for (const error of errors) {
     const controlId = fieldToId(error.field);
@@ -439,6 +507,8 @@ function showErrors(errors, withSummary) {
     if (control) {
       const closedSection = control.closest("details:not([open])");
       if (closedSection) closedSection.open = true;
+      const stepIndex = stepIndexOf(control);
+      if (stepIndex !== -1 && !stepsWithErrors.includes(stepIndex)) stepsWithErrors.push(stepIndex);
     }
 
     let linkText = error.message;
@@ -452,7 +522,16 @@ function showErrors(errors, withSummary) {
     list.append(item);
   }
 
+  markStepsWithErrors(stepsWithErrors);
+
   if (!withSummary) return;
+  // A real press of "Check the math": bring the FIRST step with a mistake
+  // forward, whichever step was showing. (Live editing never changes the step
+  // under someone's hands; it only marks the tabs.)
+  if (stepsWithErrors.length > 0) {
+    const firstStep = Math.min.apply(null, stepsWithErrors);
+    if (firstStep !== stepTabs.selectedIndex()) stepTabs.select(firstStep, false);
+  }
   const count = errors.length;
   byId("error-summary-title").textContent =
     count === 1 ? "One box needs fixing before the math can run" : count + " boxes need fixing before the math can run";
@@ -514,6 +593,8 @@ function handleJumpLinkClick(event) {
   event.preventDefault();
   const closedSection = target.closest("details:not([open])");
   if (closedSection) closedSection.open = true;
+  // The box may be in a step that is not showing: switch to it first.
+  revealBox(target);
   target.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
   target.focus({ preventScroll: true });
 }
@@ -531,6 +612,9 @@ function showResults(check, moveFocus) {
   showWarnings(check.warnings);
 
   if (moveFocus) {
+    // A real check always lands on the Verdict tab, with focus on the verdict.
+    // (Live what-if leaves the visitor on whichever tab they were reading.)
+    resultTabs.select(0, false);
     const heading = byId("verdict-heading");
     byId("results").scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     heading.focus({ preventScroll: true });
@@ -579,110 +663,60 @@ function scheduleLiveEdit() {
 
 // ─────────────────────────── examples ───────────────────────────
 
-// The three examples are a row of tabs (tabs.js has the keyboard rules). Choosing
-// a tab only SHOWS that example: its words, and the numbers its statement
-// carries. The button inside the panel fills in the form and runs the check.
-let exampleTabs = null;
-
-const CLAIMED_KIND_WORDS = { shortage: "A shortage of ", surplus: "A surplus of ", deficiency: "A deficiency of " };
-
-// The numbers this example types into the form, as a small slip. Every figure
-// comes straight from examples.js, so the slip and the form can never disagree.
-function exampleSlip(example) {
-  let billsCents = 0;
-  for (const bill of example.account.disbursements) billsCents += bill.amountCents;
-  const rows = [
-    ["Current escrow payment", formatCents(example.statement.currentMonthlyEscrowCents)],
-    ["New escrow payment", formatCents(example.statement.newMonthlyEscrowCents)],
-    ["Escrow balance at the start", formatCents(example.account.startingBalanceCents)],
-    ["Required minimum balance", formatCents(example.statement.requiredMinimumBalanceCents)],
-    ["Bills for the next 12 months", formatCents(billsCents)],
-  ];
-  const kindWords = CLAIMED_KIND_WORDS[example.statement.claimedKind];
-  const list = el("dl", { className: "example-slip-rows" });
-  for (const row of rows) {
-    list.append(el("div", { className: "example-slip-row" }, [el("dt", { text: row[0] }), el("dd", { text: row[1] })]));
-  }
-  if (kindWords) {
-    list.append(
-      el("div", { className: "example-slip-row is-total" }, [
-        el("dt", { text: "The statement says there is" }),
-        el("dd", { text: kindWords + formatCents(example.statement.claimedAmountCents) }),
-      ])
-    );
-  }
-  return el("div", { className: "example-slip" }, [
-    el("p", { className: "example-slip-title", text: "What this example’s statement says" }),
-    list,
-  ]);
-}
+// Three small buttons above the form. Each one fills in the form with that
+// example's numbers and checks the math, exactly as a visitor's own numbers
+// would be checked. (The landing page shows the same three with their stories;
+// its buttons are links that end in "#example-2", read further down.)
 
 function runExample(index) {
   const example = EXAMPLES[index];
   if (!example || pageIsFramed) return;
-  exampleTabs.select(index, false);
-  unpressExamples();
-  const note = exampleTabs.panels[index].querySelector(".example-loaded");
-  if (note) note.textContent = "These numbers are in the form now. The result is further down the page.";
   byId("f-servicer-name").value = "";
   byId("f-loan-number").value = "";
   forgetLetterEdits();
   writeFormValues(exampleToValues(example));
   setMonthGuessNote(false);
+  byId("undo-clear").hidden = true;
+  stepTabs.select(0, false);
+  markLoadedExample(index);
+  setStatus("form-status", "Example " + (index + 1) + " is in the form. Change any number to see what happens.");
   checkNow();
 }
 
-function buildExampleTabs() {
-  const items = EXAMPLES.map(function (example, index) {
-    const runButton = el("button", {
-      className: "btn btn-primary example-run",
-      text: "Fill in the form and check it",
-      attrs: { type: "button" },
-    });
-    runButton.addEventListener("click", function () {
-      runExample(index);
-    });
-    const words = el("div", { className: "tab-panel-text" }, [
-      el("p", { className: "eyebrow", text: "Example " + (index + 1) }),
-      el("h4", { className: "example-title", text: example.title }),
-      el("p", { className: "example-blurb", text: example.blurb }),
-      runButton,
-      el("p", { className: "example-loaded" }),
-    ]);
-    return { label: example.tab, content: [words, exampleSlip(example)] };
+function markLoadedExample(index) {
+  byId("example-buttons").querySelectorAll(".example-load").forEach(function (button, position) {
+    button.classList.toggle("is-loaded", position === index);
   });
-  exampleTabs = buildTabs({ holder: byId("example-buttons"), labelledBy: "examples-heading", idPrefix: "example", items: items });
 }
 
-// A link such as ./#example-2 opens the page with that example already run.
-// Handy for sharing "look at this case" and for demos. Nothing is read from the
-// address except that one small number.
+function buildExampleButtons() {
+  const holder = byId("example-buttons");
+  clear(holder);
+  EXAMPLES.forEach(function (example, index) {
+    const button = el("button", { className: "btn btn-secondary example-load", attrs: { type: "button" } }, [
+      el("span", { className: "example-load-num", text: String(index + 1), attrs: { "aria-hidden": "true" } }),
+      el("span", { text: example.tab }),
+    ]);
+    button.addEventListener("click", function () {
+      runExample(index);
+    });
+    holder.append(button);
+  });
+}
+
+// A link such as ./check.html#example-2 opens the tool with that example already
+// run. Handy for the landing page's buttons, for sharing "look at this case" and
+// for demos. Nothing is read from the address except that one small number
+// (example-link.js).
 function runExampleFromAddress() {
-  const hash = window.location.hash;
-  if (!hash.startsWith("#example-")) return;
-  const number = Number(hash.slice("#example-".length));
-  if (Number.isInteger(number) && EXAMPLES[number - 1]) runExample(number - 1);
+  const number = exampleNumberFromHash(window.location.hash, EXAMPLES.length);
+  if (number !== null) runExample(number - 1);
 }
 
 // The numbers are the visitor's own from the first keystroke, so no example is
-// "the one in the form" any more. (The chosen TAB stays chosen: a row of tabs
-// always has one.)
+// "the one in the form" any more.
 function unpressExamples() {
-  for (const note of byId("example-buttons").querySelectorAll(".example-loaded")) {
-    note.textContent = "";
-  }
-}
-
-// "Watch an example" (in the hero and again in the closing section). Without
-// script it is a plain link down to the examples. With script it runs example 1
-// straight away, exactly as pressing that example's own button would.
-function handleRunExampleClick(event) {
-  const link = event.target.closest("a[data-run-example]");
-  if (!link || pageIsFramed) return;
-  const number = Number(link.getAttribute("data-run-example"));
-  if (!Number.isInteger(number) || !EXAMPLES[number - 1]) return;
-  event.preventDefault();
-  runExample(number - 1);
+  markLoadedExample(-1);
 }
 
 // ─────────────────────────── letter + printing ───────────────────────────
@@ -744,14 +778,17 @@ function copyLetter() {
   }
 }
 
-// Closed <details> do not print, so the math steps are opened for the printout
-// and put back the way they were afterwards.
+// Closed <details> do not print, so the math steps and the five limits are
+// opened for the printout and put back the way they were afterwards. (Which
+// result TAB is showing does not matter: the print styles lay every needed
+// panel out on the one page.)
+const PRINTED_DETAILS = "#steps-body details, #limits-details";
 let stepsOpenBeforePrint = null;
 
 function openStepsForPrint() {
   if (stepsOpenBeforePrint !== null) return;
   stepsOpenBeforePrint = [];
-  for (const step of document.querySelectorAll("#steps-body details")) {
+  for (const step of document.querySelectorAll(PRINTED_DETAILS)) {
     stepsOpenBeforePrint.push(step.open);
     step.open = true;
   }
@@ -760,7 +797,7 @@ function openStepsForPrint() {
 function restoreAfterPrint() {
   document.body.classList.remove("print-letter-mode");
   if (stepsOpenBeforePrint === null) return;
-  const steps = document.querySelectorAll("#steps-body details");
+  const steps = document.querySelectorAll(PRINTED_DETAILS);
   steps.forEach(function (step, index) {
     step.open = stepsOpenBeforePrint[index] === true;
   });
@@ -898,7 +935,7 @@ function clearForm() {
   setMonthGuessNote(true);
   setStatus("form-status", "Form cleared.");
   byId("undo-clear").hidden = valuesBeforeClear === null;
-  byId("form-heading").focus();
+  goToStep(0);
 }
 
 function undoClear() {
@@ -932,10 +969,20 @@ function guardAgainstFraming() {
 }
 
 function start() {
+  initSite();
+  stepTabs = wireTabRow(".steps-list", ".step-tab", ".step-panel", syncStepButtons);
+  resultTabs = wireTabRow(".result-tabs-list", ".result-tab", ".result-panel", null);
+  syncStepButtons(0);
+  byId("step-back").addEventListener("click", function () {
+    goToStep(stepTabs.selectedIndex() - 1);
+  });
+  byId("step-next").addEventListener("click", function () {
+    goToStep(stepTabs.selectedIndex() + 1);
+  });
+
   fillMonthOptions(byId("f-start-month"), "Pick a month");
   writeFormValues(blankFormValues());
-  buildExampleTabs();
-  initHeroPreview(byId("hero-preview"));
+  buildExampleButtons();
 
   // The form never submits anywhere (there is no action, and the CSP forbids one).
   form.addEventListener("submit", function (event) {
@@ -992,7 +1039,6 @@ function start() {
   window.addEventListener("afterprint", restoreAfterPrint);
 
   document.addEventListener("click", handleJumpLinkClick);
-  document.addEventListener("click", handleRunExampleClick);
 
   byId("file-actions").hidden = false;
   byId("download-numbers").addEventListener("click", downloadNumbers);
@@ -1000,17 +1046,16 @@ function start() {
 
   // The sample statement uses the first example's numbers, so every number on
   // the page agrees with every other number on the page (SPEC D2).
-  initGuide({ panel: byId("guide-panel"), form: form, example: EXAMPLES[0] });
-  initProofPanel(byId("proof-panel"));
-  initSelfCheck(byId("selfcheck"));
-  registerServiceWorker();
+  // `reveal`: a click on the sample statement may point at a box in another step.
+  initGuide({ panel: byId("guide-panel"), form: form, example: EXAMPLES[0], reveal: revealBox });
+  initRequestLine(byId("request-count"));
 
   guardAgainstFraming();
   if (!pageIsFramed) {
     runExampleFromAddress();
     // The same link clicked while the page is already open only changes the "#"
     // part of the address, and browsers do not reload for that. Listen for it, so
-    // ./#example-2 works from anywhere, not just on a fresh load.
+    // ./check.html#example-2 works from anywhere, not just on a fresh load.
     window.addEventListener("hashchange", runExampleFromAddress);
   }
 

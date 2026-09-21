@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <!-- The line above is the privacy rule, enforced by the browser. Every page of
+       this site carries exactly the same one (index.html explains each part). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F8F5EE" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0D1222" media="(prefers-color-scheme: dark)">
+  <title>How EscrowScope is checked</title>
+  <meta name="description" content="Run EscrowScope’s calculator against a set of worked cases, on your own device, and see every number it produces next to the number it should produce.">
+  <!-- An inline tab icon and a preloaded font, for the same reason as on
+       index.html: nothing may be fetched after the page has finished loading, so
+       the "requests since load" counter at the bottom can honestly read 0. -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%231D3A63' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="./assets/fonts/Fraunces-Variable.woff2">
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./site.css">
+  <link rel="stylesheet" href="./selfcheck.css">
+  <script type="module" src="./proof-page.js"></script>
+</head>
+<body class="page-proof">
+  <a class="skip-link" href="#main">Skip to the main content</a>
+
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <a class="brand" href="./index.html">
+        <span class="brand-tile" aria-hidden="true">
+          <svg class="brand-mark" viewBox="0 0 100 100" width="20" height="20" focusable="false">
+            <g fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 66.37 59.23 A 27 27 0 1 1 66.37 40.77"/>
+              <line x1="15" y1="50" x2="85" y2="50"/>
+            </g>
+          </svg>
+        </span>
+        <span class="brand-name">EscrowScope</span>
+      </a>
+      <nav class="masthead-nav" aria-label="Main">
+        <a class="masthead-link" href="./proof.html" aria-current="page">How it’s checked</a>
+        <a class="masthead-link" href="./privacy.html">Privacy</a>
+        <a class="btn btn-primary masthead-cta" href="./check.html">Check my statement</a>
+        <details class="masthead-menu">
+          <summary class="masthead-menu-button"><span class="menu-icon" aria-hidden="true"></span><span class="menu-word">Menu</span></summary>
+          <ul class="masthead-menu-list">
+            <li><a href="./proof.html" aria-current="page">How it’s checked</a></li>
+            <li><a href="./privacy.html">Privacy</a></li>
+          </ul>
+        </details>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <!-- ───────────── Check the checker (SPEC D1) ───────────── -->
+    <section class="page-head" aria-labelledby="selfcheck-heading">
+      <div class="wrap">
+        <span class="eyebrow">Check the checker</span>
+        <h1 id="selfcheck-heading" class="page-title">Don’t take this page’s word for it.</h1>
+        <p class="section-lede">A tool that checks someone else’s math should let you check its own. This page runs this site’s calculator against a set of worked cases, right here on your device, and shows you every number. Some of the cases were worked out from the regulation before this calculator existed. Others were added later by an independent checker who had not seen the calculator’s code. The exact count of each is listed below.</p>
+      </div>
+    </section>
+
+    <section class="selfcheck-section selfcheck-section--page" id="selfcheck-section" aria-labelledby="selfcheck-run-heading">
+      <div class="wrap">
+        <h2 id="selfcheck-run-heading" class="page-h2">The worked cases, run on this device</h2>
+        <div id="selfcheck">
+          <p class="page-problem">The self-check has not loaded. Your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser.</p>
+        </div>
+        <noscript>
+          <p class="noscript-note">This page runs the cases with JavaScript, which is turned off in your browser. Nothing is sent anywhere either way.</p>
+        </noscript>
+      </div>
+    </section>
+
+    <section class="how how--page" aria-labelledby="sources-heading">
+      <div class="wrap how-grid">
+        <div>
+          <span class="eyebrow">Read it yourself</span>
+          <h2 id="sources-heading" class="page-h2">Where the cases and the second opinion live</h2>
+          <div class="how-copy">
+            <p>The worked cases are a plain file in the source code, and the project’s test command runs the same function this page just ran. A separate math audit wrote a second calculator from the federal rule and compared the two on 150,000 random accounts.</p>
+          </div>
+        </div>
+        <div>
+          <ul class="link-list">
+            <li><a href="https://github.com/VihaanKommireddy/escrowscope/blob/main/docs/verification/math-audit.md" rel="noopener noreferrer">The math audit, in full</a></li>
+            <li><a href="https://github.com/VihaanKommireddy/escrowscope/blob/main/docs/research/01-test-vectors.json" rel="noopener noreferrer">The worked cases (the file the self-check reads)</a></li>
+            <li><a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The federal escrow rule, 12 CFR 1024.17 (eCFR)</a></li>
+            <li><a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">This site’s source code</a></li>
+          </ul>
+          <p class="small muted">These links open other websites. Clicking a link like these is the only way this site ever leads anywhere else.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing closing--page" aria-labelledby="closing-heading">
+      <div class="wrap">
+        <h2 id="closing-heading">See the math behind your new payment.</h2>
+        <div class="cta-row cta-row--center">
+          <a class="btn btn-primary btn-large" href="./check.html">Check my statement</a>
+          <a class="btn btn-secondary btn-large" href="./privacy.html">Privacy you can check</a>
+        </div>
+        <p class="request-line request-line--center"><span class="request-dot" aria-hidden="true"></span><span>Requests made by this page since it finished loading: <span class="num request-count" id="request-count">–</span></span> <a href="./privacy.html">How this is counted</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p class="footer-brand">EscrowScope · free and independent</p>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="./check.html">Check my statement</a>
+        <a href="./proof.html" aria-current="page">How it’s checked</a>
+        <a href="./privacy.html">Privacy you can check</a>
+        <a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">Source code</a>
+        <a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The rule on eCFR</a>
+      </nav>
+      <p class="footer-note">This is math, not legal advice. EscrowScope is not affiliated with any mortgage servicer or government agency. It shows math. What you do next is up to you.</p>
+    </div>
+  </footer>
+</body>
+</html>
