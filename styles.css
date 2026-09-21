@@ -453,9 +453,9 @@ code,
 }
 
 .btn-large {
-  min-height: 52px;
-  padding: 12px 28px;
-  font-size: 17px;
+  min-height: 48px;
+  padding: 10px 24px;
+  font-size: 16px;
 }
 
 .btn[disabled] {
@@ -760,15 +760,20 @@ code,
   line-height: 1.5;
 }
 
+.hero-claims li {
+  position: relative;
+  padding-left: 14px;
+}
+
 .hero-claims li::before {
   content: "";
-  display: inline-block;
+  position: absolute;
+  left: 0;
+  top: 0.62em;
   width: 6px;
   height: 6px;
-  margin-right: 8px;
   border-radius: 50%;
   background: var(--accent);
-  vertical-align: 2px;
   opacity: 0.75;
 }
 
@@ -787,6 +792,9 @@ code,
    described in one sentence instead (see index.html). */
 .hero-stage {
   position: relative;
+  /* Its own stacking layer, so the sheet that sits BEHIND the frame (z-index
+     -1) cannot slip behind the page itself. */
+  isolation: isolate;
   min-width: 0;
   padding: 52px 0 30px;
 }
@@ -828,9 +836,6 @@ code,
   z-index: -1;
 }
 
-.hero-stage {
-  isolation: isolate;
-}
 
 .preview-frame {
   position: relative;
@@ -1237,12 +1242,20 @@ code,
   margin-top: clamp(20px, 3vw, 36px);
 }
 
+/* The hairline under the row is an inset shadow, not a border, so the chosen
+   tab's teal line can sit exactly on top of it without the row needing to
+   overflow (an overflowing row would grow a second, vertical scrollbar). */
 .tabs-list {
   display: flex;
   gap: clamp(18px, 4vw, 52px);
   overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  box-shadow: inset 0 -1px 0 var(--border);
+  scrollbar-width: none;
+}
+
+.tabs-list::-webkit-scrollbar {
+  display: none;
 }
 
 /* Auto margins on the two ends center the strip when there is room and fall
@@ -1260,7 +1273,7 @@ code,
   display: inline-flex;
   align-items: center;
   min-height: 56px;
-  margin: 0 0 -1px;
+  margin: 0;
   padding: 0 4px;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -3091,8 +3104,18 @@ code,
     outline-offset: 2px;
   }
 
+  .tabs-list {
+    border-bottom: 1px solid CanvasText;
+  }
+
+  /* This mode paints "transparent" borders in a real color, so every tab would
+     get an underline. Only the chosen one may have it. */
+  .tab {
+    border-bottom-color: Canvas;
+  }
+
   .tab[aria-selected="true"] {
-    border-bottom-color: Highlight;
+    border-bottom: 4px solid Highlight;
     color: CanvasText;
   }
 

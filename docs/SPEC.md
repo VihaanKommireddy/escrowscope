@@ -118,8 +118,11 @@ service worker handles only same-origin GETs for the shell; nothing else.
 - The chart has a text alternative: the same data as a real `<table>`.
 - Full keyboard operation; visible focus rings; 44px touch targets;
   `prefers-reduced-motion` respected; works at 200% zoom and 320px width.
-- Contrast: brand palette is already computed AA/AAA
-  (`escrowscope-buildrun-2026-07-08/brand/brand-guide.md`).
+- Contrast: every text and control color pair the page uses is worked out from
+  the tokens in `styles.css` by `tools/contrast.mjs`, in the light and the dark
+  theme, and held to WCAG 2.1 AA by `tests/contrast.test.js` (text 4.5:1, large
+  text and the edges of controls 3:1). (Before the 2026-09-21 reskin the palette
+  came from `escrowscope-buildrun-2026-07-08/brand/brand-guide.md`.)
 - Reading level: 6th–8th grade. Jargon gets defined the moment it appears.
 
 ### A7. Design direction
@@ -130,6 +133,20 @@ tabular figures for every number. Light + dark via `prefers-color-scheme`. Voice
 rules from the brand guide are binding: calm, never alarmed; show the math;
 servicer-neutral ("most payment jumps are lawful"); never "legal advice"; never
 promise a refund. Verdicts never rely on color alone.
+
+**Updated 2026-09-21 (the Keepbook-style reskin, owner's call).** The page now
+shares the visual language of the owner's Keepbook landing page: warm paper
+(`#F7F6F2`), green-black ink, hairline rules, flat surfaces, pill buttons, and
+one serif for headings (Fraunces, one self-hosted variable file under
+`assets/fonts/`, SIL OFL 1.1). What did NOT change: Scope Teal `#0C5460` is
+still the one accent (never Keepbook's green, because green means "matches"
+here), amber still means "look here", red is still only broken input, the body
+is still the system font stack, and every number, dollar amount, table cell,
+chip label and eyebrow is still monospace with tabular figures. The top of the
+page is a sticky bar, a hero with a small framed sample result (built from
+example 2 by the real engine at load, hidden from screen readers and described
+in one sentence), and the three examples as ARIA tabs. The only soft shadows on
+the page are on that framed sample and the chips around it.
 
 ---
 
