@@ -1,10 +1,16 @@
 // preview.js — the small framed "sample result" in the hero.
 //
 // It is a PICTURE of the tool, and every number in it is real: when the page
-// loads, example 2 ("They're holding too much") goes through the very same path
-// a visitor's numbers take (pipeline.runCheck, which calls the engine), and the
-// self-check runs the engine against every worked case. Nothing below is typed
-// in by hand, so the picture can never disagree with the calculator.
+// loads, an example goes through the very same path a visitor's numbers take
+// (pipeline.runCheck, which calls the engine), and the self-check runs the
+// engine against every worked case. Nothing below is typed in by hand, so the
+// picture can never disagree with the calculator.
+//
+// Standing still, the picture shows example 2 ("They're holding too much").
+// That is what a visitor gets with scripts half-loaded, with "reduce motion"
+// switched on, or if the motion layer fails. When motion is allowed, motion.js
+// asks this file for the other two examples as well and plays all three, one
+// after another. This file only BUILDS and FILLS the picture; it never moves it.
 //
 // It is decoration for people who can see it. index.html marks the holder
 // aria-hidden and gives screen readers one plain sentence instead, so nobody
@@ -18,8 +24,9 @@ import { EXAMPLES } from "./examples.js";
 import { exampleToValues, runCheck, isTooCloseToCall } from "./pipeline.js";
 import { formatCents, MONTH_NAMES, VECTORS, runSelfCheck } from "./engine/index.js";
 
-// Which example the picture shows (the second one: a surplus the rule says is
-// refunded, so the banner, the cushion and the low point all have a story).
+// Which example the picture shows when it stands still (the second one: a
+// surplus the rule says is refunded, so the banner, the cushion and the low
+// point all have a story).
 export const PREVIEW_EXAMPLE_INDEX = 1;
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -28,14 +35,24 @@ function monthName(calendarMonth) {
   return MONTH_NAMES[calendarMonth - 1] || "";
 }
 
-// Everything the picture shows, as plain text. Pure (no DOM), so
+// The self-check is the same for every example, so it runs once.
+let selfCheckReport = null;
+function selfCheck() {
+  if (selfCheckReport === null) selfCheckReport = runSelfCheck(VECTORS);
+  return selfCheckReport;
+}
+
+// Everything the picture shows for one example, as plain text. Pure (no DOM), so
 // tests/preview.test.js can check each string against the engine in Node.
-export function previewFacts() {
-  const example = EXAMPLES[PREVIEW_EXAMPLE_INDEX];
+// `cents` sits next to every dollar figure: the motion layer counts up to it,
+// and the last frame of the count is always formatCents(cents), the same string.
+export function previewFacts(exampleIndex = PREVIEW_EXAMPLE_INDEX) {
+  const example = EXAMPLES[exampleIndex];
+  if (example === undefined) return null;
   const check = runCheck(exampleToValues(example));
   if (!check.ok) return null;
   const result = check.result;
-  const report = runSelfCheck(VECTORS);
+  const report = selfCheck();
 
   let tone = "info";
   if (!isTooCloseToCall(check) && (check.verdict.tone === "clear" || check.verdict.tone === "flag")) {
@@ -43,14 +60,15 @@ export function previewFacts() {
   }
 
   return {
+    exampleNumber: exampleIndex + 1,
     exampleTitle: example.title,
     tone: tone,
     label: check.verdict.label,
     headline: check.verdict.headline,
     numbers: [
-      { label: "Your bills for the year", figure: formatCents(result.annualDisbursementsCents) },
-      { label: "The most cushion the law allows", figure: formatCents(result.cushionCapCents) },
-      { label: "Your lowest projected balance", figure: formatCents(result.lowPoint.projectedBalanceCents) },
+      { label: "Your bills for the year", cents: result.annualDisbursementsCents, figure: formatCents(result.annualDisbursementsCents) },
+      { label: "The most cushion the law allows", cents: result.cushionCapCents, figure: formatCents(result.cushionCapCents) },
+      { label: "Your lowest projected balance", cents: result.lowPoint.projectedBalanceCents, figure: formatCents(result.lowPoint.projectedBalanceCents) },
     ],
     cushionChip: { words: "Cushion limit", figure: formatCents(result.cushionCapCents) },
     lowChip: {
@@ -65,6 +83,18 @@ export function previewFacts() {
     cushionCapCents: result.cushionCapCents,
     lowMonthIndex: result.lowPoint.month - 1,
   };
+}
+
+// How long a line through these points is, in the chart's own units. The motion
+// layer needs it to draw the line from left to right. Pure, so Node can test it.
+export function polylineLength(points) {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const dx = points[index][0] - points[index - 1][0];
+    const dy = points[index][1] - points[index - 1][1];
+    length += Math.sqrt(dx * dx + dy * dy);
+  }
+  return length;
 }
 
 // A small line chart of the 12 projected balances, with the cushion limit as a
@@ -95,8 +125,11 @@ function previewChart(facts) {
     return value.toFixed(1);
   }
 
-  const points = balances.map(function (cents, index) {
-    return fixed(x(index)) + "," + fixed(y(cents));
+  const spots = balances.map(function (cents, index) {
+    return [x(index), y(cents)];
+  });
+  const points = spots.map(function (spot) {
+    return fixed(spot[0]) + "," + fixed(spot[1]);
   });
   const floor = fixed(height - bottom);
   const areaPoints = [fixed(x(0)) + "," + floor].concat(points, [fixed(x(balances.length - 1)) + "," + floor]);
@@ -106,6 +139,10 @@ function previewChart(facts) {
     className: "preview-chart",
     attrs: { viewBox: "0 0 " + width + " " + height, width: width, height: height, focusable: "false" },
   });
+  // The length of the line, handed to the stylesheet as a custom property (set
+  // through the style OBJECT, which the page's policy allows; never a style
+  // attribute string). Standing still, nothing reads it.
+  svg.style.setProperty("--pc-len", String(Math.ceil(polylineLength(spots)) + 2));
   svg.append(
     svgEl("line", { className: "pc-grid", attrs: { x1: left, y1: floor, x2: width - right, y2: floor } }),
     svgEl("polygon", { className: "pc-area", attrs: { points: areaPoints.join(" ") } }),
@@ -131,54 +168,147 @@ function previewChart(facts) {
   return svg;
 }
 
-// "preview-chip" is a stable name for the motion layer to find the chips by. It
-// carries no styles of its own.
-function chip(className, dotClass, words, figure) {
-  const children = [];
-  if (dotClass) children.push(el("span", { className: "chip-dot " + dotClass }));
-  children.push(words);
-  if (figure) children.push(" · ", el("b", { text: figure }));
-  return el("p", { className: "chip preview-chip " + className }, children);
-}
-
 const MARKS = { clear: "✓", flag: "!", info: "i" };
 
-export function initHeroPreview(holder) {
-  if (!holder) return;
-  try {
-    const facts = previewFacts();
-    if (facts === null) return;
-    clear(holder);
+function verdictCard(facts) {
+  return el("div", { className: "preview-verdict preview-verdict--" + facts.tone }, [
+    el("span", { className: "preview-mark", text: MARKS[facts.tone] }),
+    el("div", {}, [
+      el("p", { className: "preview-label", text: facts.label }),
+      el("p", { className: "preview-headline", text: facts.headline }),
+    ]),
+  ]);
+}
 
-    const numbers = el("dl", { className: "preview-numbers" });
-    for (const item of facts.numbers) {
-      numbers.append(el("div", { className: "preview-number" }, [el("dt", { text: item.label }), el("dd", { text: item.figure })]));
+// "preview-chip" is a stable name for the motion layer to find the chips by. It
+// carries no styles of its own. The words and the figure are kept as two nodes,
+// so another example's words can be put in without rebuilding the chip.
+function chip(className, dotClass, words, figure) {
+  const wordsNode = document.createTextNode(words);
+  const figureNode = el("b", { text: figure });
+  const children = [];
+  if (dotClass) children.push(el("span", { className: "chip-dot " + dotClass }));
+  children.push(wordsNode);
+  if (figure) children.push(" · ", figureNode);
+  const node = el("p", { className: "chip preview-chip " + className }, children);
+  return { node: node, wordsNode: wordsNode, figureNode: figureNode };
+}
+
+// Build the picture inside `holder`, showing example 2, finished and still.
+// Returns a small "stage" object the motion layer can drive, or null when the
+// picture could not be built:
+//   count              how many examples there are
+//   facts(index)       previewFacts for that example (worked out once, then kept)
+//   prepareAll()       add the verdict card and the chart of EVERY example, laid
+//                      on top of each other, so the frame is always as tall as
+//                      the tallest one and never changes height
+//   show(index, opts)  make one example the one that shows, with all its words
+//                      and final numbers. opts.counted: true writes "Example 1
+//                      of 3" on the dark pill instead of plain "Example".
+//   setNumbers(cents)  write three dollar figures (used while counting up)
+export function initHeroPreview(holder) {
+  if (!holder) return null;
+  try {
+    const factsByIndex = new Map();
+    function factsFor(index) {
+      if (!factsByIndex.has(index)) factsByIndex.set(index, previewFacts(index));
+      return factsByIndex.get(index);
     }
 
+    const first = factsFor(PREVIEW_EXAMPLE_INDEX);
+    if (first === null) return null;
+    clear(holder);
+    holder.classList.remove("is-cycling", "is-playing", "is-leaving");
+
+    const cards = new Map();
+    const charts = new Map();
+    // Both holders stack their children in one grid cell (styles.css). Standing
+    // still there is one child in each, so nothing about the look changes.
+    const verdicts = el("div", { className: "preview-verdicts" }, [
+      // What the slot says while an example is still "being worked out". Only the
+      // motion layer ever shows it.
+      el("p", { className: "preview-working", text: "Checking the math" }),
+    ]);
+    const chartHolder = el("div", { className: "preview-charts" });
+
+    function ensureBuilt(index) {
+      if (cards.has(index)) return true;
+      const facts = factsFor(index);
+      if (facts === null) return false;
+      const card = verdictCard(facts);
+      const chart = previewChart(facts);
+      cards.set(index, card);
+      charts.set(index, chart);
+      verdicts.append(card);
+      chartHolder.append(chart);
+      return true;
+    }
+
+    const numberNodes = [];
+    const numbers = el("dl", { className: "preview-numbers" });
+    for (const item of first.numbers) {
+      const figureNode = el("dd", { text: item.figure });
+      numberNodes.push(figureNode);
+      numbers.append(el("div", { className: "preview-number" }, [el("dt", { text: item.label }), figureNode]));
+    }
+
+    const barTitle = el("span", { className: "preview-bar-title" });
     const frame = el("div", { className: "preview-frame" }, [
-      el("div", { className: "preview-bar" }, [el("span", { text: "The result · example 2" })]),
-      el("div", { className: "preview-body" }, [
-        el("div", { className: "preview-verdict preview-verdict--" + facts.tone }, [
-          el("span", { className: "preview-mark", text: MARKS[facts.tone] }),
-          el("div", {}, [
-            el("p", { className: "preview-label", text: facts.label }),
-            el("p", { className: "preview-headline", text: facts.headline }),
-          ]),
-        ]),
-        numbers,
-        previewChart(facts),
-      ]),
+      // A browser-window top bar: three dots drawn in CSS, then what this is.
+      el("div", { className: "preview-bar" }, [el("span", { className: "preview-dots" }), barTitle]),
+      el("div", { className: "preview-body" }, [verdicts, numbers, chartHolder]),
     ]);
 
-    holder.append(
-      frame,
-      chip("chip--cushion", "chip-dot--warn", facts.cushionChip.words, facts.cushionChip.figure),
-      chip("chip--low", "chip-dot--accent", facts.lowChip.words, facts.lowChip.figure),
-      chip("chip--checks", facts.allChecksPassed ? "chip-dot--ok" : "chip-dot--warn", facts.checksChip, ""),
-      el("p", { className: "chip preview-chip chip--example", text: "Example" })
-    );
+    const cushion = chip("chip--cushion", "chip-dot--warn", first.cushionChip.words, first.cushionChip.figure);
+    const low = chip("chip--low", "chip-dot--accent", first.lowChip.words, first.lowChip.figure);
+    const checks = chip("chip--checks", first.allChecksPassed ? "chip-dot--ok" : "chip-dot--warn", first.checksChip, "");
+    const pill = el("p", { className: "chip preview-chip chip--example", text: "Example" });
+
+    function setNumbers(centsList) {
+      numberNodes.forEach(function (node, position) {
+        node.textContent = formatCents(centsList[position]);
+      });
+    }
+
+    function show(index, options) {
+      if (!ensureBuilt(index)) return false;
+      const facts = factsFor(index);
+      for (const [position, card] of cards) card.classList.toggle("is-current", position === index);
+      for (const [position, chart] of charts) chart.classList.toggle("is-current", position === index);
+      barTitle.textContent = "The result · example " + facts.exampleNumber;
+      numberNodes.forEach(function (node, position) {
+        node.textContent = facts.numbers[position].figure;
+      });
+      cushion.wordsNode.textContent = facts.cushionChip.words;
+      cushion.figureNode.textContent = facts.cushionChip.figure;
+      low.wordsNode.textContent = facts.lowChip.words;
+      low.figureNode.textContent = facts.lowChip.figure;
+      pill.textContent = options && options.counted ? "Example " + facts.exampleNumber + " of " + EXAMPLES.length : "Example";
+      return true;
+    }
+
+    function prepareAll() {
+      let allBuilt = true;
+      for (let index = 0; index < EXAMPLES.length; index += 1) {
+        if (!ensureBuilt(index)) allBuilt = false;
+      }
+      return allBuilt;
+    }
+
+    show(PREVIEW_EXAMPLE_INDEX, { counted: false });
+    holder.append(frame, cushion.node, low.node, checks.node, pill);
+
+    return {
+      holder: holder,
+      count: EXAMPLES.length,
+      facts: factsFor,
+      prepareAll: prepareAll,
+      show: show,
+      setNumbers: setNumbers,
+    };
   } catch (problem) {
     // The picture is optional. Leave the space empty rather than break the page.
     clear(holder);
+    return null;
   }
 }

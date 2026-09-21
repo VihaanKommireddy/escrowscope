@@ -683,8 +683,9 @@ export function setStale(isStale) {
   byId("stale-note").hidden = !isStale;
 }
 
-// A short flash on the verdict so sighted users notice it changed. The CSS
-// only animates when the visitor has not asked for reduced motion.
+// The verdict eases in (a short rise and fade) so sighted users notice it
+// changed. The CSS only animates when the visitor has not asked for reduced
+// motion.
 export function flashVerdict() {
   const box = byId("verdict");
   box.classList.remove("just-updated");

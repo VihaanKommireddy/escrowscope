@@ -858,9 +858,9 @@ test("each page loads only what it needs: the landing page never loads the resul
   requirePages();
   const mustNotLoad = {
     "index.html": ["render.js", "chart.js", "guide.js", "selfcheck-ui.js", "check.js"],
-    "check.html": ["selfcheck-ui.js", "preview.js", "landing.js"],
-    "proof.html": ["render.js", "chart.js", "guide.js", "pipeline.js", "preview.js", "examples.js"],
-    "privacy.html": ["render.js", "chart.js", "guide.js", "pipeline.js", "preview.js", "examples.js", "selfcheck-ui.js", "engine/index.js"],
+    "check.html": ["selfcheck-ui.js", "preview.js", "landing.js", "motion.js"],
+    "proof.html": ["render.js", "chart.js", "guide.js", "pipeline.js", "preview.js", "examples.js", "motion.js"],
+    "privacy.html": ["render.js", "chart.js", "guide.js", "pipeline.js", "preview.js", "examples.js", "selfcheck-ui.js", "engine/index.js", "motion.js"],
   };
   for (const page of pages) {
     const graph = importGraphOf(page.file).files.map((file) => file.split(path.sep).join("/"));
@@ -2426,6 +2426,87 @@ test("the landing page carries the hooks the motion layer is built on", () => {
     if (other.file === "index.html") continue;
     assert.ok(!other.raw.includes("data-reveal") && !other.raw.includes("data-count-to"), other.file + " should not carry the landing page's motion hooks.");
   }
+});
+
+// ───────── the motion layer itself (added 2026-09-21) ─────────
+
+// motion.js and motion.css are ordinary shell files: because landing.js imports
+// one and index.html links the other, EVERY scan above already reads them (the
+// banned list, no style attribute from script, relative paths, the offline
+// list, the voice rules). These tests add what only the motion layer needs.
+test("the motion layer is part of the shell: index.html alone links motion.css, landing.js imports motion.js, and every scan above covers both", () => {
+  requirePages();
+  const files = shellFiles().map((file) => file.split(path.sep).join("/"));
+  assert.ok(files.includes("motion.js"), "motion.js is not in the import graph, so the scans above do not read it.");
+  assert.ok(files.includes("motion.css"), "motion.css is not linked from a page, so the scans above do not read it.");
+  assert.ok(precache.urls.includes("./motion.js") && precache.urls.includes("./motion.css"), "sw.js must save both for offline use.");
+  for (const page of pages) {
+    const linksIt = page.tags.some((tag) => tag.name === "link" && (tag.attrs.href || "") === "./motion.css");
+    assert.equal(linksIt, page.file === "index.html", page.file + (linksIt ? " links motion.css, which is the landing page's alone." : " must link ./motion.css."));
+  }
+  // After site.css, so its few overrides win without !important.
+  const landingPage = pageNamed("index.html");
+  assert.ok(landingPage.raw.indexOf('href="./site.css"') < landingPage.raw.indexOf('href="./motion.css"'));
+  // A stylesheet that moves things must never reach for a file of its own.
+  assert.deepEqual(findCssUrls(readText("motion.css")), [], "motion.css draws everything with gradients: no url() at all.");
+  assert.ok(!/@import/.test(readText("motion.css")));
+});
+
+// The Content-Security-Policy blocks style ATTRIBUTES. Script may still set a
+// CSS custom property through the style OBJECT (element.style.setProperty),
+// which is how the motion layer hands a number to the stylesheet. That is the
+// only use this site allows: no script sets a real CSS property directly, so
+// how things look stays in the stylesheets, where the contrast tool reads it.
+test("scripts touch an element's style object only to set or remove a CSS custom property (--name), never a real property and never cssText", () => {
+  requirePages();
+  const problems = [];
+  let uses = 0;
+  for (const file of shellFiles()) {
+    if (!file.endsWith(".js")) continue;
+    const source = readText(file);
+    if (source === null) continue;
+    const pattern = /\.style\b\s*(\.\s*[A-Za-z]+|\[|=)?/g;
+    let match = pattern.exec(source);
+    while (match !== null) {
+      const after = source.slice(match.index, match.index + 60);
+      uses += 1;
+      if (!/^\.style\.(?:setProperty|removeProperty)\("--[a-z-]+"/.test(after)) {
+        problems.push(file + " line " + source.slice(0, match.index).split("\n").length + ": " + after.split("\n")[0]);
+      }
+      match = pattern.exec(source);
+    }
+  }
+  assert.ok(uses > 0, "Expected the motion layer's setProperty calls; the scan found none, so it is not looking at the right files.");
+  assert.deepEqual(problems, [], 'Only element.style.setProperty("--name", …) and removeProperty("--name") are allowed:\n' + problems.join("\n"));
+  // The scan is proven: it lets the allowed form through and catches the rest.
+  const allowed = /^\.style\.(?:setProperty|removeProperty)\("--[a-z-]+"/;
+  assert.ok(allowed.test('.style.setProperty("--par", "0.5")'));
+  assert.ok(!allowed.test('.style.setProperty("opacity", "0")'));
+  assert.ok(!allowed.test(".style.opacity = 0"));
+  assert.ok(!allowed.test('.style.cssText = "opacity:0"'));
+});
+
+test("the small movements shared by every page live in site.css, behind no-preference, and animate transform and opacity only", () => {
+  const css = (readText("site.css") || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  // The sliding line under the serif tabs: one element, moved with transform.
+  assert.ok(/\.tabs-slider \{[^}]*transform: translateX\(var\(--slider-x, 0px\)\) scaleX\(var\(--slider-w, 0\)\);/.test(css));
+  assert.ok(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.tabs-list\.slider-moves \.tabs-slider \{\s*transition: transform 260ms/.test(css), "The line only SLIDES for visitors who have not asked for less motion.");
+  // A chosen panel fades in over 150ms.
+  assert.ok(/\.panel-enter \{\s*animation: panel-enter 150ms ease-out;/.test(css));
+  assert.ok(/@keyframes panel-enter \{\s*from \{\s*opacity: 0;\s*\}\s*to \{\s*opacity: 1;\s*\}\s*\}/.test(css));
+  // Pills lift a pixel on hover (only where there IS a hover) and press down.
+  assert.ok(/@media \(prefers-reduced-motion: no-preference\) and \(hover: hover\) \{\s*\.btn:hover:not\(\[disabled\]\):not\(:active\) \{\s*transform: translateY\(-1px\);/.test(css));
+  assert.ok(/\.btn:active:not\(\[disabled\]\) \{\s*transform: translateY\(1px\);/.test(css));
+  // tabs.js is where the two classes come from, and only a real change of tab sets them.
+  const tabs = readText("tabs.js");
+  assert.ok(/classList\.toggle\("panel-enter", isChosen && previous !== index\)/.test(tabs));
+  assert.ok(/placeSlider\(previous !== index\);/.test(tabs));
+  // The verdict eases in with opacity and transform (it used to pulse a box-shadow).
+  const base = (readText("styles.css") || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const verdictFrames = /@keyframes verdict-updated \{([\s\S]*?)\n  \}/.exec(base);
+  assert.ok(verdictFrames !== null);
+  assert.ok(!/box-shadow/.test(verdictFrames[1]) && /opacity/.test(verdictFrames[1]) && /transform/.test(verdictFrames[1]));
+  assert.ok(/flashVerdict\(\);\s*\}\s*\n\s*\/\/ A real press/.test(readText("check.js")), "check.js eases the verdict in once per check, from showResults.");
 });
 
 // ───────── a step that is waiting its turn is still part of the form ─────────

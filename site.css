@@ -184,19 +184,31 @@ main:focus {
 
 /* ───────────────────────── 2. The landing page ───────────────────────── */
 
-/* A quiet ruled-paper layer behind the framed preview. Decoration only: it is
-   aria-hidden, holds nothing, and is there for the motion layer to move. */
+/* One huge, soft navy circle, partly behind the framed preview and running off
+   the right edge of the page. It is ruled like a ledger, and its edge melts
+   away (the mask). Decoration only: it is aria-hidden and holds nothing. No
+   image file: two gradients. motion.css moves it slower than the page. */
 .hero-backdrop {
   position: absolute;
-  inset: 0 -6% -4% -6%;
+  top: -20%;
+  left: 24%;
   z-index: -1;
+  width: min(136%, 780px);
+  aspect-ratio: 1;
+  border-radius: 50%;
   pointer-events: none;
   background:
-    repeating-linear-gradient(to bottom, transparent 0 27px, var(--border) 27px 28px),
-    repeating-linear-gradient(to right, transparent 0 111px, var(--border) 111px 112px);
-  opacity: 0.55;
-  -webkit-mask-image: radial-gradient(ellipse at 55% 50%, #000 30%, transparent 72%);
-  mask-image: radial-gradient(ellipse at 55% 50%, #000 30%, transparent 72%);
+    repeating-linear-gradient(to bottom, transparent 0 27px, var(--backdrop-mid) 27px 28px),
+    radial-gradient(circle closest-side, var(--backdrop-core) 0%, var(--backdrop-mid) 78%, var(--backdrop-mid) 100%);
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 74%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 74%, transparent 100%);
+}
+
+/* The circle is taller than the hero once it starts to move. Nothing of it may
+   hang over the band below, so the hero clips top and bottom too (styles.css
+   already clips it left and right). */
+.page-landing .hero {
+  overflow: clip;
 }
 
 /* The landing page is short on purpose: its sections breathe a little less than
@@ -205,10 +217,20 @@ main:focus {
   padding-block: clamp(32px, 5vw, 64px) clamp(40px, 6vw, 72px);
 }
 
-/* The big figures: a sunken ledger strip between two hairlines. */
+/* The big figures: one confident, full-width navy block with ivory numerals.
+   Every color in it is a --band token, and tools/contrast.mjs checks each pair.
+   (position + z-index: the band always paints over anything the hero lets out.) */
 .figures {
+  position: relative;
+  z-index: 1;
   border-block: 1px solid var(--border);
-  background: var(--sunken);
+  background: var(--band-bg);
+  color: var(--band-ink);
+}
+
+/* The page's focus ring is navy, which would vanish on navy. Here it is ivory. */
+.figures :focus-visible {
+  outline-color: var(--band-ink);
 }
 
 .figures-list {
@@ -224,7 +246,7 @@ main:focus {
   gap: var(--space-2);
   min-width: 0;
   padding: var(--space-5) 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--band-rule);
 }
 
 .figure:first-child {
@@ -233,11 +255,11 @@ main:focus {
 
 .figure-number {
   margin: 0;
-  color: var(--ink);
+  color: var(--band-ink);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "zero" 1;
-  font-size: clamp(34px, 1.6rem + 2vw, 52px);
+  font-size: clamp(36px, 1.6rem + 2.2vw, 56px);
   font-weight: var(--weight-medium);
   line-height: 1;
   letter-spacing: -0.03em;
@@ -245,24 +267,49 @@ main:focus {
 }
 
 .figure-of {
-  color: var(--ink-3);
+  color: var(--band-ink-3);
   font-size: 0.5em;
   letter-spacing: 0;
 }
 
 .figure-unit {
-  color: var(--ink-3);
+  color: var(--band-ink-3);
 }
 
 .figure-label {
   max-width: 34ch;
-  color: var(--ink-2);
+  color: var(--band-ink-2);
   font-size: 15px;
   line-height: 1.5;
 }
 
-.figure-label a {
+.figure-label a,
+.figure-label a:hover {
+  color: var(--band-ink);
+  text-decoration-color: var(--band-ink-3);
   white-space: nowrap;
+}
+
+.figure-label a:hover {
+  text-decoration-color: var(--band-ink);
+}
+
+/* While a figure counts up (motion.js), the moving copy lies on top of an
+   invisible print of the final number, so the room it takes never changes and
+   nothing next to it moves. The digits are tabular, so they do not jiggle. */
+.count-visual {
+  position: relative;
+  display: inline-block;
+}
+
+.count-ghost {
+  visibility: hidden;
+}
+
+.count-live {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 @media (min-width: 620px) {
@@ -280,7 +327,7 @@ main:focus {
 
   .figure:nth-child(even) {
     padding-left: var(--space-6);
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--band-rule);
   }
 }
 
@@ -290,13 +337,13 @@ main:focus {
   }
 
   .figure {
-    padding: clamp(28px, 3.4vw, 44px) var(--space-5) clamp(28px, 3.4vw, 44px) 0;
+    padding: clamp(34px, 4vw, 56px) var(--space-5) clamp(34px, 4vw, 56px) 0;
     border-top: 0;
   }
 
   .figure + .figure {
     padding-left: var(--space-5);
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--band-rule);
   }
 }
 
@@ -976,11 +1023,11 @@ main:focus {
   margin-top: var(--space-4);
 }
 
-.result-tab:first-child {
+.result-tab:first-of-type {
   margin-left: 0;
 }
 
-.result-tab:last-child {
+.result-tab:last-of-type {
   margin-right: 0;
 }
 
@@ -1054,6 +1101,82 @@ main:focus {
   padding-bottom: var(--space-5);
 }
 
+/* ───────────────────────── 6b. Small movements, on every page ─────────────────────────
+
+   Four quiet touches, shared by all four pages. Each one animates transform or
+   opacity only, lasts 150 to 300ms, and sits inside "no-preference": a visitor
+   who asked for less motion gets none of them. (What moves on the landing page
+   alone, the playing preview and the rest, is in motion.css.) */
+
+/* The line under the chosen serif tab is ONE element that slides from tab to
+   tab (tabs.js puts it there and tells it where to be). It is 1px wide and
+   stretched with scaleX, so only its transform ever changes. Until tabs.js has
+   measured the row (class has-slider), each tab keeps its own line as before. */
+.tabs-list {
+  position: relative;
+}
+
+.tabs-slider {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(var(--slider-x, 0px)) scaleX(var(--slider-w, 0));
+  transform-origin: 0 50%;
+}
+
+@media (forced-colors: none) {
+  .tabs-list.has-slider .tabs-slider {
+    opacity: 1;
+  }
+
+  .tabs-list.has-slider .tab[aria-selected="true"] {
+    border-bottom-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tabs-list.slider-moves .tabs-slider {
+    transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* A panel that was just chosen fades in. The one it replaces is simply gone,
+     so the two never overlap and nothing below them shifts. */
+  .panel-enter {
+    animation: panel-enter 150ms ease-out;
+  }
+
+  @keyframes panel-enter {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Pills lift a pixel under the mouse and press down when pushed. */
+  .btn {
+    transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 150ms ease-out;
+  }
+
+  .btn:active:not([disabled]) {
+    transform: translateY(1px);
+    transition-duration: 120ms, 120ms, 120ms, 90ms;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .btn:hover:not([disabled]):not(:active) {
+    transform: translateY(-1px);
+  }
+}
+
 /* ───────────────────────── 7. Less motion, and forced colors ───────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1108,8 +1231,13 @@ main:focus {
     border: 1px solid CanvasText;
   }
 
-  .hero-backdrop {
+  .hero-backdrop,
+  .tabs-slider {
     display: none;
+  }
+
+  .figures :focus-visible {
+    outline-color: Highlight;
   }
 
   .request-dot {

@@ -626,6 +626,9 @@ function showResults(check, moveFocus) {
     byId("results").scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     heading.focus({ preventScroll: true });
   }
+  // The verdict eases in once for every check: a press of the button, an
+  // example, or a live what-if edit.
+  flashVerdict();
 }
 
 // A real press of "Check the math" (or an example button).
@@ -659,7 +662,6 @@ function liveEdit() {
   clearErrors();
   showResults(check, false);
   announceVerdict(check);
-  flashVerdict();
 }
 
 function scheduleLiveEdit() {

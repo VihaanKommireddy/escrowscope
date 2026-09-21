@@ -15,6 +15,13 @@
 //   wireTabs   takes a row that is ALREADY written in the HTML (the four steps of
 //              the form and the six parts of the result on check.html), so
 //              nothing on the page jumps when the script starts.
+//
+// Two small pieces of movement live here, because every row of tabs on the site
+// goes through this file (site.css holds the styles, and switches both off for
+// a visitor who asked for less motion):
+//   - the panel that was just chosen fades in (the class "panel-enter");
+//   - on the serif rows (class "tabs-list") ONE navy line slides from the old
+//     tab to the new one, instead of each tab having a line of its own.
 
 import { el, clear } from "./dom.js";
 
@@ -39,6 +46,27 @@ export function nextTabIndex(current, count, key) {
 // Returns { select(index, moveFocus), selectedIndex(), tabs, panels }.
 export function wireTabs({ list, tabs, panels, onSelect }) {
   let chosen = 0;
+  const slider = list.classList.contains("tabs-list") ? makeSlider(list) : null;
+
+  // How far a tab's left edge is from the left edge of everything in the row
+  // (the row may be scrolled sideways on a phone).
+  function leftInsideRow(tab) {
+    return tab.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
+  }
+
+  // Put the sliding line under the chosen tab. `slide` says whether it should
+  // travel there (a change of tab) or simply be there (a resize, a late font).
+  // The two numbers go to the stylesheet as custom properties on the style
+  // OBJECT, which the page's policy allows; no style attribute is ever written.
+  function placeSlider(slide) {
+    if (slider === null) return;
+    const width = tabs[chosen].offsetWidth;
+    if (!(width > 0)) return; // the row is not on the screen yet
+    list.classList.toggle("slider-moves", slide);
+    list.style.setProperty("--slider-x", leftInsideRow(tabs[chosen]).toFixed(1) + "px");
+    list.style.setProperty("--slider-w", String(width));
+    list.classList.add("has-slider");
+  }
 
   function select(index, moveFocus) {
     if (!Number.isInteger(index) || index < 0 || index >= tabs.length) return;
@@ -49,14 +77,29 @@ export function wireTabs({ list, tabs, panels, onSelect }) {
       tab.setAttribute("aria-selected", isChosen ? "true" : "false");
       tab.setAttribute("tabindex", isChosen ? "0" : "-1");
       panels[position].hidden = !isChosen;
+      // Only a real change of tab fades the new panel in. Drawing the same tab
+      // again (live what-if does that on every edit) moves nothing.
+      panels[position].classList.toggle("panel-enter", isChosen && previous !== index);
     });
     if (moveFocus) tabs[index].focus();
     // On a narrow screen the row scrolls sideways inside its own box: bring the
     // chosen tab into view there (never the whole page).
     if (list.scrollWidth > list.clientWidth) {
-      list.scrollLeft = Math.max(0, tabs[index].offsetLeft - list.offsetLeft - 16);
+      list.scrollLeft = Math.max(0, leftInsideRow(tabs[index]) - 16);
     }
+    placeSlider(previous !== index);
     if (typeof onSelect === "function") onSelect(index, previous);
+  }
+
+  // The tabs change size when the window does, when the heading font arrives,
+  // and when a hidden row (the results) is first shown. Each time, the line is
+  // put back under the chosen tab without sliding.
+  if (slider !== null && typeof ResizeObserver === "function") {
+    const watcher = new ResizeObserver(function () {
+      placeSlider(false);
+    });
+    watcher.observe(list);
+    for (const tab of tabs) watcher.observe(tab);
   }
 
   tabs.forEach(function (tab, index) {
@@ -79,6 +122,13 @@ export function wireTabs({ list, tabs, panels, onSelect }) {
     tabs: tabs,
     panels: panels,
   };
+}
+
+// The sliding line: one empty, decorative element at the end of the row.
+function makeSlider(list) {
+  const slider = el("span", { className: "tabs-slider", attrs: { "aria-hidden": "true" } });
+  list.append(slider);
+  return slider;
 }
 
 // buildTabs({ holder, labelledBy, idPrefix, items })

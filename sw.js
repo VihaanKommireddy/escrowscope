@@ -24,7 +24,7 @@
 // those files changes, the name changes, the browser sees a different sw.js,
 // builds a fresh box and throws the old one away (see "activate"). Do not edit
 // this line by hand. tests/shell.test.js fails when it is out of date.
-const CACHE_NAME = "escrowscope-v1-ef903a864d01";
+const CACHE_NAME = "escrowscope-v1-1e38091292b5";
 
 // The app shell: site files only. Never docs/, tests/, v0/ or tools/.
 // One relative URL per line (the shell test and the stamp tool parse this list).
@@ -39,6 +39,7 @@ const PRECACHE_URLS = [
   "./privacy.html",
   "./styles.css",
   "./site.css",
+  "./motion.css",
   "./chart.css",
   "./guide.css",
   "./selfcheck.css",
@@ -58,6 +59,7 @@ const PRECACHE_URLS = [
   "./sw-register.js",
   "./tabs.js",
   "./preview.js",
+  "./motion.js",
   "./examples.js",
   "./engine/index.js",
   "./engine/money.js",

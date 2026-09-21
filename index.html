@@ -34,6 +34,7 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin href="./assets/fonts/Fraunces-Variable.woff2">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./site.css">
+  <link rel="stylesheet" href="./motion.css">
   <script type="module" src="./landing.js"></script>
 </head>
 <body class="page-landing">
@@ -87,14 +88,17 @@
         </div>
 
         <!-- A small picture of a real result. Every number in it is worked out by
-             this site's own calculator from example 2 when the page loads
-             (preview.js); nothing in it is typed by hand. Screen readers get the
-             one sentence below instead of a result that is not theirs.
+             this site's own calculator when the page loads (preview.js); nothing
+             in it is typed by hand. Standing still it shows example 2. When the
+             visitor has not asked for less motion, motion.js plays the three
+             examples one after another and adds a Pause button next to it.
+             Screen readers get the one sentence below instead of a result that
+             is not theirs.
              Hooks for the motion layer: #hero-preview is the picture, its chips
              carry the class preview-chip, and .hero-backdrop is an empty
-             decorative layer behind it. -->
+             decorative layer behind it (the big soft circle). -->
         <div class="hero-stage">
-          <p class="visually-hidden">Picture: a sample result from example 2, “They’re holding too much”. It is an example, not your result. You can open the same example in the tool from the examples on this page.</p>
+          <p class="visually-hidden">Picture: a sample result from example 2, “They’re holding too much”, or from each of the three examples in turn when the picture is playing. It is an example, not your result. You can open the same examples in the tool from the examples on this page.</p>
           <div class="hero-backdrop" aria-hidden="true"></div>
           <div id="hero-preview" class="preview" aria-hidden="true"></div>
         </div>
@@ -105,6 +109,8 @@
          Each number is either counted on this device when the page loads
          (landing.js) or pinned by a test (tests/shell.test.js). The motion layer
          finds them by data-count-to; the text inside is always the final number.
+         While a figure counts up, screen readers still get the final number and
+         the moving copy is hidden from them (motion.js).
          #figure-passed and #figure-total get theirs from landing.js at start-up,
          because the number of worked cases is never written down by hand. -->
     <section class="figures" aria-labelledby="figures-heading">

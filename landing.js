@@ -5,12 +5,17 @@
 //
 // Every number it puts on the page is worked out here, on this device, by the
 // same calculator the tool uses. Nothing is typed in by hand.
+//
+// The page is built first, finished and still. Movement (motion.js) is started
+// last, on top of a page that is already complete, and not at all for a visitor
+// who has asked their device for less motion.
 
 import { el } from "./dom.js";
 import { EXAMPLES } from "./examples.js";
 import { formatCents, VECTORS, runSelfCheck } from "./engine/index.js";
 import { buildTabs } from "./tabs.js";
 import { initHeroPreview } from "./preview.js";
+import { initMotion } from "./motion.js";
 import { watchRequestCount } from "./proof.js";
 import { initSite } from "./site.js";
 
@@ -113,9 +118,17 @@ function buildExampleTabs() {
 function start() {
   initSite();
   buildExampleTabs();
-  initHeroPreview(byId("hero-preview"));
+  const previewHolder = byId("hero-preview");
+  const stage = initHeroPreview(previewHolder);
   showSelfCheckFigure();
   showRequestsFigure();
+  // Last, so the figures above already hold their real numbers.
+  initMotion({
+    stage: stage,
+    rebuildStage: function () {
+      return initHeroPreview(previewHolder);
+    },
+  });
 }
 
 start();
