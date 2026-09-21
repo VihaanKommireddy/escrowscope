@@ -33,20 +33,21 @@
 /* ───────────────────────── 2. The panel around the sheet ───────────────────────── */
 
 @media (min-width: 1080px) {
-  /* The page layout (styles.css, .guide-col) makes the panel sticky with
-     top: 16px. The panel must then fit in the window, so the sheet scrolls
-     inside it. If that sticky `top` ever changes, set --guide-panel-top on
-     the panel to the same value. */
+  /* The page layout (styles.css, .guide-col) makes the panel sticky, 16px
+     under the sticky bar at the top of the page (--masthead-height). The panel
+     must then fit in what is left of the window, so the sheet scrolls inside
+     it. If that 16px ever changes, set --guide-panel-top on the panel to the
+     same value. */
   .guide-panel {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    max-height: calc(100vh - 2 * var(--guide-panel-top, 16px));
+    max-height: calc(100vh - var(--masthead-height, 0px) - 2 * var(--guide-panel-top, 16px));
   }
 
   @supports (height: 100dvh) {
     .guide-panel {
-      max-height: calc(100dvh - 2 * var(--guide-panel-top, 16px));
+      max-height: calc(100dvh - var(--masthead-height, 0px) - 2 * var(--guide-panel-top, 16px));
     }
   }
 }

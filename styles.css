@@ -634,15 +634,48 @@ code,
   }
 }
 
-/* The smallest phones: keep the name and the pill on one line. */
-@media (max-width: 359px) {
+/* Phones: a slightly smaller name and pill, so both fit on one line. */
+@media (max-width: 479px) {
+  .masthead-inner {
+    gap: var(--space-2);
+  }
+
+  .brand {
+    gap: 8px;
+  }
+
+  .brand-tile {
+    width: 30px;
+    height: 30px;
+  }
+
   .brand-name {
-    font-size: 19px;
+    font-size: 20px;
   }
 
   .masthead-cta {
+    margin-left: 0;
     padding-inline: 14px;
     font-size: 14px;
+  }
+}
+
+/* The narrowest screens (320px, or a bigger screen zoomed to 200%): the tile
+   stands in for the name. The name is still there for screen readers. */
+@media (max-width: 359px) {
+  .brand {
+    min-width: 44px;
+  }
+
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
@@ -1417,7 +1450,11 @@ code,
   background: linear-gradient(var(--accent), var(--accent)) center / 16px 2px no-repeat;
 }
 
+/* The title shares the first line with the plus sign and wraps INSIDE its own
+   box on a narrow screen, instead of dropping under the plus sign. */
 .summary-title {
+  flex: 1 1 12ch;
+  min-width: 0;
   font-weight: var(--weight-semibold);
   color: var(--ink);
 }
@@ -3166,8 +3203,16 @@ code,
   }
 
   body {
+    background: #FFFFFF;
     font-size: 9pt;
     line-height: 1.32;
+  }
+
+  /* After a check the verdict heading has keyboard focus. Its focus ring is for
+     the screen; on paper it would be a box drawn across the words around it. */
+  :focus,
+  :focus-visible {
+    outline: none !important;
   }
 
   .skip-link,
