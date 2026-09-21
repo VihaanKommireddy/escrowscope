@@ -34,14 +34,20 @@ import { VECTORS } from "../engine/index.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // The exact policy the page must carry (SPEC A4). Each line is one directive.
-// The test demands EXACTLY these nine: one more directive is as much a failure
+// The test demands EXACTLY these ten: one more directive is as much a failure
 // as one fewer, because an added "script-src-elem https://…" would quietly undo
 // the line above it.
+//
+// The tenth, font-src 'self', was added on 2026-09-21 with the serif heading
+// font. It allows ONE kind of thing, a font file, from ONE place, this site's
+// own folder. It must never grow a second source: a test below pins the single
+// font file the page may load.
 const REQUIRED_CSP_DIRECTIVES = [
   "default-src 'none'",
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self' data:",
+  "font-src 'self'",
   "manifest-src 'self'",
   "worker-src 'self'",
   "connect-src 'none'",
@@ -121,9 +127,17 @@ const BANNED_IN_SHELL = [
 // sw.js has to download the site's files and keep them: that is its whole job.
 // Every other entry on the list is banned in sw.js too, and tests/sw.test.js
 // runs sw.js and proves where its downloads go.
+//
+// styles.css (added 2026-09-21 with the serif heading font): the "src:" entry is
+// there to stop SCRIPT from building a file address out of what the visitor
+// typed. A stylesheet cannot do that: it has no access to the form. But CSS has
+// no other way to name a font file than the "src:" line inside @font-face. The
+// test "the page uses exactly one font file" pins that line to one file in this
+// site's own folder, so this exception cannot be used for anything else.
 const BANNED_EXCEPTIONS = [
   { file: "sw.js", name: "fetch(" },
   { file: "sw.js", name: "the browser cache storage (only sw.js may use it)" },
+  { file: "styles.css", name: "src: (a file address built through dom.js attrs)" },
 ];
 
 // A few more doors that only a service worker has.
@@ -482,7 +496,7 @@ function parseCspDirectives(policy) {
   return directives.sort();
 }
 
-test("index.html carries the Content-Security-Policy: EXACTLY the nine directives of the spec, no more and no fewer", () => {
+test("index.html carries the Content-Security-Policy: EXACTLY the ten directives of the spec, no more and no fewer", () => {
   requireIndexHtml();
   const cspTag = findCspTag();
   assert.ok(cspTag !== null, 'index.html has no <meta http-equiv="Content-Security-Policy"> tag.');
@@ -491,7 +505,7 @@ test("index.html carries the Content-Security-Policy: EXACTLY the nine directive
   assert.deepEqual(
     parseCspDirectives(cspTag.attrs.content || ""),
     required,
-    "The Content-Security-Policy must be exactly the nine directives in SPEC A4. An extra directive fails too: a later, more specific one can undo an earlier one."
+    "The Content-Security-Policy must be exactly the ten directives in SPEC A4. An extra directive fails too: a later, more specific one can undo an earlier one."
   );
   assert.ok(
     !(cspTag.attrs.content || "").includes("unsafe"),
@@ -509,7 +523,10 @@ test("the exact-match policy check rejects a policy with anything added, removed
   assert.deepEqual(parseCspDirectives("  " + REQUIRED_CSP_DIRECTIVES.slice().reverse().join(" ;  ") + " ; "), required, "Order and spacing must not matter.");
 
   const hostile = [
-    good + "; script-src-elem 'self' https://evil.example; frame-src *; font-src https:",
+    good + "; script-src-elem 'self' https://evil.example; frame-src *",
+    good.replace("font-src 'self'", "font-src https:"),
+    good.replace("font-src 'self'", "font-src 'self' https://fonts.example"),
+    good.replace("font-src 'self'", "font-src 'self' data:"),
     good + "; connect-src https://evil.example",
     good.replace("connect-src 'none'", "connect-src 'self'"),
     good.replace("; base-uri 'none'", ""),
@@ -675,6 +692,45 @@ test("index.html and its stylesheets load nothing from another website", () => {
   }
 });
 
+// ───────── the one font ─────────
+
+// font-src 'self' opened one door on 2026-09-21: the serif heading font. These
+// checks keep that door exactly one file wide.
+//  - One @font-face, one font file, and it lives in this site's own folder.
+//  - index.html preloads that same file, so it is downloaded WHILE the page
+//    loads. A font first downloaded later (when a result paints a heading)
+//    would make the privacy panel's "requests since load" counter read 1.
+//  - The font's license notice travels with the file.
+const THE_ONE_FONT = "assets/fonts/Fraunces-Variable.woff2";
+
+test("the page uses exactly one font file, from its own folder, and preloads it so the privacy counter stays at 0", () => {
+  requireIndexHtml();
+  let fontFaceRules = 0;
+  const fontUrls = [];
+  for (const sheet of linkedStylesheets) {
+    const css = (readText(sheet) || "").replace(/\/\*[\s\S]*?\*\//g, "");
+    fontFaceRules += css.split("@font-face").length - 1;
+    for (const url of findCssUrls(css)) {
+      if (/\.(?:woff2?|ttf|otf|eot)(?:[?#]|$)/i.test(url)) {
+        fontUrls.push(resolveInsideProject(url, sheet));
+      }
+    }
+  }
+  assert.equal(fontFaceRules, 1, "The stylesheets must declare exactly one @font-face.");
+  assert.deepEqual(fontUrls, [THE_ONE_FONT], "The stylesheets must load exactly one font file: " + THE_ONE_FONT);
+  assert.ok(fileExists(THE_ONE_FONT), THE_ONE_FONT + " is missing.");
+  assert.ok(fileExists("assets/fonts/FRAUNCES-LICENSE.txt"), "The font's license notice (assets/fonts/FRAUNCES-LICENSE.txt) must sit next to the font file.");
+
+  const preloads = indexTags.filter((tag) => tag.name === "link" && (tag.attrs.rel || "").toLowerCase().split(/\s+/).includes("preload"));
+  assert.equal(preloads.length, 1, "index.html must have exactly one <link rel=\"preload\">: the font.");
+  const preload = preloads[0];
+  assert.equal(preload.attrs.as, "font", 'The preload must say as="font".');
+  assert.equal(preload.attrs.type, "font/woff2", 'The preload must say type="font/woff2".');
+  assert.ok(preload.attrs.crossorigin !== undefined, "A font preload needs the crossorigin attribute, or the browser downloads the font twice.");
+  assert.equal(resolveInsideProject(preload.attrs.href || "", "index.html"), THE_ONE_FONT, "The preload must point at the same file the stylesheet uses.");
+  assert.ok(precache.urls.includes("./" + THE_ONE_FONT), "sw.js must save the font, or headings lose their typeface offline.");
+});
+
 // ═════════════════════════ 4. The static import graph ═════════════════════════
 
 test("every static import is a relative path to a file that exists", () => {
@@ -746,11 +802,15 @@ test("every probe the independent audit listed is on the banned list", () => {
   }
 });
 
-test("the list of exceptions to the banned list is exactly: sw.js may download and may use the cache storage", () => {
+test("the list of exceptions to the banned list is exactly: sw.js may download and may use the cache storage, and styles.css may name its one font file", () => {
   assert.deepEqual(BANNED_EXCEPTIONS, [
     { file: "sw.js", name: "fetch(" },
     { file: "sw.js", name: "the browser cache storage (only sw.js may use it)" },
+    { file: "styles.css", name: "src: (a file address built through dom.js attrs)" },
   ]);
+  // The styles.css exception covers ONE line: the src inside the one @font-face.
+  const styles = (readText("styles.css") || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.equal(linesMatching(styles, /\bsrc(?:set)?\s*:/).length, 1, 'styles.css may contain "src:" exactly once (inside @font-face).');
   const names = BANNED_IN_SHELL.map((banned) => banned.name);
   for (const exception of BANNED_EXCEPTIONS) {
     assert.ok(names.includes(exception.name), 'The exception "' + exception.name + '" does not name an entry on the banned list.');

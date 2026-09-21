@@ -111,6 +111,7 @@ of credit) are not covered by that rule at all.
 |---|---|
 | `index.html`, `app.js`, `render.js`, `chart.js`, `guide.js`, `proof.js` | The page |
 | `engine/` | The math, with no page code in it, so it runs the same in Node and in the browser |
+| `styles.css`, `assets/fonts/` | The look, and the one font file (Fraunces, for headings) with its license notice |
 | `tests/` | The test suite (`npm test`) |
 | `audit/` | The independent second implementation and the fuzzer |
 | `docs/research/` | The regulation notes, the 30 test cases, and the research on what else exists |

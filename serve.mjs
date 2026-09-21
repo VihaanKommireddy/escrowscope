@@ -28,6 +28,7 @@ const TYPES = {
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".png": "image/png",
   ".txt": "text/plain; charset=utf-8",
+  ".woff2": "font/woff2",
 };
 
 const BAD_REQUEST = { status: 400 };

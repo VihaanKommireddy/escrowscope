@@ -76,8 +76,13 @@ to read.
 
 - `<meta http-equiv="Content-Security-Policy">` with `default-src 'none'`,
   `script-src 'self'`, `style-src 'self'`, `img-src 'self' data:`,
-  `manifest-src 'self'`, `worker-src 'self'`, **`connect-src 'none'`**,
-  `form-action 'none'`, `base-uri 'none'`. With `connect-src 'none'` the browser
+  `font-src 'self'`, `manifest-src 'self'`, `worker-src 'self'`,
+  **`connect-src 'none'`**, `form-action 'none'`, `base-uri 'none'`: ten
+  directives, no more and no fewer. (`font-src 'self'` was added on 2026-09-21
+  with the serif heading font. It allows one kind of file, a font, from one
+  place, this site's own folder. The page preloads that one file while it
+  loads and `sw.js` saves it, so the request counter still reads 0 and the
+  page still opens offline. `tests/shell.test.js` pins the single file.) With `connect-src 'none'` the browser
   itself refuses background connections from the page: `fetch`,
   `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`.
   **What that does NOT cover (corrected 2026-09-19 after the independent QA
@@ -113,8 +118,11 @@ service worker handles only same-origin GETs for the shell; nothing else.
 - The chart has a text alternative: the same data as a real `<table>`.
 - Full keyboard operation; visible focus rings; 44px touch targets;
   `prefers-reduced-motion` respected; works at 200% zoom and 320px width.
-- Contrast: brand palette is already computed AA/AAA
-  (`escrowscope-buildrun-2026-07-08/brand/brand-guide.md`).
+- Contrast: every text and control color pair the page uses is worked out from
+  the tokens in `styles.css` by `tools/contrast.mjs`, in the light and the dark
+  theme, and held to WCAG 2.1 AA by `tests/contrast.test.js` (text 4.5:1, large
+  text and the edges of controls 3:1). (Before the 2026-09-21 reskin the palette
+  came from `escrowscope-buildrun-2026-07-08/brand/brand-guide.md`.)
 - Reading level: 6th–8th grade. Jargon gets defined the moment it appears.
 
 ### A7. Design direction
@@ -125,6 +133,35 @@ tabular figures for every number. Light + dark via `prefers-color-scheme`. Voice
 rules from the brand guide are binding: calm, never alarmed; show the math;
 servicer-neutral ("most payment jumps are lawful"); never "legal advice"; never
 promise a refund. Verdicts never rely on color alone.
+
+**Updated 2026-09-21, later the same day (new colors, owner's call: "choose
+different colors", using the `ui-ux-pro-max` and `frontend-design` skills).** The
+palette is now "Letterhead": warm ivory paper `#F8F5EE`, blue-black ink `#141B2D`,
+and ONE brand color, authority navy `#1D3A63` (dark theme: `#82AFED`). That is the
+`ui-ux-pro-max` database's answer for legal, government and traditional banking
+products ("authority navy + trust gold"), steered from its `#1E3A8A` to a hue that
+reads navy, not violet, on ivory. The gold half of that pairing is the amber the
+page already used for "look here"; its one new job is the italic headline word
+(`--punch`), because navy next to blue-black ink does not read as an accent. Scope
+Teal is retired everywhere, including the logo files and the tab icon. Green still
+means "matches", amber "look here", red only broken input. All 55 color pairs are
+checked in both themes by `tools/contrast.mjs` (110 checks, 0 under the bar). The
+two paragraphs below describe the layout, which did not change; where they say
+teal or `#F7F6F2`, read navy and `#F8F5EE`.
+
+**Updated 2026-09-21 (the Keepbook-style reskin, owner's call).** The page now
+shares the visual language of the owner's Keepbook landing page: warm paper
+(`#F7F6F2`), green-black ink, hairline rules, flat surfaces, pill buttons, and
+one serif for headings (Fraunces, one self-hosted variable file under
+`assets/fonts/`, SIL OFL 1.1). What did NOT change: Scope Teal `#0C5460` is
+still the one accent (never Keepbook's green, because green means "matches"
+here), amber still means "look here", red is still only broken input, the body
+is still the system font stack, and every number, dollar amount, table cell,
+chip label and eyebrow is still monospace with tabular figures. The top of the
+page is a sticky bar, a hero with a small framed sample result (built from
+example 2 by the real engine at load, hidden from screen readers and described
+in one sentence), and the three examples as ARIA tabs. The only soft shadows on
+the page are on that framed sample and the chips around it.
 
 ---
 

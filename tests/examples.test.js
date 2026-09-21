@@ -27,7 +27,10 @@ function run(example) {
 test("there are exactly three examples with the contract's ids, in order", () => {
   assert.deepStrictEqual(EXAMPLES.map((example) => example.id), ["jumped-ok", "holding-too-much", "cushion-too-big"]);
   for (const example of EXAMPLES) {
-    assert.deepStrictEqual(Object.keys(example), ["id", "title", "blurb", "account", "statement", "details", "expect"]);
+    assert.deepStrictEqual(Object.keys(example), ["id", "tab", "title", "blurb", "account", "statement", "details", "expect"]);
+    // `tab` is the short name on the example's tab. Three of them share one row,
+    // so it has to stay short (the panel underneath carries the full `title`).
+    assert.ok(typeof example.tab === "string" && example.tab.length > 0 && example.tab.length <= 28, example.id + ": `tab` must be 1 to 28 characters.");
     assert.deepStrictEqual(Object.keys(example.expect), ["classification", "overall", "tone", "flagKinds"]);
   }
 });

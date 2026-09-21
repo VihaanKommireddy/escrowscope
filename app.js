@@ -8,7 +8,7 @@
 
 import { el, clear } from "./dom.js";
 import { EXAMPLES } from "./examples.js";
-import { MONTH_NAMES } from "./engine/index.js";
+import { MONTH_NAMES, formatCents } from "./engine/index.js";
 import {
   BILL_KINDS,
   MAX_BILL_ROWS,
@@ -35,6 +35,8 @@ import { initGuide, renumberBoxes } from "./guide.js";
 import { initProofPanel } from "./proof.js";
 import { initSelfCheck } from "./selfcheck-ui.js";
 import { registerServiceWorker } from "./sw-register.js";
+import { buildTabs } from "./tabs.js";
+import { initHeroPreview } from "./preview.js";
 
 const LIVE_EDIT_DELAY_MS = 250;
 
@@ -577,30 +579,79 @@ function scheduleLiveEdit() {
 
 // ─────────────────────────── examples ───────────────────────────
 
-function buildExampleButtons() {
-  const holder = byId("example-buttons");
-  clear(holder);
-  EXAMPLES.forEach(function (example, index) {
-    const button = el("button", { className: "example-card", attrs: { type: "button", "aria-pressed": "false" } }, [
-      el("span", { className: "example-index", text: "Example " + (index + 1) }),
-      el("span", { className: "example-title", text: example.title }),
-      el("span", { className: "example-blurb", text: example.blurb }),
-      el("span", { className: "example-go", text: "Fill in the form and check it" }),
-    ]);
-    button.addEventListener("click", function () {
-      for (const other of holder.querySelectorAll(".example-card")) {
-        other.setAttribute("aria-pressed", "false");
-      }
-      button.setAttribute("aria-pressed", "true");
-      byId("f-servicer-name").value = "";
-      byId("f-loan-number").value = "";
-      forgetLetterEdits();
-      writeFormValues(exampleToValues(example));
-      setMonthGuessNote(false);
-      checkNow();
+// The three examples are a row of tabs (tabs.js has the keyboard rules). Choosing
+// a tab only SHOWS that example: its words, and the numbers its statement
+// carries. The button inside the panel fills in the form and runs the check.
+let exampleTabs = null;
+
+const CLAIMED_KIND_WORDS = { shortage: "A shortage of ", surplus: "A surplus of ", deficiency: "A deficiency of " };
+
+// The numbers this example types into the form, as a small slip. Every figure
+// comes straight from examples.js, so the slip and the form can never disagree.
+function exampleSlip(example) {
+  let billsCents = 0;
+  for (const bill of example.account.disbursements) billsCents += bill.amountCents;
+  const rows = [
+    ["Current escrow payment", formatCents(example.statement.currentMonthlyEscrowCents)],
+    ["New escrow payment", formatCents(example.statement.newMonthlyEscrowCents)],
+    ["Escrow balance at the start", formatCents(example.account.startingBalanceCents)],
+    ["Required minimum balance", formatCents(example.statement.requiredMinimumBalanceCents)],
+    ["Bills for the next 12 months", formatCents(billsCents)],
+  ];
+  const kindWords = CLAIMED_KIND_WORDS[example.statement.claimedKind];
+  const list = el("dl", { className: "example-slip-rows" });
+  for (const row of rows) {
+    list.append(el("div", { className: "example-slip-row" }, [el("dt", { text: row[0] }), el("dd", { text: row[1] })]));
+  }
+  if (kindWords) {
+    list.append(
+      el("div", { className: "example-slip-row is-total" }, [
+        el("dt", { text: "The statement says there is" }),
+        el("dd", { text: kindWords + formatCents(example.statement.claimedAmountCents) }),
+      ])
+    );
+  }
+  return el("div", { className: "example-slip" }, [
+    el("p", { className: "example-slip-title", text: "What this example’s statement says" }),
+    list,
+  ]);
+}
+
+function runExample(index) {
+  const example = EXAMPLES[index];
+  if (!example || pageIsFramed) return;
+  exampleTabs.select(index, false);
+  unpressExamples();
+  const note = exampleTabs.panels[index].querySelector(".example-loaded");
+  if (note) note.textContent = "These numbers are in the form now. The result is further down the page.";
+  byId("f-servicer-name").value = "";
+  byId("f-loan-number").value = "";
+  forgetLetterEdits();
+  writeFormValues(exampleToValues(example));
+  setMonthGuessNote(false);
+  checkNow();
+}
+
+function buildExampleTabs() {
+  const items = EXAMPLES.map(function (example, index) {
+    const runButton = el("button", {
+      className: "btn btn-primary example-run",
+      text: "Fill in the form and check it",
+      attrs: { type: "button" },
     });
-    holder.append(button);
+    runButton.addEventListener("click", function () {
+      runExample(index);
+    });
+    const words = el("div", { className: "tab-panel-text" }, [
+      el("p", { className: "eyebrow", text: "Example " + (index + 1) }),
+      el("h4", { className: "example-title", text: example.title }),
+      el("p", { className: "example-blurb", text: example.blurb }),
+      runButton,
+      el("p", { className: "example-loaded" }),
+    ]);
+    return { label: example.tab, content: [words, exampleSlip(example)] };
   });
+  exampleTabs = buildTabs({ holder: byId("example-buttons"), labelledBy: "examples-heading", idPrefix: "example", items: items });
 }
 
 // A link such as ./#example-2 opens the page with that example already run.
@@ -610,14 +661,28 @@ function runExampleFromAddress() {
   const hash = window.location.hash;
   if (!hash.startsWith("#example-")) return;
   const number = Number(hash.slice("#example-".length));
-  const buttons = byId("example-buttons").querySelectorAll(".example-card");
-  if (Number.isInteger(number) && buttons[number - 1]) buttons[number - 1].click();
+  if (Number.isInteger(number) && EXAMPLES[number - 1]) runExample(number - 1);
 }
 
+// The numbers are the visitor's own from the first keystroke, so no example is
+// "the one in the form" any more. (The chosen TAB stays chosen: a row of tabs
+// always has one.)
 function unpressExamples() {
-  for (const button of byId("example-buttons").querySelectorAll(".example-card")) {
-    button.setAttribute("aria-pressed", "false");
+  for (const note of byId("example-buttons").querySelectorAll(".example-loaded")) {
+    note.textContent = "";
   }
+}
+
+// "Watch an example" (in the hero and again in the closing section). Without
+// script it is a plain link down to the examples. With script it runs example 1
+// straight away, exactly as pressing that example's own button would.
+function handleRunExampleClick(event) {
+  const link = event.target.closest("a[data-run-example]");
+  if (!link || pageIsFramed) return;
+  const number = Number(link.getAttribute("data-run-example"));
+  if (!Number.isInteger(number) || !EXAMPLES[number - 1]) return;
+  event.preventDefault();
+  runExample(number - 1);
 }
 
 // ─────────────────────────── letter + printing ───────────────────────────
@@ -869,7 +934,8 @@ function guardAgainstFraming() {
 function start() {
   fillMonthOptions(byId("f-start-month"), "Pick a month");
   writeFormValues(blankFormValues());
-  buildExampleButtons();
+  buildExampleTabs();
+  initHeroPreview(byId("hero-preview"));
 
   // The form never submits anywhere (there is no action, and the CSP forbids one).
   form.addEventListener("submit", function (event) {
@@ -926,6 +992,7 @@ function start() {
   window.addEventListener("afterprint", restoreAfterPrint);
 
   document.addEventListener("click", handleJumpLinkClick);
+  document.addEventListener("click", handleRunExampleClick);
 
   byId("file-actions").hidden = false;
   byId("download-numbers").addEventListener("click", downloadNumbers);
@@ -939,7 +1006,13 @@ function start() {
   registerServiceWorker();
 
   guardAgainstFraming();
-  if (!pageIsFramed) runExampleFromAddress();
+  if (!pageIsFramed) {
+    runExampleFromAddress();
+    // The same link clicked while the page is already open only changes the "#"
+    // part of the address, and browsers do not reload for that. Listen for it, so
+    // ./#example-2 works from anywhere, not just on a fresh load.
+    window.addEventListener("hashchange", runExampleFromAddress);
+  }
 
   // LAST line on purpose: if anything above threw, this never runs and the
   // "If the buttons on this page do nothing…" paragraph stays on the page.

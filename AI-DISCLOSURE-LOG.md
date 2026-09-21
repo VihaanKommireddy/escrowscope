@@ -64,3 +64,14 @@ direction. The running detail (which agent built which file, and when) is in
   independent auditor caught it and the rule was replaced.
 - Not verified by anyone: Safari, Firefox, a real phone, a screen reader. The
   page was tested in Chromium only.
+
+## 2026-09-21: the Keepbook-style restyle
+
+- AI wrote it. A Claude Code agent (model: Claude Fable 5.1) restyled the page on
+  the branch `ui-keepbook`: the stylesheets, the new top and bottom of
+  `index.html`, two small new modules (`tabs.js`, `preview.js`), a contrast tool
+  and the tests that go with them. Details are in `BUILD-LOG.md`.
+- Vihaan directed it: he chose the look ("like the Keepbook landing page", his
+  own earlier project), and merging or shipping it is his call.
+- The font (Fraunces) is not AI-made. It is an open-source typeface under the SIL
+  Open Font License 1.1, copied from the Keepbook project.

@@ -33,20 +33,21 @@
 /* ───────────────────────── 2. The panel around the sheet ───────────────────────── */
 
 @media (min-width: 1080px) {
-  /* The page layout (styles.css, .guide-col) makes the panel sticky with
-     top: 16px. The panel must then fit in the window, so the sheet scrolls
-     inside it. If that sticky `top` ever changes, set --guide-panel-top on
-     the panel to the same value. */
+  /* The page layout (styles.css, .guide-col) makes the panel sticky, 16px
+     under the sticky bar at the top of the page (--masthead-height). The panel
+     must then fit in what is left of the window, so the sheet scrolls inside
+     it. If that 16px ever changes, set --guide-panel-top on the panel to the
+     same value. */
   .guide-panel {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    max-height: calc(100vh - 2 * var(--guide-panel-top, 16px));
+    max-height: calc(100vh - var(--masthead-height, 0px) - 2 * var(--guide-panel-top, 16px));
   }
 
   @supports (height: 100dvh) {
     .guide-panel {
-      max-height: calc(100dvh - 2 * var(--guide-panel-top, 16px));
+      max-height: calc(100dvh - var(--masthead-height, 0px) - 2 * var(--guide-panel-top, 16px));
     }
   }
 }
@@ -59,14 +60,14 @@
   margin-top: var(--space-2);
   font-size: var(--text-small);
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-status {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-left: 3px solid var(--color-primary);
-  background: var(--color-info-tint);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-subtle);
   font-size: var(--text-small);
   line-height: 1.5;
 }
@@ -92,14 +93,12 @@
   position: relative;
   overflow: hidden;
   padding: var(--space-4);
-  border: 1px solid var(--color-hairline);
-  border-top: 3px solid var(--color-ink);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  box-shadow: var(--shadow-sheet, none);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   font-size: var(--text-small);
   line-height: 1.45;
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 /* The faint SAMPLE mark across the page. Decoration only (aria-hidden). */
@@ -114,7 +113,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--color-ink);
+  color: var(--ink);
   opacity: 0.05;
   pointer-events: none;
   user-select: none;
@@ -129,7 +128,7 @@
 .guide-section {
   margin-top: var(--space-4);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--color-hairline);
+  border-top: 1px solid var(--border);
 }
 
 .guide-head {
@@ -140,7 +139,7 @@
   line-height: 1.4;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-story,
@@ -148,7 +147,7 @@
   margin: 0 0 var(--space-2);
   font-size: 13px;
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-note {
@@ -190,7 +189,7 @@
 .guide-stamp {
   display: inline-block;
   padding: 2px var(--space-2);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--border-strong);
   border-radius: 2px;
   font-family: var(--font-mono);
   font-size: var(--text-micro);
@@ -198,7 +197,7 @@
   line-height: 1.5;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 /* ───────────────────────── 4. Lines, regions, badges ───────────────────────── */
@@ -232,7 +231,7 @@
   grid-column: 1 / -1;
   font-size: 13px;
   line-height: 1.45;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 /* A region: on the full sheet it is a real <button>, in a snippet a <span>. */
@@ -249,7 +248,7 @@
   min-height: 44px;
   margin: 3px 0;
   padding: 6px;
-  border: 1px dashed var(--color-border-strong);
+  border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
@@ -265,8 +264,8 @@ button.guide-region {
 
 button.guide-region:hover {
   border-style: solid;
-  border-color: var(--color-primary);
-  background: var(--color-info-tint);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 .guide-region-body {
@@ -285,10 +284,10 @@ button.guide-region:hover {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border: 2px solid var(--color-primary);
+  border: 2px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--accent);
+  color: var(--on-accent);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
   font-weight: var(--weight-bold);
@@ -303,14 +302,14 @@ button.guide-region:hover {
 .guide-region.is-active,
 .guide-region-static {
   border-style: solid;
-  border-color: var(--color-primary);
-  background: var(--color-info-tint);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .guide-region.is-active .guide-badge {
-  background: var(--color-on-primary);
-  color: var(--color-primary);
+  background: var(--on-accent);
+  color: var(--accent);
 }
 
 .guide-here {
@@ -330,8 +329,8 @@ button.guide-region:hover {
   display: block;
   padding: 0 6px;
   border-radius: 2px;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: var(--text-micro);
   font-weight: var(--weight-semibold);
   line-height: 1.3;
@@ -380,18 +379,18 @@ button.guide-region:hover {
 
 .guide-pay-colhead {
   padding: 0 7px var(--space-1);
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-align: right;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-pay-corner {
   align-self: stretch;
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--border);
 }
 
 .guide-pay-label {
@@ -415,7 +414,7 @@ button.guide-region:hover {
 }
 
 .guide-pay-total {
-  border-top: 1px solid var(--color-ink);
+  border-top: 1px solid var(--ink);
   font-weight: var(--weight-semibold);
 }
 
@@ -438,7 +437,7 @@ button.guide-region:hover {
 .guide-coupon {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px dashed var(--color-border-strong);
+  border-top: 1px dashed var(--border-strong);
 }
 
 .guide-coupon-tear {
@@ -447,7 +446,7 @@ button.guide-region:hover {
   font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 /* ───────────────────────── 7. The 12-month table ───────────────────────── */
@@ -473,12 +472,12 @@ button.guide-region:hover {
 .guide-row + .guide-row {
   margin-top: var(--space-1);
   padding-top: var(--space-1);
-  border-top: 1px solid var(--color-hairline);
+  border-top: 1px solid var(--border);
 }
 
 .guide-row-head {
   padding: 0 7px var(--space-1) 37px;
-  border-bottom: 1px solid var(--color-ink);
+  border-bottom: 1px solid var(--ink);
   /* Room for the "You are here" tab above the first row. */
   margin-bottom: var(--space-2);
 }
@@ -489,7 +488,7 @@ button.guide-region:hover {
   font-weight: var(--weight-medium);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-cell {
@@ -503,7 +502,7 @@ button.guide-region:hover {
   font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-cell-month:empty,
@@ -525,13 +524,13 @@ button.guide-region:hover {
   font-weight: var(--weight-bold);
   letter-spacing: normal;
   text-transform: none;
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 .guide-row-first .guide-cell-activity {
   grid-column: 1 / -1;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 /* The first-month row has no amount, so its words may use that room. */
@@ -556,7 +555,7 @@ button.guide-region:hover {
     font-size: inherit;
     letter-spacing: normal;
     text-transform: none;
-    color: var(--color-ink);
+    color: var(--ink);
   }
 
   .guide-row-first .guide-cell-activity {
@@ -576,7 +575,7 @@ button.guide-region:hover {
   gap: var(--space-2);
   min-height: 44px;
   padding: var(--space-1) 0;
-  color: var(--color-primary);
+  color: var(--accent);
   font-size: var(--text-small);
   font-weight: var(--weight-semibold);
   text-decoration: underline;
@@ -607,7 +606,7 @@ button.guide-region:hover {
 }
 
 .where-summary:hover {
-  color: var(--color-primary-ink);
+  color: var(--accent-hover);
   text-decoration-thickness: 2px;
 }
 
@@ -639,11 +638,11 @@ button.guide-region:hover {
   margin-top: var(--space-2);
   font-size: var(--text-small);
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .where-hint strong {
-  color: var(--color-ink);
+  color: var(--ink);
 }
 
 /* ───────────────────────── 9. The form box you just jumped to ───────────────────────── */
@@ -652,7 +651,7 @@ button.guide-region:hover {
    can find the box even when the browser shows no focus ring (a drop-down or a
    radio button focused by script after a mouse click). */
 .guide-jump {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--accent);
   outline-offset: 6px;
   border-radius: var(--radius-sm);
 }
@@ -669,9 +668,9 @@ button.guide-region:hover {
   gap: 2px;
   margin-block: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px dotted var(--color-border-strong);
+  border: 1px dotted var(--border-strong);
   border-radius: var(--radius-sm);
-  color: var(--color-muted);
+  color: var(--ink-2);
 }
 
 .guide-not-this-line {
@@ -688,5 +687,5 @@ button.guide-region:hover {
   font-size: var(--text-micro);
   font-weight: var(--weight-medium);
   letter-spacing: 0.04em;
-  color: var(--color-ink);
+  color: var(--ink);
 }

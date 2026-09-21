@@ -8,20 +8,29 @@
        It does not stop a link you click from opening another site, and it cannot
        stop this site's own files from being downloaded. The code never puts what
        you type into either of those, and the code is open for anyone to read.
-       No inline scripts or styles are allowed either, so this line is real. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+       No inline scripts or styles are allowed either, so this line is real.
+       font-src 'self' lets the page use exactly one font file, and only from this
+       site's own folder (assets/fonts). No font can come from anywhere else. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#0C5460">
+  <meta name="theme-color" content="#F8F5EE" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0D1222" media="(prefers-color-scheme: dark)">
   <title>EscrowScope: see why your mortgage payment jumped</title>
   <meta name="description" content="Type the numbers from your yearly mortgage escrow statement and see whether the math follows the federal escrow rule. Free. Nothing you type leaves the page.">
   <!-- The tab icon is written inline (a data: address) on purpose. Browsers fetch a
        file-based icon by themselves just AFTER the page loads, which would make the
        "requests since load" counter in the privacy panel read 1 instead of 0.
        It is the same drawing as assets/favicon.svg. -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%230C5460' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%231D3A63' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="manifest" href="./manifest.webmanifest">
+  <!-- The one font file (the serif used for headings) is asked for here, WHILE the
+       page loads, for the same reason the tab icon is inline: a font that is first
+       fetched later (when a result paints a heading) would make the "requests
+       since load" counter read 1 instead of 0. It comes from this site's own
+       folder; the policy above allows a font from nowhere else. -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="./assets/fonts/Fraunces-Variable.woff2">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./guide.css">
   <link rel="stylesheet" href="./chart.css">
@@ -33,33 +42,57 @@
 
   <header class="masthead">
     <div class="wrap masthead-inner">
-      <div class="masthead-bar">
-        <p class="brand">
-          <svg class="brand-mark" viewBox="0 0 100 100" width="36" height="36" aria-hidden="true" focusable="false">
-            <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+      <a class="brand" href="#top">
+        <span class="brand-tile" aria-hidden="true">
+          <svg class="brand-mark" viewBox="0 0 100 100" width="20" height="20" focusable="false">
+            <g fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
               <path d="M 66.37 59.23 A 27 27 0 1 1 66.37 40.77"/>
               <line x1="15" y1="50" x2="85" y2="50"/>
             </g>
-            <circle cx="85" cy="50" r="5.5" fill="currentColor"/>
           </svg>
-          <span class="brand-name">EscrowScope</span>
-        </p>
-        <a class="privacy-chip" href="#privacy-proof">
-          <svg class="chip-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-            <rect x="5" y="10.5" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span>This page never sends what you type</span>
-        </a>
-      </div>
-      <h1 class="masthead-title">See why your mortgage payment jumped.</h1>
-      <p class="masthead-sub">Type the numbers from your yearly escrow statement. This page redoes the math the federal rule requires, shows every step, and tells you in plain English what it found.</p>
+        </span>
+        <span class="brand-name">EscrowScope</span>
+      </a>
+      <nav class="masthead-nav" aria-label="On this page">
+        <a class="masthead-link" href="#how">How it works</a>
+        <a class="masthead-link" href="#selfcheck-section">Check the checker</a>
+        <a class="masthead-link" href="#privacy-proof">Privacy</a>
+        <a class="btn btn-primary masthead-cta" href="#form-heading">Check my statement</a>
+      </nav>
     </div>
-    <div class="tick-rule" aria-hidden="true"></div>
   </header>
 
   <main id="main">
     <p id="framed-warning" class="page-alert wrap" hidden>This page is being shown inside another website, so the form is switched off here. To use EscrowScope, open it directly in its own browser tab.</p>
+
+    <!-- ───────────── Hero ───────────── -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap hero-grid">
+        <div class="hero-pitch">
+          <p class="eyebrow hero-eyebrow">A free check of your escrow statement</p>
+          <h1 id="hero-title" class="hero-title">See why your mortgage payment <em>jumped.</em></h1>
+          <p class="hero-lede">Type the numbers from your yearly escrow statement. This page redoes the math the federal rule requires, shows every step, and tells you in plain English what it found.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary btn-large" href="#form-heading">Check my statement</a>
+            <a class="btn btn-secondary btn-large" href="#examples-heading" data-run-example="1">Watch an example</a>
+          </div>
+          <ul class="hero-claims">
+            <li><a href="#privacy-proof">This page never sends what you type</a></li>
+            <li>Free, with no account and no tracking</li>
+            <li>Works offline after your first visit, in most browsers</li>
+          </ul>
+        </div>
+
+        <!-- A small picture of a real result. Every number in it is worked out by
+             this page's own calculator from example 2 when the page loads
+             (preview.js); nothing in it is typed by hand. Screen readers get the
+             one sentence below instead of a result that is not theirs. -->
+        <div class="hero-stage">
+          <p class="visually-hidden">Picture: a sample result from example 2, “They’re holding too much”. It is an example, not your result. You can run the same example yourself further down the page.</p>
+          <div id="hero-preview" class="preview" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
 
     <!-- ───────────── Intro + examples + pre-check ───────────── -->
     <section class="intro" aria-labelledby="intro-heading">
@@ -72,10 +105,10 @@
         </div>
 
         <div class="examples">
-          <h3 id="examples-heading">No statement handy? Watch it work on an example.</h3>
-          <p class="muted small">Each button fills in the form and checks the math. You can change any number afterwards to see what happens.</p>
-          <div id="example-buttons" class="example-grid" role="group" aria-labelledby="examples-heading">
-            <p class="page-problem">The example buttons have not loaded. Your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser.</p>
+          <h3 id="examples-heading" class="examples-heading" tabindex="-1">No statement handy? Watch it work on an example.</h3>
+          <p class="muted small examples-lede">Pick an example, then press its button: it fills in the form and checks the math. You can change any number afterwards to see what happens.</p>
+          <div id="example-buttons" class="example-tabs">
+            <p class="page-problem">The examples have not loaded. Your browser may be too old, or part of the page failed to load. Try reloading the page, or open it in an up-to-date browser.</p>
           </div>
         </div>
 
@@ -424,6 +457,31 @@
       </div>
     </section>
 
+    <!-- ───────────── How this works + the sources ───────────── -->
+    <section class="how" id="how" aria-labelledby="how-heading">
+      <div class="wrap how-grid">
+        <div>
+          <span class="eyebrow">How it works</span>
+          <h2 id="how-heading">The federal method, run on your numbers.</h2>
+          <div class="how-copy">
+            <p>Federal rule 12 CFR 1024.17 tells every mortgage servicer how to run an escrow account: add up the year’s bills, divide by 12, walk the balance forward month by month, and keep a cushion no bigger than one sixth of the year’s bills. This page runs that same method on the numbers you type and compares the answer with your statement.</p>
+            <p>The whole thing is a handful of plain files that run in your browser. There is no account and no tracking. The files are hosted on GitHub Pages, which, like any web host, can see that your browser downloaded them. It never sees what you type. After your first visit the page works with the internet turned off in most browsers.</p>
+          </div>
+        </div>
+        <div>
+          <span class="eyebrow">Read it yourself</span>
+          <h3 id="sources-heading" class="how-h">The rule, the agency, and this page’s code</h3>
+          <ul class="link-list">
+            <li><a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The federal escrow rule, 12 CFR 1024.17 (eCFR)</a></li>
+            <li><a href="https://www.consumerfinance.gov/rules-policy/regulations/1024/17/" rel="noopener noreferrer">The same rule on the CFPB’s site</a></li>
+            <li><a href="https://www.consumerfinance.gov/find-a-housing-counselor/" rel="noopener noreferrer">Find a HUD-approved housing counselor (CFPB)</a></li>
+            <li><a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">This page’s source code</a></li>
+          </ul>
+          <p class="small muted">These links open other websites. Clicking a link like these is the only way this page ever leads anywhere else.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- ───────────── Check the checker (SPEC D1) ───────────── -->
     <section class="selfcheck-section" id="selfcheck-section" aria-labelledby="selfcheck-heading">
       <div class="wrap">
@@ -433,35 +491,38 @@
         <div id="selfcheck"></div>
       </div>
     </section>
-  </main>
 
-  <footer class="site-footer">
-    <div class="wrap">
-      <section id="privacy-proof" class="privacy-proof" aria-labelledby="privacy-heading" tabindex="-1">
+    <!-- ───────────── Privacy you can check ───────────── -->
+    <section id="privacy-proof" class="privacy-section privacy-proof" aria-labelledby="privacy-heading" tabindex="-1">
+      <div class="wrap">
         <span class="eyebrow">Privacy you can check</span>
         <h2 id="privacy-heading">This page does not send your numbers anywhere. Check it yourself.</h2>
         <div id="proof-panel"></div>
-      </section>
-
-      <div class="footer-grid">
-        <section aria-labelledby="how-heading">
-          <h2 id="how-heading" class="footer-h">How this works</h2>
-          <p>Federal rule 12 CFR 1024.17 tells every mortgage servicer how to run an escrow account: add up the year’s bills, divide by 12, walk the balance forward month by month, and keep a cushion no bigger than one sixth of the year’s bills. This page runs that same method on the numbers you type and compares the answer with your statement.</p>
-          <p>The whole thing is a handful of plain files that run in your browser. There is no account and no tracking. The files are hosted on GitHub Pages, which, like any web host, can see that your browser downloaded them. It never sees what you type. After your first visit the page works with the internet turned off in most browsers.</p>
-        </section>
-        <section aria-labelledby="sources-heading">
-          <h2 id="sources-heading" class="footer-h">Read it yourself</h2>
-          <ul class="link-list">
-            <li><a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The federal escrow rule, 12 CFR 1024.17 (eCFR)</a></li>
-            <li><a href="https://www.consumerfinance.gov/rules-policy/regulations/1024/17/" rel="noopener noreferrer">The same rule on the CFPB’s site</a></li>
-            <li><a href="https://www.consumerfinance.gov/find-a-housing-counselor/" rel="noopener noreferrer">Find a HUD-approved housing counselor (CFPB)</a></li>
-            <li><a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">This page’s source code</a></li>
-          </ul>
-          <p class="small muted">These links open other websites. Clicking one is the only way this page ever leads anywhere else.</p>
-        </section>
       </div>
+    </section>
 
-      <p class="footer-note small">EscrowScope is free and independent. It is not affiliated with any mortgage servicer or government agency. It shows math. What you do next is up to you.</p>
+    <!-- ───────────── Closing ───────────── -->
+    <section class="closing" aria-labelledby="closing-heading">
+      <div class="wrap">
+        <h2 id="closing-heading">See the math behind your new payment.</h2>
+        <p class="closing-lede">Many payment jumps are lawful. Some statements have mistakes. It takes about two minutes to find out which one you are holding.</p>
+        <div class="cta-row cta-row--center">
+          <a class="btn btn-primary btn-large" href="#form-heading">Check my statement</a>
+          <a class="btn btn-secondary btn-large" href="#examples-heading" data-run-example="1">Watch an example</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p class="footer-brand">EscrowScope · free and independent</p>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="https://github.com/VihaanKommireddy/escrowscope" rel="noopener noreferrer">Source code</a>
+        <a href="https://www.ecfr.gov/current/title-12/section-1024.17" rel="noopener noreferrer">The rule on eCFR</a>
+        <a href="#privacy-proof">Privacy you can check</a>
+      </nav>
+      <p class="footer-note">This is math, not legal advice. EscrowScope is not affiliated with any mortgage servicer or government agency. It shows math. What you do next is up to you.</p>
     </div>
   </footer>
 </body>

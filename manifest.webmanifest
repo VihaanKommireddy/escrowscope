@@ -6,11 +6,11 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "theme_color": "#0C5460",
-  "background_color": "#FFFFFF",
+  "theme_color": "#F8F5EE",
+  "background_color": "#F8F5EE",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23FFFFFF'/%3E%3Cg fill='none' stroke='%230C5460' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23FFFFFF'/%3E%3Cg fill='none' stroke='%231D3A63' stroke-width='13' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M62.84 60.17A25 25 0 1 1 62.84 39.83'/%3E%3Cpath d='M14 50H86'/%3E%3C/g%3E%3C/svg%3E",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

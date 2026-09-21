@@ -11,10 +11,13 @@
 // - `month` on a bill is in ESCROW-YEAR order: month 1 is the first month of the
 //   escrow year (`startMonth` says which calendar month that is, 1 = January).
 // - No real servicer names, no real people. These are teaching examples.
+// - `tab` is the short name on the example's tab; `title` is the full heading
+//   inside the panel. Keep `tab` to a few words: three of them share one row.
 
 export const EXAMPLES = [
   {
     id: "jumped-ok",
+    tab: "The math checks out",
     title: "My payment jumped, and the math checks out",
     blurb:
       "Tax and insurance bills went up $900 for the year. The statement raises the escrow payment from $400 to $500 a month. The federal math agrees with every number.",
@@ -50,6 +53,7 @@ export const EXAMPLES = [
 
   {
     id: "holding-too-much",
+    tab: "They're holding too much",
     title: "They're holding too much",
     blurb:
       "The owner's hand-worked test case #1. The account never drops below $1,100, but the most cushion the law allows is $800. That leaves a $300 surplus. The rule says a surplus of $50 or more is refunded within 30 days, as long as payments are current.",
@@ -87,6 +91,7 @@ export const EXAMPLES = [
 
   {
     id: "cushion-too-big",
+    tab: "The cushion is too big",
     title: "The cushion is too big",
     blurb:
       "The statement keeps a $1,800 cushion. That is 3 months of escrow payments. The most the federal rule allows is 2 months: $1,200. The extra $600 shows up as a shortage the federal math does not find.",

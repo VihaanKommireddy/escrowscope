@@ -879,7 +879,7 @@ So the number is: files this page asked for after it finished loading. Checking 
 | | other tabs, other apps, browser extensions |
 | | anything after the browser's log fills up (about 250 entries) |
 
-**What the CSP blocks.** The Content-Security-Policy is one `<meta>` line near the top of `index.html`, with nine directives. `connect-src 'none'` makes the browser itself refuse background connections from the page: `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`. `form-action 'none'` blocks form posts. `script-src 'self'` and `style-src 'self'` block inline and third-party scripts and styles. `default-src 'none'` blocks everything not listed.
+**What the CSP blocks.** The Content-Security-Policy is one `<meta>` line near the top of `index.html`, with ten directives (the tenth, `font-src 'self'`, was added on 2026-09-21 for the one serif font file, which comes from this site's own folder). `connect-src 'none'` makes the browser itself refuse background connections from the page: `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`. `form-action 'none'` blocks form posts. `script-src 'self'` and `style-src 'self'` block inline and third-party scripts and styles. `default-src 'none'` blocks everything not listed.
 
 **What the CSP does not block** (straight from the QA audit, defect 1):
 
@@ -1000,9 +1000,11 @@ Counts are from the last full run while this doc was being written (2026-09-19, 
 | `tests/properties.test.js` | 14 | Layer 2. | "THE SECOND ORACLE agrees on every number, the low month, the classification, nearLine and the new payment." |
 | `tests/purity.test.js` | 23 | The engine's source has no DOM, clock, network or globals, and `/` appears only in the two helpers. | "The engine loads with no `document`, `window` or `fetch` defined." |
 | `tests/pipeline.test.js` | 51 | The exact path the page uses: examples, garbage, hostile text, negative balances, non-January years, file round trip. | "`runCheck` never throws, whatever it is handed." |
-| `tests/shell.test.js` | 48 | The files keep the page's promises: exact CSP, no inline code, no banned calls, relative paths, precache list matches the import graph, cache name is fresh. | "`index.html` carries EXACTLY the nine directives of the spec, no more and no fewer." |
+| `tests/shell.test.js` | 50 | The files keep the page's promises: exact CSP, no inline code, no banned calls, relative paths, precache list matches the import graph, cache name is fresh. | "`index.html` carries EXACTLY the ten directives of the spec, no more and no fewer." |
 | `tests/sw.test.js` | 16 | Runs the real `sw.js` inside Node's `node:vm` with a fake network and fake cache, and watches what it does. | "Requests to another website are NEVER answered, and never cause a download." |
 | `tests/serve.test.js` | 11 | The local preview server cannot be crashed or tricked into serving files outside the folder. | "A malformed percent sign is a 400, never an exception." |
+| `tests/contrast.test.js` | 4 | Added 2026-09-21 with the Keepbook-style reskin. Every text and control color pair in `styles.css` clears WCAG 2.1 AA in the light and the dark theme, worked out by `tools/contrast.mjs` from the tokens themselves. | "Every text and control color pair clears WCAG 2.1 AA in the light and the dark theme." |
+| `tests/preview.test.js` | 5 | Added 2026-09-21. The sample result pictured in the hero is built from the engine at load, never typed in; the example tabs wrap round with the arrow keys. | "The hero preview shows example 2, and every string in it is what the engine gives for example 2." |
 
 One honest limit, written in `BUILD-LOG.md`: there is no browser in the test suite (zero dependencies, so no jsdom). Focus handling, the live region, the error boundary and the framing guard are verified by real-browser runs, not by unit tests. A green `npm test` does not by itself prove the page behaves.
 
