@@ -93,12 +93,17 @@ test("example tabs: each example has a short tab name, and the arrow keys wrap r
   assert.equal(nextTabIndex(0, 0, "ArrowRight"), 0);
 });
 
-test("the page's two \"Watch an example\" links work without script (they point at the examples) and name a real example", () => {
-  const links = [...indexHtml.matchAll(/<a [^>]*data-run-example="(\d+)"[^>]*>/g)];
+// Until the site became four pages, these two links ran example 1 further down
+// the same page (data-run-example). Now they are plain links to the tool, which
+// opens with the example filled in: ./check.html#example-1. A plain link needs
+// no script on THIS page; check.js reads the number on the other side, and
+// tests/shell.test.js tests that reader (example-link.js).
+test("the landing page's two \"Watch an example\" links are plain links to the tool and name a real example", () => {
+  const links = [...indexHtml.matchAll(/<a [^>]*href="\.\/check\.html#example-(\d+)"[^>]*>Watch an example<\/a>/g)];
   assert.equal(links.length, 2, "Expected the hero link and the closing-section link.");
   for (const link of links) {
-    assert.ok(/href="#examples-heading"/.test(link[0]), "Without script the link must still lead to the examples.");
-    assert.ok(EXAMPLES[Number(link[1]) - 1] !== undefined, "data-run-example names an example that does not exist.");
+    assert.ok(EXAMPLES[Number(link[1]) - 1] !== undefined, "The link names an example that does not exist.");
+    assert.ok(!/data-run-example/.test(link[0]), "The old same-page hook must be gone: nothing on the landing page listens for it.");
   }
-  assert.ok(/id="examples-heading"/.test(indexHtml));
+  assert.ok(/id="examples-heading"/.test(indexHtml), "The landing page still shows the three examples.");
 });

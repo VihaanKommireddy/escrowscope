@@ -20,9 +20,9 @@ function byId(id) {
 
 // ─────────────────────────── the big figures ───────────────────────────
 
-// "30 of 30": counted by running every worked case on this device, right now.
-// If a case ever failed, the band would say so ("29 of 30"). The motion layer
-// reads data-count-to, so it is set here together with the text.
+// The worked cases: counted by running every one of them on this device, right
+// now. If a case ever failed, the band would say so, with the real count. The
+// motion layer reads data-count-to, so it is set here together with the text.
 function showSelfCheckFigure() {
   const passedNode = byId("figure-passed");
   const totalNode = byId("figure-total");
