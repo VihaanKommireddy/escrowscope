@@ -348,3 +348,14 @@ stands); it is checked by real-browser runs.
 
 **Not done on purpose:** nothing was pushed, `main` was not touched, the live
 site is unchanged. Shipping is the owner's click.
+
+### 2026-09-21: co-author lines removed from the commit messages
+
+At the owner's request, the `Co-Authored-By: Claude ...` line that ended 55 of
+the 60 commit messages was removed. That meant rewriting those commit messages
+and force-pushing. The files are byte-identical before and after, the authors
+and dates are unchanged, and the five original hand-typed code commits kept
+their IDs. GitHub no longer lists Claude in the contributors sidebar because of
+this. Who wrote what has not changed, and it is recorded here and in
+`AI-DISCLOSURE-LOG.md`: AI agents wrote all of v1, and Vihaan typed everything
+in `v0/`.
