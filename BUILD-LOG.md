@@ -359,3 +359,16 @@ their IDs. GitHub no longer lists Claude in the contributors sidebar because of
 this. Who wrote what has not changed, and it is recorded here and in
 `AI-DISCLOSURE-LOG.md`: AI agents wrote all of v1, and Vihaan typed everything
 in `v0/`.
+
+### 2026-09-21: live site tested at phone size, one fix
+
+The director agent opened the live site in a phone-sized, touch-emulated Chromium
+(375x812, mobile user agent). Not a real iPhone: this Mac has no iOS simulator.
+Passed: the three examples, the 30 live checks, request counter at 0, service
+worker active on the `/escrowscope/` path with 26 files saved, number keypads on
+all 9 money boxes, every "Where is this on my statement?" helper fits the screen,
+wide tables scroll inside their own boxes, no sideways page scroll, dark mode,
+clean console. One bug found and fixed by the director: the editable letter box
+was 14px, and iPhone Safari zooms the page in when a text box under 16px is
+tapped. Now 1rem, with a regression test that was shown to fail on the old value.
+Still verified by nobody: a real iPhone, Safari's engine, a screen reader.

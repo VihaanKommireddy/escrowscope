@@ -1778,3 +1778,29 @@ test("no _dev-* scratch files are left in the project folder", () => {
   }
   assert.deepEqual(leftovers, [], "Helpers must delete their scratch files before finishing:\n" + leftovers.join("\n"));
 });
+
+// Found testing the live site at phone size (2026-09-21): the editable letter box
+// was 14px. iPhone Safari zooms the page in when a text-entry control under 16px
+// gets focus. Checkboxes and radio buttons do not trigger that zoom, so this only
+// looks at boxes people type in.
+test("phone: no box people type in has a font size under 16px (iPhone Safari would zoom the page on tap)", async () => {
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const cssFiles = readdirSync(root).filter((name) => name.endsWith(".css"));
+  assert.ok(cssFiles.includes("styles.css"));
+  const typedInto = /(textarea|\.letter-text|input\[type="?(text|date|number|search|email|tel)"?\]|\.money-input|\.text-input|select)/;
+  const tooSmall = [];
+  for (const name of cssFiles) {
+    const css = readFileSync(root + name, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = rule[1].trim();
+      if (!typedInto.test(selector)) continue;
+      const size = rule[2].match(/font-size:\s*([0-9.]+)(px|rem)/);
+      if (!size) continue;
+      const pixels = size[2] === "rem" ? Number(size[1]) * 16 : Number(size[1]);
+      if (pixels < 16) tooSmall.push(name + ": " + selector.split("\n").pop() + " is " + size[1] + size[2]);
+    }
+  }
+  assert.deepEqual(tooSmall, []);
+});
