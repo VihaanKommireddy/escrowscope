@@ -57,6 +57,6 @@ git merge v1
 git push
 ```
 
-That replaces the hand-typed v0.3 page on the live site with v1. Read
-`~/Gov App Challenge/V1-AND-THE-CONTEST.md` first: if `main` is a contest entry,
-do not merge before submitting.
+That replaces the hand-typed v0.3 page on the live site with v1. The hand-typed
+version stays in `v0/` either way. Decide first which one you want at the live
+address.
