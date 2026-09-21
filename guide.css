@@ -93,10 +93,8 @@
   overflow: hidden;
   padding: var(--space-4);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--ink);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-2, none);
   font-size: var(--text-small);
   line-height: 1.45;
   color: var(--ink);

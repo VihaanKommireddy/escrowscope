@@ -1,0 +1,104 @@
+// tests/preview.test.js — the hero's "sample result" and the example tabs.
+//
+// The picture at the top of the page shows a verdict, three dollar figures, a
+// cushion limit, a lowest month and a self-check count. A picture of a result
+// that the calculator would not actually give would be a small lie at the very
+// top of an honesty tool. So:
+//   1. preview.js builds every string from the engine when the page loads, and
+//      this file checks each one against the engine, worked out separately here;
+//   2. index.html's hero contains no dollar figure at all (nothing hard-coded);
+//   3. the picture is hidden from screen readers and described in one sentence.
+//
+// Run it from the project folder:   node --test tests/preview.test.js
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+import { EXAMPLES } from "../examples.js";
+import { analyze, compareWithStatement, explainVerdict, formatCents, runSelfCheck, VECTORS } from "../engine/index.js";
+import { previewFacts, PREVIEW_EXAMPLE_INDEX } from "../preview.js";
+import { nextTabIndex } from "../tabs.js";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const indexHtml = readFileSync(path.join(ROOT, "index.html"), "utf8");
+
+test("the hero preview shows example 2, and every string in it is what the engine gives for example 2", () => {
+  assert.equal(PREVIEW_EXAMPLE_INDEX, 1);
+  const example = EXAMPLES[PREVIEW_EXAMPLE_INDEX];
+  assert.equal(example.id, "holding-too-much");
+
+  // Worked out here straight from the engine, not through pipeline.js.
+  const result = analyze(example.account);
+  const verdict = explainVerdict(result, compareWithStatement(result, example.statement));
+
+  const facts = previewFacts();
+  assert.ok(facts !== null, "previewFacts() returned nothing: example 2 no longer passes the form's own checks.");
+  assert.equal(facts.headline, verdict.headline);
+  assert.equal(facts.label, verdict.label);
+  assert.equal(facts.tone, verdict.tone);
+  assert.deepEqual(
+    facts.numbers.map((item) => item.figure),
+    [formatCents(result.annualDisbursementsCents), formatCents(result.cushionCapCents), formatCents(result.lowPoint.projectedBalanceCents)]
+  );
+  assert.deepEqual(
+    facts.months.map((month) => month.balanceCents),
+    result.table.map((row) => row.projectedBalanceCents)
+  );
+  assert.equal(facts.lowMonthIndex, result.lowPoint.month - 1);
+  assert.equal(facts.months[facts.lowMonthIndex].balanceCents, result.lowPoint.projectedBalanceCents, "The ringed point must be the lowest month.");
+
+  // The figures a person reads off the picture today. If the example or the
+  // engine changes, these change with it, and this line says so out loud.
+  assert.equal(facts.cushionChip.words + " · " + facts.cushionChip.figure, "Cushion limit · $800.00");
+  assert.equal(facts.lowChip.words + " · " + facts.lowChip.figure, "Lowest month · November · $1,100.00");
+  assert.deepEqual(facts.numbers.map((item) => item.figure), ["$4,800.00", "$800.00", "$1,100.00"]);
+});
+
+test("the \"checks passed\" chip is counted, not written down: it comes from running the self-check", () => {
+  const report = runSelfCheck(VECTORS);
+  const facts = previewFacts();
+  assert.equal(facts.checksChip, report.passed + " of " + report.total + " checks passed");
+  assert.equal(facts.allChecksPassed, report.failed === 0 && report.total === VECTORS.length);
+  const source = readFileSync(path.join(ROOT, "preview.js"), "utf8");
+  assert.ok(!/\d+ of \d+ checks/.test(source), "preview.js must not contain a written-down count of checks.");
+});
+
+test("index.html hard-codes no result in the hero: no dollar figure, and the picture is hidden from screen readers and described instead", () => {
+  const start = indexHtml.indexOf('<section class="hero"');
+  const end = indexHtml.indexOf("</section>", start);
+  assert.ok(start !== -1 && end !== -1, "index.html has no hero section.");
+  const hero = indexHtml.slice(start, end).replace(/<!--[\s\S]*?-->/g, "");
+  assert.ok(!/\$\s?\d/.test(hero), "The hero in index.html contains a dollar figure. Every number in the picture must come from preview.js.");
+  assert.ok(/<div id="hero-preview"[^>]*aria-hidden="true"/.test(hero), 'The picture holder must be aria-hidden="true".');
+  assert.ok(/<p class="visually-hidden">[^<]*example 2[^<]*not your result/.test(hero), "The hero needs the one-sentence description that says the picture is an example, not the visitor's result.");
+  const holder = /<div id="hero-preview"[^>]*>([\s\S]*?)<\/div>/.exec(hero);
+  assert.equal(holder[1].trim(), "", "The picture holder must be empty in index.html: preview.js fills it.");
+});
+
+test("example tabs: each example has a short tab name, and the arrow keys wrap round the row", () => {
+  for (const example of EXAMPLES) {
+    assert.ok(typeof example.tab === "string" && example.tab.trim() !== "", example.id + " has no tab name.");
+  }
+  const count = EXAMPLES.length;
+  assert.equal(nextTabIndex(0, count, "ArrowRight"), 1);
+  assert.equal(nextTabIndex(count - 1, count, "ArrowRight"), 0, "Right arrow on the last tab goes to the first.");
+  assert.equal(nextTabIndex(0, count, "ArrowLeft"), count - 1, "Left arrow on the first tab goes to the last.");
+  assert.equal(nextTabIndex(1, count, "Home"), 0);
+  assert.equal(nextTabIndex(0, count, "End"), count - 1);
+  assert.equal(nextTabIndex(1, count, "Enter"), 1, "Any other key leaves the choice alone.");
+  assert.equal(nextTabIndex(7, count, "ArrowRight"), 0, "A position that does not exist falls back to the first tab.");
+  assert.equal(nextTabIndex(0, 0, "ArrowRight"), 0);
+});
+
+test("the page's two \"Watch an example\" links work without script (they point at the examples) and name a real example", () => {
+  const links = [...indexHtml.matchAll(/<a [^>]*data-run-example="(\d+)"[^>]*>/g)];
+  assert.equal(links.length, 2, "Expected the hero link and the closing-section link.");
+  for (const link of links) {
+    assert.ok(/href="#examples-heading"/.test(link[0]), "Without script the link must still lead to the examples.");
+    assert.ok(EXAMPLES[Number(link[1]) - 1] !== undefined, "data-run-example names an example that does not exist.");
+  }
+  assert.ok(/id="examples-heading"/.test(indexHtml));
+});

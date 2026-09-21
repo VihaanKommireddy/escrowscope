@@ -76,8 +76,13 @@ to read.
 
 - `<meta http-equiv="Content-Security-Policy">` with `default-src 'none'`,
   `script-src 'self'`, `style-src 'self'`, `img-src 'self' data:`,
-  `manifest-src 'self'`, `worker-src 'self'`, **`connect-src 'none'`**,
-  `form-action 'none'`, `base-uri 'none'`. With `connect-src 'none'` the browser
+  `font-src 'self'`, `manifest-src 'self'`, `worker-src 'self'`,
+  **`connect-src 'none'`**, `form-action 'none'`, `base-uri 'none'`: ten
+  directives, no more and no fewer. (`font-src 'self'` was added on 2026-09-21
+  with the serif heading font. It allows one kind of file, a font, from one
+  place, this site's own folder. The page preloads that one file while it
+  loads and `sw.js` saves it, so the request counter still reads 0 and the
+  page still opens offline. `tests/shell.test.js` pins the single file.) With `connect-src 'none'` the browser
   itself refuses background connections from the page: `fetch`,
   `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`, `<a ping>`.
   **What that does NOT cover (corrected 2026-09-19 after the independent QA

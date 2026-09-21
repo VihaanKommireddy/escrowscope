@@ -347,7 +347,7 @@
   font-size: var(--text-micro);
   font-weight: var(--weight-medium);
   line-height: 1.4;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-2);
 }
