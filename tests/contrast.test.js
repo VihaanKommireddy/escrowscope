@@ -49,9 +49,10 @@ test("styles.css defines every token the contrast pairs name, in both themes", (
   assert.notEqual(themes.dark["--accent"], themes.light["--accent"]);
 });
 
-test("the accent is EscrowScope's own teal, not green (green already means \"matches\" on this page)", () => {
+test("the accent is authority navy, not green or gold (green already means \"matches\" and gold means \"look here\" on this page)", () => {
   const themes = readTokens(stylesCss);
-  assert.equal(themes.light["--accent"].toUpperCase(), "#0C5460");
+  assert.equal(themes.light["--accent"].toUpperCase(), "#1D3A63");
+  assert.notEqual(themes.light["--accent"].toUpperCase(), themes.light["--warn-mark"].toUpperCase());
   assert.notEqual(themes.light["--accent"].toUpperCase(), themes.light["--ok-mark"].toUpperCase());
 });
 

@@ -453,3 +453,21 @@ scroll.
 **Still verified by nobody:** Safari, Firefox, a real phone, a screen reader,
 real Windows High Contrast. In Safari and Firefox the font preload and the
 counter reading 0 were NOT checked.
+
+### 2026-09-21: new colors before going live (owner: "choose different colors")
+
+The owner asked for different colors and named two skills to choose them with:
+`ui-ux-pro-max` (its color database, searched for legal, government, banking and
+editorial products) and `frontend-design` (one dominant color, one sharp accent, no
+cliches). The database's answer for this kind of product is "authority navy + trust
+gold". The director agent applied it as the "Letterhead" palette: ivory paper
+`#F8F5EE`, blue-black ink `#141B2D`, navy `#1D3A63` as the one brand color (dark
+theme `#82AFED`), and the existing "look here" amber doing the gold's work, plus one
+new token, `--punch`, for the italic headline word. The database's own navy,
+`#1E3A8A`, was tried first and rejected after looking at it rendered: on ivory it
+reads violet. Only color tokens, the two logo files, the inline tab icon, the
+manifest and the theme-color tags changed. No layout, copy or engine change.
+`tools/contrast.mjs`: 110 checks (55 pairs x 2 themes), 0 under the bar. `npm test`
+657 of 657. One test was changed on purpose: the accent is now pinned as navy, and
+as different from both the green and the gold marks. Looked at in Chromium, light
+and dark, hero and a green verdict; request counter still 0; console clean.

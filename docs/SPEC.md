@@ -134,6 +134,21 @@ rules from the brand guide are binding: calm, never alarmed; show the math;
 servicer-neutral ("most payment jumps are lawful"); never "legal advice"; never
 promise a refund. Verdicts never rely on color alone.
 
+**Updated 2026-09-21, later the same day (new colors, owner's call: "choose
+different colors", using the `ui-ux-pro-max` and `frontend-design` skills).** The
+palette is now "Letterhead": warm ivory paper `#F8F5EE`, blue-black ink `#141B2D`,
+and ONE brand color, authority navy `#1D3A63` (dark theme: `#82AFED`). That is the
+`ui-ux-pro-max` database's answer for legal, government and traditional banking
+products ("authority navy + trust gold"), steered from its `#1E3A8A` to a hue that
+reads navy, not violet, on ivory. The gold half of that pairing is the amber the
+page already used for "look here"; its one new job is the italic headline word
+(`--punch`), because navy next to blue-black ink does not read as an accent. Scope
+Teal is retired everywhere, including the logo files and the tab icon. Green still
+means "matches", amber "look here", red only broken input. All 55 color pairs are
+checked in both themes by `tools/contrast.mjs` (110 checks, 0 under the bar). The
+two paragraphs below describe the layout, which did not change; where they say
+teal or `#F7F6F2`, read navy and `#F8F5EE`.
+
 **Updated 2026-09-21 (the Keepbook-style reskin, owner's call).** The page now
 shares the visual language of the owner's Keepbook landing page: warm paper
 (`#F7F6F2`), green-black ink, hairline rules, flat surfaces, pill buttons, and

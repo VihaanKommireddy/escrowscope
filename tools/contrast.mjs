@@ -112,7 +112,8 @@ export const PAIRS = [
   ["--ink-3", "--paper", "text", "footer, hero claims, inactive tabs"],
   ["--ink-3", "--surface", "text", "tiny labels in the hero preview"],
   ["--ink-3", "--sunken", "text", "muted text in a sunken well"],
-  ["--accent", "--paper", "text", "links, eyebrows, the italic punchline"],
+  ["--accent", "--paper", "text", "links, eyebrows"],
+  ["--punch", "--paper", "text", "the italic gold punchline in the headline"],
   ["--accent", "--surface", "text", "links and figures inside cards and chips"],
   ["--accent", "--sunken", "text", "links on a hovered row"],
   ["--accent-hover", "--paper", "text", "link hover"],
@@ -128,7 +129,7 @@ export const PAIRS = [
 
   // the subtle pairs
   ["--accent-deep", "--accent-subtle", "text", "the REQUIRED tag, self-check tags"],
-  ["--ink", "--accent-subtle", "text", "text on a teal tint"],
+  ["--ink", "--accent-subtle", "text", "text on a navy tint"],
   ["--ok-deep", "--ok-subtle", "text", "MATCHES label, Matches chip"],
   ["--ink", "--ok-subtle", "text", "green verdict headline and body"],
   ["--warn-deep", "--warn-subtle", "text", "LOOK HERE label, Differs chip"],

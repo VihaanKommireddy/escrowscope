@@ -9,7 +9,7 @@
    table cell, chip label and eyebrow. Flat surfaces: the only soft shadows on
    the page are on the framed preview in the hero and the chips around it.
 
-   One accent: EscrowScope's own deep teal. Green is never the accent here,
+   One accent: authority navy. Green is never the accent here,
    because on this page green already means "matches". Amber means "look here",
    steel blue means "too close to call", and red is only ever broken input,
    never a verdict.
@@ -39,20 +39,20 @@
   color-scheme: light dark;
 
   /* Neutrals: paper, the white sheet that sits on it, and the sunken well */
-  --paper: #F7F6F2;
+  --paper: #F8F5EE;
   --surface: #FFFFFF;
-  --sunken: #EFEDE7;
-  --border: #DCD8CE;
-  --border-strong: #83807A;
-  --ink: #1F2823;
-  --ink-2: #55605A;
-  --ink-3: #5F6B64;
+  --sunken: #F0EBE1;
+  --border: #DED6C6;
+  --border-strong: #7D7668;
+  --ink: #141B2D;
+  --ink-2: #4A5266;
+  --ink-3: #5C6478;
 
-  /* The one accent: deep teal (the logo's color) */
-  --accent: #0C5460;
-  --accent-hover: #09434D;
-  --accent-subtle: #DCEBEA;
-  --accent-deep: #093F48;
+  /* The one accent: authority navy (the logo's color) */
+  --accent: #1D3A63;
+  --accent-hover: #162D4E;
+  --accent-subtle: #E3E9F2;
+  --accent-deep: #15294A;
   --on-accent: #FFFFFF;
 
   /* "Matches" = green */
@@ -70,10 +70,10 @@
   --on-warn-mark: #FFFFFF;
 
   /* "Too close to call" and plain information = steel blue */
-  --info-text: #275F79;
-  --info-subtle: #E0EEF4;
-  --info-deep: #22546B;
-  --info-mark: #22546B;
+  --info-text: #2F5573;
+  --info-subtle: #E3ECF3;
+  --info-deep: #294C68;
+  --info-mark: #294C68;
   --on-info-mark: #FFFFFF;
 
   /* Broken input only */
@@ -83,15 +83,17 @@
   --danger-deep: #8A2A22;
   --on-danger: #FFFFFF;
 
-  --focus: #0C5460;
+  --focus: #1D3A63;
+
+  --punch: #8F5B00; /* the italic headline word: trust gold */
 
   /* The sticky bar is see-through paper. Written as a color, not an opacity, so
      the words on it keep their full contrast. */
-  --masthead-bg: rgba(247, 246, 242, 0.86);
-  --masthead-rule: rgba(220, 216, 206, 0.7);
+  --masthead-bg: rgba(248, 245, 238, 0.86);
+  --masthead-rule: rgba(222, 214, 198, 0.7);
   /* The dark pill on the hero preview ("EXAMPLE"). */
-  --pill-bg: rgba(31, 40, 35, 0.86);
-  --pill-ink: #F7F6F2;
+  --pill-bg: rgba(20, 27, 45, 0.88);
+  --pill-ink: #F8F5EE;
 
   /* Type */
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -139,27 +141,27 @@
   --masthead-height: 64px;
 
   /* Soft shadows: ONLY the framed hero preview and the chips around it. */
-  --shadow-2: 0 2px 8px rgba(31, 40, 35, 0.1);
-  --shadow-3: 0 8px 28px rgba(31, 40, 35, 0.16);
-  --shadow-chip: 0 12px 28px rgba(31, 40, 35, 0.14), 0 2px 6px rgba(31, 40, 35, 0.07);
+  --shadow-2: 0 2px 8px rgba(20, 27, 45, 0.1);
+  --shadow-3: 0 8px 28px rgba(20, 27, 45, 0.16);
+  --shadow-chip: 0 12px 28px rgba(20, 27, 45, 0.14), 0 2px 6px rgba(20, 27, 45, 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #121917;
-    --surface: #1A2320;
-    --sunken: #212C28;
-    --border: #32403A;
-    --border-strong: #6E7E76;
-    --ink: #E7ECE8;
-    --ink-2: #A6B2AB;
-    --ink-3: #93A099;
+    --paper: #0D1222;
+    --surface: #151B2E;
+    --sunken: #1B2338;
+    --border: #2A344E;
+    --border-strong: #6C7796;
+    --ink: #E9ECF5;
+    --ink-2: #ABB3C9;
+    --ink-3: #939CB5;
 
-    --accent: #5BB8C6;
-    --accent-hover: #7CCAD6;
-    --accent-subtle: #16353B;
-    --accent-deep: #A3DAE2;
-    --on-accent: #06181B;
+    --accent: #82AFED;
+    --accent-hover: #A3C4F3;
+    --accent-subtle: #182842;
+    --accent-deep: #B4CEF5;
+    --on-accent: #081424;
 
     --ok-text: #6FC7A0;
     --ok-subtle: #1E3A2E;
@@ -173,11 +175,11 @@
     --warn-mark: #D9A441;
     --on-warn-mark: #1F1608;
 
-    --info-text: #85BCD8;
-    --info-subtle: #1E3441;
-    --info-deep: #9CC9E0;
-    --info-mark: #85BCD8;
-    --on-info-mark: #0B1A22;
+    --info-text: #9DB7D6;
+    --info-subtle: #1B2A3D;
+    --info-deep: #AFC6E0;
+    --info-mark: #9DB7D6;
+    --on-info-mark: #0B1622;
 
     --danger: #E58779;
     --danger-text: #F09B90;
@@ -185,17 +187,19 @@
     --danger-deep: #F0A99F;
     --on-danger: #1A0E0C;
 
-    --focus: #5BB8C6;
+    --focus: #82AFED;
 
-    --masthead-bg: rgba(18, 25, 23, 0.86);
-    --masthead-rule: rgba(50, 64, 58, 0.7);
-    --pill-bg: rgba(231, 236, 232, 0.9);
-    --pill-ink: #121917;
+    --punch: #E3C07E;
+
+    --masthead-bg: rgba(13, 18, 34, 0.86);
+    --masthead-rule: rgba(42, 52, 78, 0.7);
+    --pill-bg: rgba(233, 236, 245, 0.9);
+    --pill-ink: #0D1222;
 
     /* Dark elevation reads as an edge, not a glow. */
-    --shadow-2: 0 0 0 1px #32403A;
-    --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px #32403A;
-    --shadow-chip: 0 14px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px #6E7E76;
+    --shadow-2: 0 0 0 1px #2A344E;
+    --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px #2A344E;
+    --shadow-chip: 0 14px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px #6C7796;
   }
 }
 
@@ -388,7 +392,7 @@ code,
 
 /* ───────────────────────── 4. Buttons ───────────────────────── */
 
-/* Every button is a pill. Filled teal = the main thing to do. Outlined paper =
+/* Every button is a pill. Filled navy = the main thing to do. Outlined paper =
    the second thing. "Quiet" = a text link that behaves like a button. */
 .btn {
   display: inline-flex;
@@ -716,13 +720,16 @@ code,
   letter-spacing: -0.02em;
 }
 
-/* The punchline sits on its own line, slanted, lighter, in the accent. */
+/* The punchline sits on its own line, slanted, lighter, in GOLD. Navy is the
+   brand color, but navy next to blue-black ink does not read as an accent, so
+   the one sharp note in the palette (the gold of the "look here" verdicts)
+   carries the word that matters. It is type, not a status: nothing is flagged. */
 .hero-title em {
   display: block;
   margin-top: 0.12em;
   font-style: italic;
   font-weight: 420;
-  color: var(--accent);
+  color: var(--punch);
 }
 
 .hero-lede {
@@ -1235,7 +1242,7 @@ code,
 }
 
 /* The three examples are tabs: big serif labels sitting on a hairline, the
-   chosen one in full ink with a teal line under it. Real tabs for the keyboard
+   chosen one in full ink with a navy line under it. Real tabs for the keyboard
    too (app.js): arrow keys move between them. On a narrow screen the strip
    scrolls sideways inside its own box; the page itself never does. */
 .example-tabs {
@@ -1243,7 +1250,7 @@ code,
 }
 
 /* The hairline under the row is an inset shadow, not a border, so the chosen
-   tab's teal line can sit exactly on top of it without the row needing to
+   tab's navy line can sit exactly on top of it without the row needing to
    overflow (an overflowing row would grow a second, vertical scrollbar). */
 .tabs-list {
   display: flex;
